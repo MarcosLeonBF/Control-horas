@@ -5,7 +5,7 @@
 > - Diseño: [`specs/2026-06-23-hucha-presupuestos-design.md`](specs/2026-06-23-hucha-presupuestos-design.md)
 > - Plan de implementación 1: [`plans/2026-06-23-plan1-fundacion-datos-ledger.md`](plans/2026-06-23-plan1-fundacion-datos-ledger.md)
 
-**Última actualización:** 2026-06-23
+**Última actualización:** 2026-06-23 (Plan 1 completado)
 
 ---
 
@@ -58,15 +58,22 @@ Cada plan deja software funcionando y probado antes de pasar al siguiente.
 
 ## 5. Estado de avance
 
-### Plan 1 — Fundación de datos + Ledger
+### Plan 1 — Fundación de datos + Ledger — ✅ COMPLETADO
 | Task | Descripción | Estado |
 |---|---|---|
 | 1 | Usuarios/roles, proyectos, asignaciones (+ creación automática de perfil, permisos base) | ✅ Completada y revisada |
-| 2 | Tablas de la hucha (banco + movimientos), estados y creación automática de la hucha al crear proyecto | 🔄 En curso |
-| 3 | Motor del libro de movimientos (registrar consumo/ampliación/anulación con sus validaciones) | ⏳ Pendiente |
-| 4 | Reglas de seguridad/permisos a nivel base de datos | ⏳ Pendiente |
+| 2 | Tablas de la hucha (banco + movimientos), estados y creación automática de la hucha al crear proyecto | ✅ Completada y revisada |
+| 3 | Motor del libro de movimientos (registrar consumo/ampliación/anulación con sus validaciones) | ✅ Completada y revisada |
+| 4 | Reglas de seguridad/permisos a nivel base de datos (RLS) | ✅ Completada y revisada |
 
-**Método de calidad:** cada pieza se construye con prueba primero (falla → se implementa → pasa), se revisa de forma independiente, y se corrige antes de avanzar.
+**Review final de toda la rama: ✅ aprobado** — esquema coherente, seguridad de punta a punta (sin escalación de rol, sin escritura directa de saldos, aislamiento entre managers), cuentas del dinero correctas. Sin hallazgos graves; 6 observaciones menores registradas y diferidas.
+
+**Método de calidad:** cada pieza se construye con prueba primero (falla → se implementa → pasa), se revisa de forma independiente, y se corrige antes de avanzar. Migraciones aplicadas a producción vía Supabase; un hallazgo importante (anular una anulación) se detectó en review y se corrigió con su propio test.
+
+**Lo que ya existe en la base de datos:** las 5 tablas, la creación automática de la hucha al crear un proyecto, el alta automática de perfil al crear un usuario, y el motor que registra consumos/ampliaciones/anulaciones manteniendo el saldo y el historial — todo con permisos por rol. Falta solo la interfaz (Planes 2 y 3).
+
+### Próximo: Plan 2 — App HUCHA (Manager)
+Pantallas del manager: sus proyectos con saldo, registrar consumo, historial. ⏳ Por planificar.
 
 ---
 
