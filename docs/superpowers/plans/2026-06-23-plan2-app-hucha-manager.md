@@ -16,9 +16,9 @@
 - Escritura de consumo SOLO vía Server Action que llama `supabase.rpc('registrar_movimiento_hucha', …)`. Nunca insertar movimientos ni tocar saldos desde el cliente.
 - 3 roles: `operativo` / `manager` / `admin`. El área HUCHA es para `manager` y `admin`.
 - TypeScript estricto: prohibido `any`. Tipar las filas de Supabase.
-- **Dirección estética "Tesorería" (banca privada): formal, elegante, hermosa, cómoda.** Es el **design system de TODA la plataforma** (HUCHA y Horas v2), no solo HUCHA: los tokens y fuentes viven en `app/globals.css` y `app/layout.tsx` (raíz) y aplican app-wide.
+- **Dirección estética "Estudio" (editorial / suizo): formal, elegante, atemporal, cómoda.** Es el **design system de TODA la plataforma** (Control de Horas como producto principal + HUCHA), no solo HUCHA: los tokens y fuentes viven en `app/globals.css` y `app/layout.tsx` (raíz) y aplican app-wide.
   - Tipografía: títulos **Fraunces** (serif con carácter), cuerpo **Geist Sans**, cifras de dinero en **Geist Mono** (tabular). NO Inter/Roboto.
-  - Paleta (CSS variables): fondo marfil `--background: oklch(0.98 0.005 95)`; tarjetas blancas; tinta `--foreground: oklch(0.21 0.02 265)`; acento latón `--accent: oklch(0.72 0.09 75)`. Estados: disponible=esmeralda, bajo=ámbar, consumido=slate, excedido=rosa, sin_presupuesto=neutral.
+  - Paleta (CSS variables): fondo hueso `--background: oklch(0.965 0.006 95)`; tarjetas blancas; tinta `--foreground: oklch(0.20 0.012 285)`; acento cobalto `--accent: oklch(0.50 0.17 264)` (usado con moderación: links, nav activa, foco). Estados: disponible=esmeralda, bajo=ámbar, consumido=slate, excedido=rosa, sin_presupuesto=neutral.
   - Superficies: borde hairline 1px, sombra suave, radio `lg`, grid 8pt, espaciado generoso.
   - UX: badges color+texto (accesible AA), empty states, skeletons de carga, toasts de feedback, focus rings visibles, responsive (cards en móvil / tabla en ≥md), confirmación al exceder presupuesto, reveal escalonado sutil al cargar.
 - Alcance: **solo manager**. La gestión de usuarios/proyectos, ampliación, dashboard global y exports son del Plan 3. La descarga del manager (decisión revisable) también se difiere al Plan 3 para centralizar la lógica de export.
@@ -33,7 +33,7 @@
 ## File Structure
 
 - `lib/fonts.ts` — carga de fuentes con `next/font` (Fraunces, Geist Sans, Geist Mono).
-- `app/globals.css` — design tokens (CSS variables) del tema Tesorería (modificar el existente con cuidado de no romper legacy).
+- `app/globals.css` — design tokens (CSS variables) del tema Estudio (modificar el existente con cuidado de no romper legacy).
 - `lib/hucha/format.ts` — formateo de dinero EUR y helpers de estado.
 - `lib/hucha/types.ts` — tipos TS de las filas HUCHA (bank, movement, project).
 - `lib/hucha/queries.ts` — funciones server que leen proyectos/banco/movimientos del manager (RLS).
@@ -99,18 +99,18 @@ export const geistMono = GeistMono   // exposes .variable = '--font-geist-mono'
 
 Modify `app/layout.tsx` to add the font variables to `<html>` (keep existing structure; add `className={\`${fraunces.variable} ${geistSans.variable} ${geistMono.variable}\`}` to the `<html>` tag and import from `@/lib/fonts`).
 
-Append the Tesorería tokens to `app/globals.css` (do not remove existing rules):
+Append the Estudio tokens to `app/globals.css` (do not remove existing rules):
 ```css
 :root {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-display), Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  --background: oklch(0.98 0.005 95);
-  --foreground: oklch(0.21 0.02 265);
+  --background: oklch(0.965 0.006 95);
+  --foreground: oklch(0.20 0.012 285);
   --card: oklch(1 0 0);
-  --border: oklch(0.92 0.004 95);
-  --accent-brass: oklch(0.72 0.09 75);
+  --border: oklch(0.90 0.004 95);
+  --accent: oklch(0.50 0.17 264);
 
   /* estados HUCHA */
   --status-disponible: oklch(0.62 0.13 155);
@@ -303,7 +303,7 @@ Expected: 1 passed. (Playwright levanta el dev server, global-setup siembra el m
 - [ ] **Step 9: Commit**
 ```bash
 git add lib/fonts.ts lib/hucha/format.ts components.json components/ui app/globals.css app/layout.tsx playwright.config.ts e2e package.json package-lock.json "app/(hucha)"
-git commit -m "feat(hucha): design tokens Tesorería + shadcn + Playwright harness + seed"
+git commit -m "feat(hucha): design tokens Estudio + shadcn + Playwright harness + seed"
 ```
 
 ---
@@ -638,7 +638,7 @@ export default async function MisProyectosPage() {
             <Link
               key={p.id}
               href={`/presupuestos/${p.id}`}
-              className="group rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-(--accent-brass)/40"
+              className="group rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-(--accent)/40"
             >
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
@@ -987,17 +987,17 @@ export default function ConsumoForm({ projectId, remaining }: { projectId: strin
         <div>
           <label htmlFor="amount" className="mb-1 block text-sm font-medium">Importe (€)</label>
           <input id="amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--accent-brass)" placeholder="0,00" />
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--accent)" placeholder="0,00" />
         </div>
         <div>
           <label htmlFor="description" className="mb-1 block text-sm font-medium">Descripción</label>
           <input id="description" value={description} onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--accent-brass)" placeholder="Motivo del consumo" />
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--accent)" placeholder="Motivo del consumo" />
         </div>
         <div>
           <label htmlFor="entry_date" className="mb-1 block text-sm font-medium">Fecha</label>
           <input id="entry_date" type="date" max={todayISO()} value={entryDate} onChange={(e) => setEntryDate(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--accent-brass)" />
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--accent)" />
         </div>
         {willExceed && <p className="text-xs text-amber-700">Atención: excede el presupuesto disponible.</p>}
         {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
@@ -1061,7 +1061,7 @@ git commit -m "feat(hucha): registrar consumo (Server Action + RPC) con validaci
 - §11 estados (badge) → Task 3/StatusBadge. ✅
 - §15 flujo manager (login → proyectos → detalle → registrar → historial) → Tasks 2-5. ✅
 - Aislamiento por RLS (no ve lo no asignado) → Task 3 test. ✅
-- Estética Tesorería + UX cómoda → Task 1 (tokens/fonts) aplicada en todas las pantallas. ✅
+- Estética Estudio (editorial/suizo) + UX cómoda → Task 1 (tokens/fonts) aplicada en todas las pantallas. ✅
 
 **Fuera de alcance (Plan 3):** gestión de usuarios/proyectos, ampliación, corrección/anulación desde UI, dashboard global con filtros, descargas Excel/CSV (incluida la del manager). Correcto.
 
