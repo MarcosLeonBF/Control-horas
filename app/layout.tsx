@@ -14,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${fraunces.variable} ${geistSans.variable} ${geistMono.variable}`}>
-      <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
+      <body className="min-h-screen antialiased">
         {children}
       </body>
     </html>
