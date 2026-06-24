@@ -43,7 +43,7 @@ export async function updateSession(request: NextRequest) {
   if (user && isAuthPage) {
     // Ya tiene sesión y va al login → redirigir a la app
     const url = request.nextUrl.clone()
-    url.pathname = '/registrar'
+    url.pathname = '/'
     return NextResponse.redirect(url)
   }
 
