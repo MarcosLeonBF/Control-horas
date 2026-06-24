@@ -48,25 +48,25 @@
 }
 
 :root {
-    /* Estudio tokens — override shadcn defaults */
-    --background: oklch(0.965 0.006 95);
-    --foreground: oklch(0.20 0.012 285);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.50 0.17 264);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.90 0.004 95);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    /* Estudio · Bastida & Farina — override shadcn defaults (hex de marca) */
+    --background: #FAF7F5;            /* papel cálido */
+    --foreground: #1D1D1B;           /* tinta */
+    --card: #FFFFFF;
+    --card-foreground: #1D1D1B;
+    --popover: #FFFFFF;
+    --popover-foreground: #1D1D1B;
+    --primary: #BD0842;              /* carmín (acción de marca) */
+    --primary-foreground: #FFFFFF;
+    --secondary: #F4EFEC;
+    --secondary-foreground: #1D1D1B;
+    --muted: #F4EFEC;
+    --muted-foreground: #7A716B;
+    --accent: #F4EFEC;               /* hover neutro de shadcn (no es el acento de marca) */
+    --accent-foreground: #1D1D1B;
+    --destructive: #A0073A;
+    --border: #ECE4DF;
+    --input: #ECE4DF;
+    --ring: #BD0842;                 /* foco carmín */
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -87,12 +87,18 @@
     --font-display: var(--font-display), Georgia, serif;
     --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
+    /* Marca Bastida & Farina */
+    --brand: #BD0842;          /* carmín (insignia) */
+    --brand-strong: #A0073A;   /* carmín oscuro (hover) */
+    --wine: #54123D;           /* vino/berenjena */
+    --muted-surface: #F4EFEC;  /* relleno sutil (cabeceras de tabla) */
+
     /* estados HUCHA */
-    --status-disponible: oklch(0.62 0.13 155);
-    --status-bajo: oklch(0.74 0.14 75);
-    --status-consumido: oklch(0.55 0.02 265);
-    --status-excedido: oklch(0.58 0.18 18);
-    --status-sin: oklch(0.7 0.01 265);
+    --status-disponible: #157F5B;
+    --status-bajo: #B5760A;
+    --status-consumido: #6B6560;
+    --status-excedido: #A0073A;
+    --status-sin: #9A938D;
 }
 
 .font-display { font-family: var(--font-display); }

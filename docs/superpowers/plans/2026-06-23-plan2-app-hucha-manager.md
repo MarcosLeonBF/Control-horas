@@ -18,7 +18,7 @@
 - TypeScript estricto: prohibido `any`. Tipar las filas de Supabase.
 - **Dirección estética "Estudio" (editorial / suizo): formal, elegante, atemporal, cómoda.** Es el **design system de TODA la plataforma** (Control de Horas como producto principal + HUCHA), no solo HUCHA: los tokens y fuentes viven en `app/globals.css` y `app/layout.tsx` (raíz) y aplican app-wide.
   - Tipografía: títulos **Fraunces** (serif con carácter), cuerpo **Geist Sans**, cifras de dinero en **Geist Mono** (tabular). NO Inter/Roboto.
-  - Paleta (CSS variables): fondo hueso `--background: oklch(0.965 0.006 95)`; tarjetas blancas; tinta `--foreground: oklch(0.20 0.012 285)`; acento cobalto `--accent: oklch(0.50 0.17 264)` (usado con moderación: links, nav activa, foco). Estados: disponible=esmeralda, bajo=ámbar, consumido=slate, excedido=rosa, sin_presupuesto=neutral.
+  - Paleta de **marca Bastida & Farina** (CSS variables, hex exacto): fondo papel cálido `--background: #FAF7F5`; tarjeta `--card: #FFFFFF`; tinta `--foreground: #1D1D1B`; texto secundario `--muted-foreground: #7A716B`; borde `--border: #ECE4DF`. Marca: **carmín** `--brand: #BD0842` (acción/links/nav activa/foco), `--brand-strong: #A0073A` (hover), **vino** `--wine: #54123D` (wordmark/títulos/superficies profundas). Estados: disponible `#157F5B`, bajo `#B5760A`, consumido `#6B6560`, excedido `#A0073A` (carmín = sobre presupuesto), sin_presupuesto `#9A938D`. **Botón primario = carmín sólido.** Además mapear shadcn `--primary`/`--ring` a carmín.
   - Superficies: borde hairline 1px, sombra suave, radio `lg`, grid 8pt, espaciado generoso.
   - UX: badges color+texto (accesible AA), empty states, skeletons de carga, toasts de feedback, focus rings visibles, responsive (cards en móvil / tabla en ≥md), confirmación al exceder presupuesto, reveal escalonado sutil al cargar.
 - Alcance: **solo manager**. La gestión de usuarios/proyectos, ampliación, dashboard global y exports son del Plan 3. La descarga del manager (decisión revisable) también se difiere al Plan 3 para centralizar la lógica de export.
@@ -106,19 +106,30 @@ Append the Estudio tokens to `app/globals.css` (do not remove existing rules):
   --font-display: var(--font-display), Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  --background: oklch(0.965 0.006 95);
-  --foreground: oklch(0.20 0.012 285);
-  --card: oklch(1 0 0);
-  --border: oklch(0.90 0.004 95);
-  --accent: oklch(0.50 0.17 264);
+  /* Estudio · Bastida & Farina (hex de marca) */
+  --background: #FAF7F5;        /* papel cálido */
+  --foreground: #1D1D1B;        /* tinta */
+  --card: #FFFFFF;
+  --muted-surface: #F4EFEC;     /* relleno sutil (cabeceras de tabla) */
+  --border: #ECE4DF;            /* hairline */
+  --muted-foreground: #7A716B;  /* texto secundario */
+
+  --brand: #BD0842;             /* carmín (insignia) */
+  --brand-strong: #A0073A;      /* carmín oscuro (hover) */
+  --wine: #54123D;              /* vino/berenjena */
 
   /* estados HUCHA */
-  --status-disponible: oklch(0.62 0.13 155);
-  --status-bajo: oklch(0.74 0.14 75);
-  --status-consumido: oklch(0.55 0.02 265);
-  --status-excedido: oklch(0.58 0.18 18);
-  --status-sin: oklch(0.7 0.01 265);
+  --status-disponible: #157F5B;
+  --status-bajo: #B5760A;
+  --status-consumido: #6B6560;
+  --status-excedido: #A0073A;
+  --status-sin: #9A938D;
 }
+
+/* Mapear los primitivos de shadcn a la marca (en el bloque @theme/:root que genera shadcn,
+   fijar): --primary: #BD0842; --primary-foreground: #FFFFFF; --ring: #BD0842; --background: #FAF7F5;
+   --foreground: #1D1D1B; --card: #FFFFFF; --border: #ECE4DF; --muted-foreground: #7A716B;
+   Resolver duplicados de :root fusionando; los valores de marca ganan. */
 
 .font-display { font-family: var(--font-display); }
 .tabular-money { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
@@ -638,7 +649,7 @@ export default async function MisProyectosPage() {
             <Link
               key={p.id}
               href={`/presupuestos/${p.id}`}
-              className="group rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-(--accent)/40"
+              className="group rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-(--brand)/40"
             >
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
@@ -731,7 +742,7 @@ export default function MovementsTable({ movements }: { movements: HuchaMovement
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <table className="w-full text-sm">
-        <thead className="bg-foreground/[0.03] text-left text-xs text-foreground/55">
+        <thead className="bg-(--muted-surface) text-left text-xs text-foreground/55">
           <tr>
             <th className="px-4 py-3 font-medium">Fecha</th>
             <th className="px-4 py-3 font-medium">Tipo</th>
@@ -970,7 +981,7 @@ export default function ConsumoForm({ projectId, remaining }: { projectId: strin
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+        className="rounded-lg bg-(--brand) px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
       >
         Registrar consumo
       </button>
@@ -987,23 +998,23 @@ export default function ConsumoForm({ projectId, remaining }: { projectId: strin
         <div>
           <label htmlFor="amount" className="mb-1 block text-sm font-medium">Importe (€)</label>
           <input id="amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--accent)" placeholder="0,00" />
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--brand)" placeholder="0,00" />
         </div>
         <div>
           <label htmlFor="description" className="mb-1 block text-sm font-medium">Descripción</label>
           <input id="description" value={description} onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--accent)" placeholder="Motivo del consumo" />
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--brand)" placeholder="Motivo del consumo" />
         </div>
         <div>
           <label htmlFor="entry_date" className="mb-1 block text-sm font-medium">Fecha</label>
           <input id="entry_date" type="date" max={todayISO()} value={entryDate} onChange={(e) => setEntryDate(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--accent)" />
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--brand)" />
         </div>
         {willExceed && <p className="text-xs text-amber-700">Atención: excede el presupuesto disponible.</p>}
         {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
         <div className="flex gap-2 pt-1">
           <button type="submit" disabled={pending}
-            className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50">
+            className="rounded-lg bg-(--brand) px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
             {pending ? 'Guardando…' : 'Guardar'}
           </button>
           <button type="button" onClick={() => { reset(); setOpen(false) }}

@@ -31,7 +31,7 @@ Dos aplicaciones internas relacionadas para Bastida & Fariña, que comparten una
 | D7 | **Banco + "ledger" (libro de movimientos)** como patrón central | Guardar cada movimiento (no solo el saldo) da auditoría completa y permite corregir sin borrar | Firme |
 | D8 | **El manager puede descargar los datos de sus proyectos** | Es el mismo dato que ya ve; sin coste técnico | **Revisable en reunión** (el PDF da la descarga solo al admin) |
 | D9 | **"Usuario autorizado" que amplía = admin** por ahora | Con 3 roles, ese permiso recae en admin | Revisable (futuro 4º rol) |
-| D10 | **Design system de plataforma: shadcn/ui + estética "Estudio"** (editorial/suizo: formal, elegante, atemporal, cómoda) | Consistencia visual profesional en **toda la plataforma**, anclada al producto principal (Control de Horas); HUCHA la hereda. Tokens globales en `app/globals.css`/`app/layout.tsx`. Se descartó "Tesorería" por sesgo a dinero | Firme |
+| D10 | **Design system de plataforma: shadcn/ui + estética "Estudio"** (editorial/suizo: formal, elegante, atemporal, cómoda) con **paleta de colores de marca Bastida & Farina** (carmín #BD0842, vino #54123D, tinta #1D1D1B + neutros cálidos) | Consistencia visual profesional en **toda la plataforma**, anclada al producto principal (Control de Horas); HUCHA la hereda. Tokens globales en `app/globals.css`. Se descartó "Tesorería" por sesgo a dinero | Firme |
 | D11 | **Trabajar directo sobre producción** (Supabase y git) | El proyecto aún no está en uso → es seguro y ágil | Firme (mientras no haya usuarios reales) |
 
 ---
