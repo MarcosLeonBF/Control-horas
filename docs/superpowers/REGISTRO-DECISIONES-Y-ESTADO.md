@@ -31,7 +31,7 @@ Dos aplicaciones internas relacionadas para Bastida & Fariña, que comparten una
 | D7 | **Banco + "ledger" (libro de movimientos)** como patrón central | Guardar cada movimiento (no solo el saldo) da auditoría completa y permite corregir sin borrar | Firme |
 | D8 | **El manager puede descargar los datos de sus proyectos** | Es el mismo dato que ya ve; sin coste técnico | **Revisable en reunión** (el PDF da la descarga solo al admin) |
 | D9 | **"Usuario autorizado" que amplía = admin** por ahora | Con 3 roles, ese permiso recae en admin | Revisable (futuro 4º rol) |
-| D10 | **UI con shadcn/ui, diseño limpio y corporativo** | Consistencia visual profesional entre ambas apps | Firme |
+| D10 | **Design system de plataforma: shadcn/ui + estética "Tesorería"** (banca privada: formal, elegante, hermosa, cómoda) | Consistencia visual profesional en **toda la plataforma** (HUCHA y Horas v2), no solo HUCHA. Tokens globales en `app/globals.css`/`app/layout.tsx` | Firme |
 | D11 | **Trabajar directo sobre producción** (Supabase y git) | El proyecto aún no está en uso → es seguro y ágil | Firme (mientras no haya usuarios reales) |
 
 ---
