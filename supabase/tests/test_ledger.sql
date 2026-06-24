@@ -15,6 +15,10 @@ declare
   v_bank  uuid;
   v_consumo public.hucha_movements;
   v_amp   public.hucha_movements;
+  v_anulacion        public.hucha_movements;
+  v_remaining_antes  numeric(14,2);
+  v_consumed_antes   numeric(14,2);
+  v_anulacion_id     uuid;
 begin
   -- usuarios: insertar en auth.users (trigger crea profiles con role='operativo')
   -- luego actualizar role y full_name según necesite el test
@@ -116,6 +120,45 @@ begin
   if (select status from public.hucha_banks where id=v_bank) <> 'excedido'
      then raise exception 'FALLO: sobreconsumo no marcó excedido'; end if;
   raise notice 'OK: sobreconsumo marca excedido';
+
+  -- ── (a) ADMIN anula el consumo de 100 → remaining sube, consumed_total baja ──
+  -- Estado previo: assigned=500, consumed=1100 (100+1000), remaining=-600
+  -- Tras anular consumo de 100: assigned=500, consumed=1000, remaining=-500
+  perform set_config('role','postgres', true);
+  select remaining, consumed_total
+    into v_remaining_antes, v_consumed_antes
+    from public.hucha_banks where id=v_bank;
+
+  perform set_config('request.jwt.claims',
+    json_build_object('sub',v_admin,'email','admin@x.com','role','authenticated')::text, true);
+  perform set_config('role','authenticated', true);
+  v_anulacion := public.registrar_movimiento_hucha(
+    v_pid,'anulacion',100,null,null,'revertir consumo',current_date, v_consumo.id);
+
+  perform set_config('role','postgres', true);
+  if (select remaining from public.hucha_banks where id=v_bank) <> v_remaining_antes + 100
+     then raise exception 'FALLO: anulacion no aumentó remaining en 100 (antes=%, ahora=%)',
+       v_remaining_antes, (select remaining from public.hucha_banks where id=v_bank); end if;
+  if (select consumed_total from public.hucha_banks where id=v_bank) <> v_consumed_antes - 100
+     then raise exception 'FALLO: anulacion no redujo consumed_total en 100 (antes=%, ahora=%)',
+       v_consumed_antes, (select consumed_total from public.hucha_banks where id=v_bank); end if;
+  raise notice 'OK: anulacion de consumo revierte correctamente';
+
+  -- ── (b) ADMIN intenta anular una anulacion → debe ser RECHAZADO ──
+  v_anulacion_id := v_anulacion.id;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub',v_admin,'email','admin@x.com','role','authenticated')::text, true);
+  perform set_config('role','authenticated', true);
+  begin
+    perform public.registrar_movimiento_hucha(
+      v_pid,'anulacion',100,null,null,'doble anulacion',current_date, v_anulacion_id);
+    perform set_config('role','postgres', true);
+    raise exception 'FALLO: se permitió anular una anulacion';
+  exception when sqlstate 'P0001' then
+    if sqlerrm like 'FALLO:%' then raise; end if;
+    perform set_config('role','postgres', true);
+    raise notice 'OK: anulacion de anulacion rechazada';
+  end;
 
   raise notice 'TODOS OK';
 end $$;
