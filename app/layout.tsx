@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { fraunces, geistSans, geistMono } from '@/lib/fonts'
 
 export const metadata: Metadata = {
   title: 'Control de Horas — Bastida & Fariña',
@@ -12,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${fraunces.variable} ${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
         {children}
       </body>
