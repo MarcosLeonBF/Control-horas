@@ -12,7 +12,7 @@
 
 - Nombre del feature: **HUCHA** (con H) en todo (tablas, columnas, UI). El PDF dice "UCHA"; ignorar.
 - 3 roles en `profiles.role`: `operativo`, `manager`, `admin` (exactos).
-- Dinero: `numeric(14,2)`, una moneda por banco, default `USD`.
+- Dinero: `numeric(14,2)`, una moneda por banco, default `EUR` (euros).
 - Umbral de estado "bajo": **`remaining < 0.20 * assigned_total`** (constante global).
 - El ledger es **append-only**: nunca `UPDATE`/`DELETE` sobre `hucha_movements`. Corregir = movimiento reverso.
 - No incluir nada de Horas (etapas, departamento, multilínea, banco por rol). Fuera de alcance.
@@ -246,7 +246,7 @@ begin
   insert into public.projects (name) values ('Proyecto Test') returning id into v_pid;
   if not exists (select 1 from public.hucha_banks
       where project_id=v_pid and assigned_total=0 and consumed_total=0
-        and remaining=0 and status='sin_presupuesto' and currency='USD')
+        and remaining=0 and status='sin_presupuesto' and currency='EUR')
   then raise exception 'FALLO: no se creó el banco en 0 al crear el proyecto'; end if;
   raise notice 'OK: trigger crea banco en 0';
 end $$;
@@ -270,7 +270,7 @@ Create `supabase/migrations/0002_hucha_tables.sql`:
 create table if not exists public.hucha_banks (
   id             uuid primary key default gen_random_uuid(),
   project_id     uuid not null unique references public.projects(id) on delete cascade,
-  currency       text not null default 'USD',
+  currency       text not null default 'EUR',
   assigned_total numeric(14,2) not null default 0,
   consumed_total numeric(14,2) not null default 0,
   remaining      numeric(14,2) not null default 0,

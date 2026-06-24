@@ -139,7 +139,7 @@ HUCHA usa `hucha_banks` + `hucha_movements`. Horas v2 clonará el patrón con `h
 |---|---|---|
 | id | uuid PK | |
 | project_id | uuid FK | `UNIQUE` (un banco por proyecto) |
-| currency | text | default `USD` |
+| currency | text | default `EUR` (euros) |
 | assigned_total | numeric(14,2) | Σ ampliaciones/carga inicial *(cache)* |
 | consumed_total | numeric(14,2) | Σ consumos *(cache)* |
 | remaining | numeric(14,2) | `assigned_total − consumed_total` *(cache)* |
@@ -267,7 +267,7 @@ Monto añadido > 0 · motivo obligatorio · solo admin.
 2. **Concurrencia:** la función bloquea la fila del banco (`FOR UPDATE`) → saldo siempre consistente.
 3. **Corrección/anulación:** movimiento reverso con su propio before/after; no reescribe el pasado.
 4. **Estados (precedencia):** `excedido` (rem<0) → `consumido` (rem=0) → `bajo` (0<rem<umbral) → `disponible` (rem≥umbral) → `sin_presupuesto` (nunca asignado ni consumido).
-5. **Dinero:** `numeric(14,2)`, una moneda por banco (`USD` default).
+5. **Dinero:** `numeric(14,2)`, una moneda por banco (`EUR` default — euros).
 6. **Usuario inactivo:** no puede registrar.
 7. **Proyecto:** se archiva (no se borra); archivado no acepta nuevos consumos, conserva historial.
 
