@@ -8,7 +8,7 @@ export default defineConfig({
   globalTeardown: './e2e/global-teardown.ts',
   use: { baseURL: 'http://localhost:3000', trace: 'on-first-retry' },
   projects: [
-    { name: 'chromium', use: { storageState: 'e2e/.auth/manager.json' } },
+    { name: 'chromium', use: { storageState: 'e2e/.auth/manager.json' }, testIgnore: '**/horas-*.spec.ts' },
     {
       name: 'chromium-horas',
       use: { storageState: 'e2e/.auth/operativo.json' },
