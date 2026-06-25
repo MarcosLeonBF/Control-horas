@@ -41,6 +41,7 @@ begin
 
   -- Resolver el área interna una vez (reutilizada en el loop).
   select id into v_internal_area_id from public.areas where is_internal = true;
+  if v_internal_area_id is null then raise exception 'configuración inválida: no existe un área interna (is_internal)'; end if;
 
   -- Crear o localizar el registro padre (solo propio salvo admin).
   if p_log_id is null then

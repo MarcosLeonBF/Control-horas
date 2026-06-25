@@ -18,6 +18,10 @@ begin
   select id into v_seo  from public.areas where name='SEO';
   select id into v_intern from public.areas where is_internal = true;
   select id into v_etapa from public.etapas where name='Setup';
+  -- Precondiciones: el test de "área no asignada" sería vacío si faltara SEO.
+  if v_area is null or v_seo is null or v_intern is null or v_etapa is null then
+    raise exception 'precondición del test: faltan áreas/etapa semilla (CRM/SEO/interna/Setup)';
+  end if;
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_op::text, 'role','authenticated')::text, true);
 
