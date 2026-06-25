@@ -10,9 +10,10 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const { data: { user } } = await supabase.auth.getUser()
   const { areas, etapas } = await getCatalogos()
   const myAreas = await getMyAreas(user!.id)
-  const internal = areas.find((a) => a.is_internal)!
-  // Para el selector: las áreas del usuario + la interna (para proyecto "Departamento")
-  const selectableAreas = [...myAreas, internal]
+  const internal = areas.find((a) => a.is_internal)
+  if (!internal) throw new Error('No hay un área interna configurada (is_internal) para el proyecto "Departamento".')
+  // Para el selector: las áreas del usuario + la interna (sin duplicar si el usuario ya la tuviera)
+  const selectableAreas = [...myAreas.filter((a) => a.id !== internal.id), internal]
 
   let projects: string[] = []
   try { projects = (await getCachedBancoHoras()).map((b) => b.project) } catch { /* Excel caído: solo Departamento */ }
