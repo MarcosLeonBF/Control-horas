@@ -22,7 +22,7 @@ export default async function globalSetup() {
   await managerPage.context().storageState({ path: 'e2e/.auth/manager.json' })
   await managerPage.close()
 
-  // ── HORAS: seed operativo ────────────────────────────────────────────────
+  // ── HORAS: seed operativo + admin ────────────────────────────────────────
   const horasFixture = await seedHorasFixture()
 
   // Login operativo → /registrar
@@ -34,6 +34,16 @@ export default async function globalSetup() {
   await operativoPage.waitForURL('**/registrar')
   await operativoPage.context().storageState({ path: 'e2e/.auth/operativo.json' })
   await operativoPage.close()
+
+  // Login admin (lands on /presupuestos per role redirect for now — just wait for networkidle)
+  const adminPage = await browser.newPage({ baseURL: 'http://localhost:3000' })
+  await adminPage.goto('/login')
+  await adminPage.getByLabel('Email').fill(horasFixture.adminEmail)
+  await adminPage.getByLabel('Contraseña').fill(horasFixture.adminPassword)
+  await adminPage.getByRole('button', { name: /ingresar/i }).click()
+  await adminPage.waitForLoadState('networkidle')
+  await adminPage.context().storageState({ path: 'e2e/.auth/admin-horas.json' })
+  await adminPage.close()
 
   await browser.close()
 }
