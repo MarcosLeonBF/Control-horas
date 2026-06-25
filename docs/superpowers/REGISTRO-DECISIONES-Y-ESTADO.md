@@ -5,7 +5,7 @@
 > - Diseño: [`specs/2026-06-23-hucha-presupuestos-design.md`](specs/2026-06-23-hucha-presupuestos-design.md)
 > - Plan de implementación 1: [`plans/2026-06-23-plan1-fundacion-datos-ledger.md`](plans/2026-06-23-plan1-fundacion-datos-ledger.md)
 
-**Última actualización:** 2026-06-23 (Plan 1 completado)
+**Última actualización:** 2026-06-25 (Plan 2 completado + definición del origen de datos vía Excel)
 
 ---
 
@@ -86,11 +86,44 @@ Cada plan deja software funcionando y probado antes de pasar al siguiente.
 **Pruebas:** suite E2E de camino feliz (acceso, mis proyectos, detalle, registrar consumo) — 8/8 en verde. El dev server lo gestiona el usuario; las pruebas asumen el servidor ya levantado.
 
 ### Próximo: Plan 3 — App HUCHA (Admin + Dashboard + Descargas)
-Gestión de usuarios/proyectos, ampliar/corregir presupuesto, dashboard global y exports. ⏳ Por planificar.
+Sincronización de proyectos/presupuestos desde el Excel, dashboard global, ampliaciones y exports. ⏳ Por planificar (depende de tener el Excel definido — ver sección 6).
 
 ---
 
-## 6. Temas a confirmar en la reunión
-1. **Descargas del manager** (D8) — ¿se mantiene o se restringe a solo admin?
-2. **¿Hace falta un 4º rol** (alguien que amplíe presupuesto sin ser admin completo)? (D9)
-3. Validar la frontera de alcance HUCHA vs Horas y el orden de fases.
+## 6. De dónde salen los proyectos y presupuestos (definición 2026-06-25)
+
+**Decisión clave:** HUCHA **no inventa proyectos ni presupuestos**. Replica exactamente la arquitectura del **banco de horas** que ya funciona en la app de Horas.
+
+**Cómo funciona el banco de horas hoy (referencia):** la app lee en vivo una tabla de un Excel en SharePoint (vía Microsoft Graph). El Excel manda; la app solo lo muestra y **nunca lo escribe**. Lo único que guarda en su base de datos son los **consumos**. El restante y lo "excedido" se calculan. La descarga se arma desde la base de datos.
+
+**HUCHA hace lo mismo, pero con dinero:**
+
+| | Banco de Horas | Presupuesto HUCHA |
+|---|---|---|
+| Lista de proyectos | Excel (lectura en vivo) | Excel (lectura, **sincronizable**) |
+| Presupuesto/total asignado | Excel | Excel |
+| Qué proyectos aplican | Todos | **Solo los marcados** en el Excel (no todos tienen HUCHA) |
+| Consumos | Base de datos | Base de datos |
+| Restante / excedido | Se calculan | Se calculan |
+| ¿Se escribe al Excel? | **Nunca** | **Nunca** |
+| Historial / reporte | Desde la base de datos | Desde la base de datos |
+
+**Reglas firmes acordadas:**
+1. El **Excel es la única fuente** de proyectos y presupuesto asignado, y es de **solo lectura**. HUCHA jamás escribe ahí. Se podrá **resincronizar** con un botón (como "Actualizar banco").
+2. **No todos los proyectos tienen HUCHA.** El Excel indicará con alguna columna/cualidad cuáles sí.
+3. Los **consumos** los registran los managers dentro de HUCHA (van a la base de datos), nunca al Excel.
+4. **Ampliaciones / "valor agregado":** como no se escribe al Excel, el presupuesto extra se maneja en HUCHA y aparece en el **reporte descargado**, sumado al total y marcado como agregado. Se hace de **dos formas combinadas**: (a) el **admin registra ampliaciones** con su motivo/referencia, y (b) lo que un proyecto quede **excedido sin ampliación** se reporta **automáticamente** como valor agregado. Mismo criterio que el banco de horas.
+
+**Pendiente para construir el sincronizador (necesitamos el Excel, aún no existe):**
+- ¿Tabla/hoja nueva en el **mismo archivo** del banco de horas, o **archivo aparte**? Nombre de la tabla.
+- **Columnas**: proyecto, presupuesto asignado, la columna que marca "tiene HUCHA", ¿cliente?, ¿manager asignado?
+- **Clave de cruce**: ¿nombre de proyecto (como Horas) o un código?
+- La **asignación manager↔proyecto**, ¿viene del Excel o se gestiona en HUCHA?
+
+---
+
+## 7. Temas a confirmar en la reunión
+1. **Estructura del Excel de presupuestos** (las 4 preguntas pendientes de la sección 6) — es lo que destraba el Plan 3.
+2. **Descargas del manager** (D8) — ¿se mantiene o se restringe a solo admin?
+3. **¿Hace falta un 4º rol** (alguien que amplíe presupuesto sin ser admin completo)? (D9)
+4. Validar la frontera de alcance HUCHA vs Horas y el orden de fases.
