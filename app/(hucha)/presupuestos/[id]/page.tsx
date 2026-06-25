@@ -4,6 +4,7 @@ import { getProjectWithBank, getMovements } from '@/lib/hucha/queries'
 import { formatEUR } from '@/lib/hucha/format'
 import StatusBadge from '@/components/hucha/StatusBadge'
 import MovementsTable from '@/components/hucha/MovementsTable'
+import ConsumoForm from './ConsumoForm'
 
 export default async function DetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -22,6 +23,8 @@ export default async function DetallePage({ params }: { params: Promise<{ id: st
         </div>
         <StatusBadge status={project.bank.status} />
       </header>
+
+      <div className="mb-10"><ConsumoForm projectId={project.id} remaining={project.bank.remaining} /></div>
 
       <div className="mb-10 grid gap-4 sm:grid-cols-3">
         {[

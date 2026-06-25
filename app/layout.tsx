@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { fraunces, geistSans, geistMono } from '@/lib/fonts'
+import { Toaster } from '@/components/ui/sonner'
 
 export const metadata: Metadata = {
   title: 'Control de Horas — Bastida & Fariña',
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="es" className={`${fraunces.variable} ${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-screen antialiased">
         {children}
+        <Toaster richColors position="top-center" />
       </body>
     </html>
   )
