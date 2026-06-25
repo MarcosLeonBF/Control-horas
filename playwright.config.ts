@@ -7,7 +7,14 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
   globalTeardown: './e2e/global-teardown.ts',
   use: { baseURL: 'http://localhost:3000', trace: 'on-first-retry' },
-  projects: [{ name: 'chromium', use: { storageState: 'e2e/.auth/manager.json' } }],
+  projects: [
+    { name: 'chromium', use: { storageState: 'e2e/.auth/manager.json' } },
+    {
+      name: 'chromium-horas',
+      use: { storageState: 'e2e/.auth/operativo.json' },
+      testMatch: '**/horas-*.spec.ts',
+    },
+  ],
   // Sin bloque `webServer`: el dev server lo gestiona el usuario.
   // Antes de correr E2E debe estar levantado en http://localhost:3000.
 })
