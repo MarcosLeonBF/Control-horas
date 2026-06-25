@@ -5,7 +5,7 @@
 > - Diseño: [`specs/2026-06-23-hucha-presupuestos-design.md`](specs/2026-06-23-hucha-presupuestos-design.md)
 > - Plan de implementación 1: [`plans/2026-06-23-plan1-fundacion-datos-ledger.md`](plans/2026-06-23-plan1-fundacion-datos-ledger.md)
 
-**Última actualización:** 2026-06-25 (Plan 2 completado + definición del origen de datos vía Excel)
+**Última actualización:** 2026-06-25 (HUCHA Plan 2 + Horas v2 Fase 1 completados; definición del origen de datos vía Excel)
 
 ---
 
@@ -85,8 +85,26 @@ Cada plan deja software funcionando y probado antes de pasar al siguiente.
 
 **Pruebas:** suite E2E de camino feliz (acceso, mis proyectos, detalle, registrar consumo) — 8/8 en verde. El dev server lo gestiona el usuario; las pruebas asumen el servidor ya levantado.
 
-### Próximo: Plan 3 — App HUCHA (Admin + Dashboard + Descargas)
-Sincronización de proyectos/presupuestos desde el Excel, dashboard global, ampliaciones y exports. ⏳ Por planificar (depende de tener el Excel definido — ver sección 6).
+### Horas v2 — Fase 1 (Registro diario + usuarios) — ✅ COMPLETADA
+Reconstrucción de la app de Control de Horas (estaba pausado HUCHA a la espera del Excel). Enfoque *strangler fig*: se **retiró la app de Horas legacy** y la v2 ocupa las rutas raíz, reutilizando la fundación compartida (perfiles, roles, patrón ledger).
+
+| Pieza | Estado |
+|---|---|
+| Catálogos (áreas, etapas) + relación usuario↔áreas | ✅ migración + RLS + test |
+| Registro diario padre/líneas (`time_logs` + `time_log_lines`) | ✅ migración + RLS (escritura solo por RPC) + test |
+| Motor transaccional para guardar/anular registros (validaciones, ventana 7 días, sin duplicados, **área debe ser del usuario**) | ✅ RPC + tests de autorización |
+| Pantalla de **registro diario multilínea** (añadir/quitar líneas, total del día, Departamento condicional) + edición | ✅ + E2E |
+| **Mis registros** (ver, editar y anular los propios) | ✅ + E2E |
+| **Alta de usuarios** por admin (rol + áreas) | ✅ + E2E |
+| **Vista de equipo** (manager/admin, solo lectura) | ✅ + E2E |
+
+**Roles (definidos por el usuario):** *operativo* (solo registra/corrige sus horas), *manager* (ve las horas registradas, no amplía ni crea), *administrador* (poder absoluto).
+
+**Calidad:** cada pieza con prueba (SQL para la base, E2E Playwright para la app), revisión independiente por tarea y review final de toda la rama. Se cerró un hallazgo importante: la validación de que el área de cada línea pertenece al usuario ahora vive en el motor (no solo en la pantalla), dejando la base lista para los bancos de la Fase 2. El dashboard/descargas, las alertas y los bancos de horas por área quedan para fases siguientes.
+
+### Próximo (dos frentes)
+- **HUCHA · Plan 3** (Admin + Dashboard + Descargas): sincronización desde el Excel, dashboard global, ampliaciones y exports. ⏳ Depende de tener el Excel definido (ver sección 6).
+- **Horas v2 · Fase 2** (Bancos de horas): bancos por cliente/área alimentados desde el/los Excel de banco de horas, descuento por línea, movimientos, ampliaciones. ⏳ Por planificar.
 
 ---
 
