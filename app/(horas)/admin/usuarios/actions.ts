@@ -11,7 +11,8 @@ export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | 
   // Verificar que el actor es admin
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: me } = await supabase.from('profiles').select('role').eq('id', user!.id).single()
+  if (!user) return { ok: false, error: 'No autenticado.' }
+  const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (me?.role !== 'admin') return { ok: false, error: 'Solo un administrador puede crear usuarios.' }
 
   if (!input.full_name.trim() || !input.email.trim() || input.password.length < 8) {
@@ -26,13 +27,15 @@ export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | 
   if (error) return { ok: false, error: error.message }
   const id = created.user!.id
 
-  await admin.from('profiles').update({
+  const { error: profileError } = await admin.from('profiles').update({
     full_name: input.full_name.trim(), email: input.email.trim(), position: input.position.trim(),
-    role: input.role, status: 'activo', created_by: user!.id,
+    role: input.role, status: 'activo', created_by: user.id,
   }).eq('id', id)
+  if (profileError) return { ok: false, error: `Usuario creado pero falló su perfil: ${profileError.message}` }
 
   if (input.areaIds.length) {
-    await admin.from('user_areas').insert(input.areaIds.map((area_id) => ({ user_id: id, area_id })))
+    const { error: areasError } = await admin.from('user_areas').insert(input.areaIds.map((area_id) => ({ user_id: id, area_id })))
+    if (areasError) return { ok: false, error: `Usuario creado pero fallaron sus áreas: ${areasError.message}` }
   }
   return { ok: true }
 }

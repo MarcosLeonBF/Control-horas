@@ -18,7 +18,7 @@ export default function UsuarioForm({ areas }: { areas: AreaRow[] }) {
     <form onSubmit={onSubmit} className="max-w-md space-y-3">
       <input aria-label="Nombre" placeholder="Nombre" value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} className="w-full rounded border border-border px-3 py-2" />
       <input aria-label="Correo" type="email" placeholder="Correo" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} className="w-full rounded border border-border px-3 py-2" />
-      <input aria-label="Contraseña" type="text" placeholder="Contraseña inicial" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} className="w-full rounded border border-border px-3 py-2" />
+      <input aria-label="Contraseña" type="password" placeholder="Contraseña inicial" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} className="w-full rounded border border-border px-3 py-2" />
       <input aria-label="Posición" placeholder="Posición" value={f.position} onChange={(e) => setF({ ...f, position: e.target.value })} className="w-full rounded border border-border px-3 py-2" />
       <select aria-label="Rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as NuevoUsuario['role'] })} className="w-full rounded border border-border px-3 py-2">
         <option value="operativo">operativo</option><option value="manager">manager</option><option value="admin">admin</option>
