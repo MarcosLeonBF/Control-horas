@@ -72,8 +72,21 @@ Cada plan deja software funcionando y probado antes de pasar al siguiente.
 
 **Lo que ya existe en la base de datos:** las 5 tablas, la creación automática de la hucha al crear un proyecto, el alta automática de perfil al crear un usuario, y el motor que registra consumos/ampliaciones/anulaciones manteniendo el saldo y el historial — todo con permisos por rol. Falta solo la interfaz (Planes 2 y 3).
 
-### Próximo: Plan 2 — App HUCHA (Manager)
-Pantallas del manager: sus proyectos con saldo, registrar consumo, historial. ⏳ Por planificar.
+### Plan 2 — App HUCHA (Manager) — ✅ COMPLETADO
+| Task | Descripción | Estado |
+|---|---|---|
+| 1 | Identidad de marca (Bastida & Fariña), componentes base y arnés de pruebas E2E | ✅ Completada y revisada |
+| 2 | Acceso por rol, navegación y pantalla de ingreso con la marca | ✅ Completada y revisada |
+| 3 | "Mis proyectos": lista con saldo y estado de cada hucha | ✅ Completada y revisada |
+| 4 | Detalle de proyecto con saldo e historial de movimientos | ✅ Completada y revisada |
+| 5 | Registrar consumo (con validación y aviso de confirmación) | ✅ Completada y revisada |
+
+**Estética:** se aplicó la paleta de marca (carmín/vino sobre fondo cálido) y un estilo editorial limpio a toda la plataforma, no solo a HUCHA.
+
+**Pruebas:** suite E2E de camino feliz (acceso, mis proyectos, detalle, registrar consumo) — 8/8 en verde. El dev server lo gestiona el usuario; las pruebas asumen el servidor ya levantado.
+
+### Próximo: Plan 3 — App HUCHA (Admin + Dashboard + Descargas)
+Gestión de usuarios/proyectos, ampliar/corregir presupuesto, dashboard global y exports. ⏳ Por planificar.
 
 ---
 
