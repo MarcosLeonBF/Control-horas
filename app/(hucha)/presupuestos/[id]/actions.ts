@@ -29,3 +29,24 @@ export async function registrarConsumo(
   revalidatePath('/presupuestos')
   return { ok: true }
 }
+
+export async function ampliarPresupuesto(
+  projectId: string,
+  input: { monto: number; motivo: string; referencia: string; fecha: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!Number.isFinite(input.monto) || input.monto <= 0) return { ok: false, error: 'El monto debe ser mayor a 0.' }
+  if (!input.motivo.trim()) return { ok: false, error: 'El motivo es obligatorio.' }
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('registrar_movimiento_hucha', {
+    p_project_id: projectId,
+    p_type: 'ampliacion',
+    p_amount: input.monto,
+    p_reason: input.motivo.trim(),
+    p_reference: input.referencia.trim() || null,
+    p_entry_date: input.fecha || undefined,
+  })
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/presupuestos/${projectId}`)
+  revalidatePath('/presupuestos')
+  return { ok: true }
+}

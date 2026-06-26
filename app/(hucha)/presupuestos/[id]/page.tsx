@@ -5,12 +5,18 @@ import { formatEUR } from '@/lib/hucha/format'
 import StatusBadge from '@/components/hucha/StatusBadge'
 import MovementsTable from '@/components/hucha/MovementsTable'
 import ConsumoForm from './ConsumoForm'
+import { createClient } from '@/lib/supabase/server'
+import AmpliarForm from './AmpliarForm'
 
 export default async function DetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const project = await getProjectWithBank(id)
   if (!project) notFound()
   const movements = await getMovements(project.bank.id)
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: me } = await supabase.from('profiles').select('role').eq('id', user!.id).single()
+  const isAdmin = me?.role === 'admin'
 
   return (
     <div>
@@ -25,6 +31,7 @@ export default async function DetallePage({ params }: { params: Promise<{ id: st
       </header>
 
       <div className="mb-10"><ConsumoForm projectId={project.id} remaining={project.bank.remaining} /></div>
+      {isAdmin && <div className="mb-10"><AmpliarForm projectId={project.id} /></div>}
 
       <div className="mb-10 grid gap-4 sm:grid-cols-3">
         {[
