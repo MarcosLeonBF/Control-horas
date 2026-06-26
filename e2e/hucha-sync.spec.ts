@@ -46,6 +46,17 @@ test('aplicarSync crea proyectos con base, asigna manager y reporta no-matcheado
   const { data: asig } = await db.from('project_assignments').select('id').eq('project_id', proj!.id).eq('user_id', mgrId)
   expect(asig!.length).toBe(1)
 
+  // Re-sync: cambia el Hucha del asignado -> actualiza (no crea) y recalcula la base.
+  const report2 = await aplicarSync(
+    { proyectos: [{ proyecto: 'Sync E2E Asignado', hucha: 1500 }], managerPorProyecto: new Map() },
+    db,
+  )
+  expect(report2.proyectosActualizados).toBe(1)
+  expect(report2.proyectosCreados).toBe(0)
+  const { data: bank2 } = await db.from('hucha_banks').select('excel_hucha, assigned_total').eq('project_id', proj!.id).single()
+  expect(Number(bank2!.excel_hucha)).toBe(1500)
+  expect(Number(bank2!.assigned_total)).toBe(1500)
+
   // Limpieza.
   await db.from('projects').delete().like('name', 'Sync E2E%')
   await db.auth.admin.deleteUser(mgrId)

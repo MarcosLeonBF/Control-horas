@@ -84,6 +84,8 @@ Hoy `assigned_total` se arma **solo** de movimientos (Plan 1). Se agrega la base
 
 > Compatibilidad: con `excel_hucha = 0` (default) el comportamiento es idéntico al de Plan 1, así que los datos/tests existentes no se rompen.
 
+> **Nota de implementación (decisión durante el build):** en vez de una función `recompute_hucha_bank` que re-deriva todo desde el ledger, se implementó **`set_hucha_excel_base(p_bank_id, p_hucha)`** que aplica la **diferencia (delta)** entre la nueva base y la anterior sobre `assigned_total`/`remaining`/`status`. Es más simple, mantiene la misma invariante (`assigned_total = excel_hucha + ampliaciones`) y **no requiere tocar `registrar_movimiento_hucha`** (el RPC sigue intacto). Contrapartida: no hay un recálculo "self-healing" desde el ledger; si `assigned_total` se desincronizara por una edición manual, no se reconcilia solo. Se difiere a **Plan 3b** evaluar una función de reconciliación (útil también para el edge case de `Hucha→0`).
+
 ---
 
 ## 6. Pantalla de sincronización (admin)

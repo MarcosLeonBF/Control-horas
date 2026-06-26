@@ -1,7 +1,10 @@
 -- 0011_hucha_excel_base.sql — base del Excel en el banco HUCHA
 alter table public.hucha_banks add column if not exists excel_hucha numeric(14,2) not null default 0;
 
--- Permite upsert de proyectos por nombre (la tabla projects es exclusiva de HUCHA).
+-- Permite upsert de proyectos por nombre. NOTA: `projects` es la tabla compartida
+-- de la fundación (Plan 1), pero en la práctica solo HUCHA la puebla (Horas v2 lee
+-- sus proyectos del Excel en vivo y guarda el nombre como texto en time_log_lines).
+-- El nombre de proyecto es un identificador, así que la unicidad global es aceptable.
 create unique index if not exists projects_name_key on public.projects(name);
 
 -- Aplica la base del Excel como delta sobre el asignado (no crea movimiento).
