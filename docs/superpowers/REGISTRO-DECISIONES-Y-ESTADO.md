@@ -102,8 +102,19 @@ Reconstrucción de la app de Control de Horas (estaba pausado HUCHA a la espera 
 
 **Calidad:** cada pieza con prueba (SQL para la base, E2E Playwright para la app), revisión independiente por tarea y review final de toda la rama. Se cerró un hallazgo importante: la validación de que el área de cada línea pertenece al usuario ahora vive en el motor (no solo en la pantalla), dejando la base lista para los bancos de la Fase 2. El dashboard/descargas, las alertas y los bancos de horas por área quedan para fases siguientes.
 
+### HUCHA · Plan 3a — Sincronización desde el Excel — ✅ COMPLETADA
+Con el Excel `Presupuestos Hucha.xlsx` provisto, se construyó el **sincronizador** que puebla la app HUCHA con datos reales:
+- Lee la tabla `ProyectosHucha_1` (Proyecto, Hucha) y el `Manager del proyecto` de `Clientes_Proyectos` (solo lectura, vía Microsoft Graph; nunca escribe al Excel).
+- Sincroniza solo los proyectos con presupuesto (`Hucha > 0`); el monto es la **base** del banco (las ampliaciones del admin van encima como valor agregado).
+- Asigna el manager **por nombre** (los que no matchean un usuario se reportan, sin bloquear).
+- Pantalla **solo-admin** con botón "Sincronizar con Excel" y un resumen del resultado.
+
+*Estado del Excel hoy:* de 233 proyectos, **1** tiene presupuesto cargado (Impladent, 2.500 €, manager "Pilar"); a medida que carguen más `Hucha` en el Excel, el sync los irá tomando.
+
+**Calidad:** modelo con test SQL, lógica con test de fixtures (incluye re-sync), lector verificado contra el Excel real, pantalla con E2E; revisión por tarea + review final ("listo para merge con fixes", sin defectos críticos).
+
 ### Próximo (dos frentes)
-- **HUCHA · Plan 3** (Admin + Dashboard + Descargas): sincronización desde el Excel, dashboard global, ampliaciones y exports. ⏳ Depende de tener el Excel definido (ver sección 6).
+- **HUCHA · Plan 3b** (Admin + Dashboard + Descargas): ampliar/corregir presupuestos desde la UI, dashboard global, exports Excel/CSV, y la reconciliación/desactivación de proyectos que pierden su HUCHA. ⏳ Por planificar.
 - **Horas v2 · Fase 2** (Bancos de horas): bancos por cliente/área alimentados desde el/los Excel de banco de horas, descuento por línea, movimientos, ampliaciones. ⏳ Por planificar.
 
 ---
