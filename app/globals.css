@@ -104,6 +104,12 @@
 .font-display { font-family: var(--font-display); }
 .tabular-money { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
 .dark {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
