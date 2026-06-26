@@ -3,7 +3,7 @@
 - **Fecha:** 2026-06-23
 - **Autor:** Equipo de desarrollo (brainstorming con Claude)
 - **Estado:** Aprobado para escribir plan de implementación
-- **Proyecto:** `controlHoras` — Bastida & Fariña
+- **Proyecto:** `controlHoras` — Bastida & Farina
 - **Stack:** Next.js (App Router) + Supabase (Postgres, Auth, RLS) + Tailwind + shadcn/ui
 
 > **Nota de nombre:** el presupuesto se llama **HUCHA** (con H, como la hucha/alcancía).

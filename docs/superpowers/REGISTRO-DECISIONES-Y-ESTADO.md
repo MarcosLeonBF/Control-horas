@@ -11,7 +11,7 @@
 
 ## 1. Qué estamos construyendo
 
-Dos aplicaciones internas relacionadas para Bastida & Fariña, que comparten una misma base:
+Dos aplicaciones internas relacionadas para Bastida & Farina, que comparten una misma base:
 
 1. **Control de Horas** — registro de horas del equipo con "bancos de horas" por cliente/proyecto/área, alertas, dashboard. Ya existe una primera versión muy básica.
 2. **Presupuesto HUCHA** — versión simple del mismo concepto de "banco", pero con **dinero**: cada proyecto tiene una hucha de presupuesto; los managers registran gastos (consumos) y administración la amplía.
@@ -75,7 +75,7 @@ Cada plan deja software funcionando y probado antes de pasar al siguiente.
 ### Plan 2 — App HUCHA (Manager) — ✅ COMPLETADO
 | Task | Descripción | Estado |
 |---|---|---|
-| 1 | Identidad de marca (Bastida & Fariña), componentes base y arnés de pruebas E2E | ✅ Completada y revisada |
+| 1 | Identidad de marca (Bastida & Farina), componentes base y arnés de pruebas E2E | ✅ Completada y revisada |
 | 2 | Acceso por rol, navegación y pantalla de ingreso con la marca | ✅ Completada y revisada |
 | 3 | "Mis proyectos": lista con saldo y estado de cada hucha | ✅ Completada y revisada |
 | 4 | Detalle de proyecto con saldo e historial de movimientos | ✅ Completada y revisada |

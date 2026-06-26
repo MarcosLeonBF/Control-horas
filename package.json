@@ -1,7 +1,7 @@
 {
   "name": "control-horas",
   "version": "1.0.0",
-  "description": "Aplicación interna de control de horas - Bastida & Fariña",
+  "description": "Aplicación interna de control de horas - Bastida & Farina",
   "scripts": {
     "dev": "node ./node_modules/next/dist/bin/next dev",
     "build": "node ./node_modules/next/dist/bin/next build",

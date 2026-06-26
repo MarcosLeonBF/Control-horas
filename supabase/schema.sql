@@ -1,5 +1,5 @@
 -- ============================================================
--- Control de Horas — Bastida & Fariña
+-- Control de Horas — Bastida & Farina
 -- Script completo: tablas, RLS y políticas de acceso
 -- Pegar en: Supabase → SQL Editor → New query → Run
 -- ============================================================

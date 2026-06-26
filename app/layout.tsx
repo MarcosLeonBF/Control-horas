@@ -4,7 +4,7 @@ import { fraunces, geistSans, geistMono } from '@/lib/fonts'
 import { Toaster } from '@/components/ui/sonner'
 
 export const metadata: Metadata = {
-  title: 'Control de Horas — Bastida & Fariña',
+  title: 'Control de Horas — Bastida & Farina',
   description: 'Sistema interno de registro y seguimiento de horas por proyecto',
 }
 

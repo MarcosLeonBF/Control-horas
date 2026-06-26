@@ -63,23 +63,23 @@ export default function LoginPage() {
         </p>
 
         <div className="animate-fade-up relative flex flex-col items-center text-center [animation-delay:120ms]">
-          <Image src="/logo-blanco.png" alt="Bastida &amp; Fariña" width={400} height={140} priority className="h-20 w-auto" />
+          <Image src="/logo-blanco.png" alt="Bastida &amp; Farina" width={400} height={140} priority className="h-20 w-auto" />
           <p className="font-display mt-7 text-2xl">Control de Horas</p>
           <div className="mt-5 h-px w-12 bg-white/40" />
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/75">
-            Registro de horas, bancos y presupuestos del equipo de Bastida &amp; Fariña.
+            Registro de horas, bancos y presupuestos del equipo de Bastida &amp; Farina.
           </p>
         </div>
 
         <p className="animate-fade-up relative text-xs text-white/60 [animation-delay:200ms]">
-          Bastida &amp; Fariña · Sistema interno
+          Bastida &amp; Farina · Sistema interno
         </p>
       </aside>
 
       {/* ── Panel del formulario ─────────────────────────────────────── */}
       <main className="flex flex-col justify-center px-6 py-12 sm:px-10 lg:px-20">
         <div className="mx-auto w-full max-w-sm">
-          <Image src="/logo-negro.png" alt="Bastida &amp; Fariña" width={400} height={140} className="mb-10 h-9 w-auto md:hidden" />
+          <Image src="/logo-negro.png" alt="Bastida &amp; Farina" width={400} height={140} className="mb-10 h-9 w-auto md:hidden" />
 
           <p className="animate-fade-up text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground">
             Acceso

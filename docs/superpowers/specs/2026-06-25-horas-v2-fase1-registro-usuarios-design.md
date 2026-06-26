@@ -201,7 +201,7 @@ Formulario mínimo, solo para `admin`:
 ## 7. Rutas, estética y testing
 
 - **Strangler fig:** Horas v2 vive en un grupo de rutas nuevo (p. ej. `app/(horas)/…`). La Horas legacy (`app/(app)/…`) queda **congelada** hasta el corte. El redireccionamiento por rol (`app/page.tsx`) se actualizará para apuntar a v2 cuando la fase esté lista.
-- **Estética:** paleta de marca Bastida & Fariña + shadcn/ui (la estética editorial aplica a toda la plataforma, no solo a HUCHA).
+- **Estética:** paleta de marca Bastida & Farina + shadcn/ui (la estética editorial aplica a toda la plataforma, no solo a HUCHA).
 - **Testing:** E2E Playwright happy-path (alta de usuario, registro diario multilínea, validaciones, ventana de 7 días, Departamento condicional). El **dev server lo gestiona el usuario**: la config de Playwright no arranca el server (sin bloque `webServer`), asume `http://localhost:3000` levantado. Seed vía service_role, como en HUCHA.
 
 ---

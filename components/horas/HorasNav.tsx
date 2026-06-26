@@ -30,8 +30,8 @@ export default function HorasNav({ displayName, role }: { displayName: string; r
     <header className="border-b border-border bg-card/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
         <div className="flex items-center gap-8">
-          <Link href="/registrar" className="flex items-center" aria-label="Bastida &amp; Fariña">
-            <Image src="/logo-negro.png" alt="Bastida &amp; Fariña" width={400} height={140} priority className="h-7 w-auto" />
+          <Link href="/registrar" className="flex items-center" aria-label="Bastida &amp; Farina">
+            <Image src="/logo-negro.png" alt="Bastida &amp; Farina" width={400} height={140} priority className="h-7 w-auto" />
           </Link>
           <nav className="flex items-center gap-6">
             {link('/registrar', 'Registrar')}
