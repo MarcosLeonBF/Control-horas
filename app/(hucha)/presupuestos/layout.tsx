@@ -14,7 +14,7 @@ export default async function HuchaLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <HuchaNav displayName={profile.full_name || user.email!} />
+      <HuchaNav displayName={profile.full_name || user.email!} role={profile.role} />
       <main className="mx-auto max-w-5xl px-6 py-10">{children}</main>
     </div>
   )

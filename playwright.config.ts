@@ -12,7 +12,7 @@ export default defineConfig({
       name: 'node-hucha',
       testMatch: ['**/hucha-sync.spec.ts'],
     },
-    { name: 'chromium', use: { storageState: 'e2e/.auth/manager.json' }, testIgnore: ['**/horas-*.spec.ts', '**/hucha-sync.spec.ts'] },
+    { name: 'chromium', use: { storageState: 'e2e/.auth/manager.json' }, testIgnore: ['**/horas-*.spec.ts', '**/hucha-sync.spec.ts', '**/hucha-sync-ui.spec.ts'] },
     {
       name: 'chromium-horas',
       use: { storageState: 'e2e/.auth/operativo.json' },
@@ -22,7 +22,7 @@ export default defineConfig({
     {
       name: 'chromium-horas-admin',
       use: { storageState: 'e2e/.auth/admin-horas.json' },
-      testMatch: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts'],
+      testMatch: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/hucha-sync-ui.spec.ts'],
     },
   ],
   // Sin bloque `webServer`: el dev server lo gestiona el usuario.
