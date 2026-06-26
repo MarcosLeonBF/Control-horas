@@ -6,7 +6,7 @@ export default async function Home() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role === 'manager' || profile?.role === 'admin') redirect('/presupuestos')
+  // Control de Horas es la app principal: todos entran ahí. HUCHA (presupuestos)
+  // se accede desde el link en la barra de navegación (manager/admin).
   redirect('/registrar')
 }

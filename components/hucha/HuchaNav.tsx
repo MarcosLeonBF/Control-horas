@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -22,8 +23,13 @@ export default function HuchaNav({ displayName, role }: { displayName: string; r
     <header className="border-b border-border bg-card/80 backdrop-blur">
       <div className="mx-auto max-w-5xl px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <span className="font-display text-lg font-semibold tracking-tight">HUCHA</span>
+          <Link href="/presupuestos" className="flex items-center" aria-label="Bastida &amp; Fariña — Presupuestos HUCHA">
+            <Image src="/logo-negro.png" alt="Bastida &amp; Fariña" width={400} height={140} priority className="h-7 w-auto" />
+          </Link>
           <nav className="flex items-center gap-6">
+            <Link href="/registrar" className="text-sm text-(--brand) transition-colors hover:text-(--brand-strong)">
+              Control de Horas
+            </Link>
             <Link
               href="/presupuestos"
               className={`text-sm transition-colors ${activePresupuestos ? 'text-foreground font-medium' : 'text-foreground/60 hover:text-foreground'}`}

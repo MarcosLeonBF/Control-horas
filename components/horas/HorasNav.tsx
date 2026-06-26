@@ -1,23 +1,56 @@
 'use client'
+import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 export default function HorasNav({ displayName, role }: { displayName: string; role: string }) {
   const path = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+
+  async function logout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
   const link = (href: string, label: string) => (
-    <Link href={href} className={`text-sm ${path === href ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>{label}</Link>
+    <Link
+      href={href}
+      className={`text-sm transition-colors ${path === href ? 'font-medium text-foreground' : 'text-foreground/60 hover:text-foreground'}`}
+    >
+      {label}
+    </Link>
   )
+
+  const isManagerOrAdmin = role === 'manager' || role === 'admin'
+
   return (
-    <header className="border-b border-border">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-6">
-          <span className="font-display text-base">Control de Horas</span>
-          {link('/registrar', 'Registrar')}
-          {link('/mis-registros', 'Mis registros')}
-          {(role === 'manager' || role === 'admin') && link('/equipo', 'Equipo')}
-          {role === 'admin' && link('/admin/usuarios', 'Usuarios')}
+    <header className="border-b border-border bg-card/80 backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
+        <div className="flex items-center gap-8">
+          <Link href="/registrar" className="flex items-center" aria-label="Bastida &amp; Fariña — Control de Horas">
+            <Image src="/logo-negro.png" alt="Bastida &amp; Fariña" width={400} height={140} priority className="h-7 w-auto" />
+          </Link>
+          <nav className="flex items-center gap-6">
+            {link('/registrar', 'Registrar')}
+            {link('/mis-registros', 'Mis registros')}
+            {isManagerOrAdmin && link('/equipo', 'Equipo')}
+            {role === 'admin' && link('/admin/usuarios', 'Usuarios')}
+            {isManagerOrAdmin && (
+              <Link href="/presupuestos" className="text-sm text-(--brand) transition-colors hover:text-(--brand-strong)">
+                Presupuestos
+              </Link>
+            )}
+          </nav>
         </div>
-        <span className="text-sm text-muted-foreground">{displayName}</span>
+        <div className="flex items-center gap-4">
+          <span className="hidden text-xs text-foreground/50 sm:block">{displayName}</span>
+          <button onClick={logout} className="text-xs text-foreground/60 transition-colors hover:text-foreground">
+            Salir
+          </button>
+        </div>
       </div>
     </header>
   )

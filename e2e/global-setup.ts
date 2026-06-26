@@ -12,13 +12,13 @@ export default async function globalSetup() {
 
   const browser = await chromium.launch()
 
-  // Login manager → presupuestos
+  // Login manager → /registrar (todos entran a Horas; HUCHA se accede por la nav)
   const managerPage = await browser.newPage({ baseURL: 'http://localhost:3000' })
   await managerPage.goto('/login')
   await managerPage.getByLabel('Email').fill(fixture.managerEmail)
   await managerPage.getByLabel('Contraseña').fill(fixture.managerPassword)
   await managerPage.getByRole('button', { name: /ingresar/i }).click()
-  await managerPage.waitForURL('**/presupuestos')
+  await managerPage.waitForURL('**/registrar')
   await managerPage.context().storageState({ path: 'e2e/.auth/manager.json' })
   await managerPage.close()
 

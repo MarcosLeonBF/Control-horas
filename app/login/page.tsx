@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -31,17 +32,25 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-          <div className="mb-8 text-center">
-            <h1 className="text-2xl font-display font-semibold text-gray-900">Control de Horas</h1>
-            <p className="mt-1 text-sm text-gray-500">Bastida &amp; Fariña</p>
-          </div>
+        <div className="mb-8 flex flex-col items-center text-center">
+          <Image
+            src="/logo-negro.png"
+            alt="Bastida &amp; Fariña"
+            width={400}
+            height={140}
+            priority
+            className="h-12 w-auto"
+          />
+          <p className="font-display mt-6 text-lg text-foreground">Control de Horas</p>
+          <p className="mt-1 text-sm text-muted-foreground">Acceso interno</p>
+        </div>
 
+        <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="mb-1 block text-sm font-medium text-foreground">
                 Email
               </label>
               <input
@@ -51,13 +60,13 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--brand) focus:border-transparent"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="tu@email.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="mb-1 block text-sm font-medium text-foreground">
                 Contraseña
               </label>
               <input
@@ -67,24 +76,28 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--brand) focus:border-transparent"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="••••••••"
               />
             </div>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+              <p className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-(--brand-strong)">
+                {error}
+              </p>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-(--brand) hover:bg-(--brand-strong) px-4 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full rounded-lg bg-(--brand) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--brand-strong) disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Ingresando...' : 'Ingresar'}
+              {loading ? 'Ingresando…' : 'Ingresar'}
             </button>
           </form>
         </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground">Bastida &amp; Fariña · Sistema interno</p>
       </div>
     </div>
   )
