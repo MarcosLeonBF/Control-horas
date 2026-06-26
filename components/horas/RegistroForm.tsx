@@ -82,7 +82,9 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
                 <td className="min-w-32.5 pr-3 align-top">
                   <select aria-label="Área" value={l.area_id} disabled={isDepartamento(l.project)}
                     onChange={(e) => update(i, { area_id: e.target.value })} className={field}>
-                    {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {isDepartamento(l.project)
+                      ? <option value={internalAreaId}>Interno</option>
+                      : areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </td>
                 <td className="min-w-32.5 pr-3 align-top">
