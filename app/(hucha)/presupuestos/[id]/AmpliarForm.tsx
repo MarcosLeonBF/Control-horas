@@ -38,7 +38,8 @@ export default function AmpliarForm({ projectId }: { projectId: string }) {
         <input aria-label="Referencia" placeholder="Referencia (opcional)" value={referencia}
           onChange={(e) => setReferencia(e.target.value)} className="rounded border border-border px-3 py-2 sm:col-span-2" />
       </div>
-      <button type="submit" disabled={saving} className="rounded bg-brand px-4 py-2 text-white">
+      <button type="submit" disabled={saving}
+        className="rounded-lg bg-(--brand) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--brand-strong) disabled:cursor-not-allowed disabled:opacity-50">
         {saving ? 'Ampliando…' : 'Ampliar'}
       </button>
     </form>

@@ -23,7 +23,7 @@ export default function HuchaNav({ displayName, role }: { displayName: string; r
     <header className="border-b border-border bg-card/80 backdrop-blur">
       <div className="mx-auto max-w-5xl px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <Link href="/presupuestos" className="flex items-center" aria-label="Bastida &amp; Fariña — Presupuestos HUCHA">
+          <Link href="/presupuestos" className="flex items-center" aria-label="Bastida &amp; Fariña">
             <Image src="/logo-negro.png" alt="Bastida &amp; Fariña" width={400} height={140} priority className="h-7 w-auto" />
           </Link>
           <nav className="flex items-center gap-6">

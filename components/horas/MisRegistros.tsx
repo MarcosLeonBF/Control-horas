@@ -30,7 +30,7 @@ export default function MisRegistros({ logs }: { logs: Log[] }) {
           </ul>
           {l.status !== 'anulado' && (
             <div className="mt-2 flex gap-3">
-              <Link href={`/registrar?edit=${l.id}`} className="text-xs text-brand">Editar</Link>
+              <Link href={`/registrar?edit=${l.id}`} className="text-xs font-medium text-(--brand) hover:text-(--brand-strong)">Editar</Link>
               <button onClick={() => onAnular(l.id)} className="text-xs text-(--excedido)">Anular</button>
             </div>
           )}

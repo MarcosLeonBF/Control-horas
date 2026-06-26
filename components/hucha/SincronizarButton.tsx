@@ -19,7 +19,8 @@ export default function SincronizarButton() {
 
   return (
     <div className="space-y-4">
-      <button onClick={onSync} disabled={loading} className="rounded bg-brand px-4 py-2 text-white">
+      <button onClick={onSync} disabled={loading}
+        className="rounded-lg bg-(--brand) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--brand-strong) disabled:cursor-not-allowed disabled:opacity-50">
         {loading ? 'Sincronizando…' : 'Sincronizar con Excel'}
       </button>
 

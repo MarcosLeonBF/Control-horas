@@ -32,7 +32,7 @@ export default function UsuarioForm({ areas }: { areas: AreaRow[] }) {
           </label>
         ))}
       </fieldset>
-      <button type="submit" disabled={saving} className="rounded bg-brand px-4 py-2 text-white">{saving ? 'Creando…' : 'Crear usuario'}</button>
+      <button type="submit" disabled={saving} className="rounded-lg bg-(--brand) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--brand-strong) disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Creando…' : 'Crear usuario'}</button>
     </form>
   )
 }
