@@ -50,3 +50,19 @@ export async function ampliarPresupuesto(
   revalidatePath('/presupuestos')
   return { ok: true }
 }
+
+export async function anularMovimiento(
+  projectId: string, movementId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('registrar_movimiento_hucha', {
+    p_project_id: projectId,
+    p_type: 'anulacion',
+    p_amount: 1, // la RPC deriva el efecto real del movimiento original; sólo cumple la validación > 0
+    p_corrects_movement_id: movementId,
+  })
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/presupuestos/${projectId}`)
+  revalidatePath('/presupuestos')
+  return { ok: true }
+}

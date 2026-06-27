@@ -17,6 +17,7 @@ export default async function DetallePage({ params }: { params: Promise<{ id: st
   const { data: { user } } = await supabase.auth.getUser()
   const { data: me } = await supabase.from('profiles').select('role').eq('id', user!.id).single()
   const isAdmin = me?.role === 'admin'
+  const anulledIds = new Set(movements.filter((m) => m.type === 'anulacion' && m.corrects_movement_id).map((m) => m.corrects_movement_id as string))
 
   return (
     <div>
@@ -48,7 +49,7 @@ export default async function DetallePage({ params }: { params: Promise<{ id: st
 
       <section>
         <h2 className="font-display mb-4 text-xl font-semibold">Historial</h2>
-        <MovementsTable movements={movements} />
+        <MovementsTable movements={movements} isAdmin={isAdmin} projectId={project.id} anulledIds={anulledIds} />
       </section>
     </div>
   )

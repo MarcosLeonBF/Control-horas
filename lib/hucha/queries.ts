@@ -35,7 +35,7 @@ export async function getMovements(bankId: string): Promise<HuchaMovementRow[]> 
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('hucha_movements')
-    .select('id, type, amount, balance_before, balance_after, description, reference, reason, actor_name, entry_date, created_at')
+    .select('id, type, amount, balance_before, balance_after, description, reference, reason, actor_name, entry_date, created_at, corrects_movement_id')
     .eq('bank_id', bankId)
     .order('created_at', { ascending: false })
   if (error) throw error

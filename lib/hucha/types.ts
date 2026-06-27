@@ -29,4 +29,5 @@ export interface HuchaMovementRow {
   actor_name: string
   entry_date: string
   created_at: string
+  corrects_movement_id: string | null
 }

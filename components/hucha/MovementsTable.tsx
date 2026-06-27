@@ -1,11 +1,14 @@
 import type { HuchaMovementRow } from '@/lib/hucha/types'
 import { formatEUR } from '@/lib/hucha/format'
+import AnularButton from '@/components/hucha/AnularButton'
 
 const TYPE_LABELS: Record<HuchaMovementRow['type'], string> = {
   consumo: 'Consumo', ampliacion: 'Ampliación', correccion: 'Corrección', anulacion: 'Anulación',
 }
 
-export default function MovementsTable({ movements }: { movements: HuchaMovementRow[] }) {
+export default function MovementsTable({ movements, isAdmin = false, projectId = '', anulledIds }: {
+  movements: HuchaMovementRow[]; isAdmin?: boolean; projectId?: string; anulledIds?: Set<string>
+}) {
   if (movements.length === 0) {
     return <p className="text-sm text-foreground/55">Sin movimientos todavía.</p>
   }
@@ -20,6 +23,7 @@ export default function MovementsTable({ movements }: { movements: HuchaMovement
             <th className="px-4 py-3 font-medium text-right">Importe</th>
             <th className="px-4 py-3 font-medium text-right">Saldo</th>
             <th className="px-4 py-3 font-medium">Por</th>
+            {isAdmin && <th className="px-4 py-3 font-medium text-right">Acción</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -33,6 +37,12 @@ export default function MovementsTable({ movements }: { movements: HuchaMovement
               </td>
               <td className="px-4 py-3 text-right tabular-money text-foreground/70">{formatEUR(m.balance_after)}</td>
               <td className="px-4 py-3 text-foreground/55">{m.actor_name}</td>
+              {isAdmin && (
+                <td className="px-4 py-3 text-right">
+                  <AnularButton projectId={projectId} movementId={m.id}
+                    disabled={m.type === 'anulacion' || (anulledIds?.has(m.id) ?? false)} />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

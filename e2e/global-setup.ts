@@ -41,7 +41,7 @@ export default async function globalSetup() {
   await adminPage.getByLabel('Email').fill(horasFixture.adminEmail)
   await adminPage.getByLabel('Contraseña').fill(horasFixture.adminPassword)
   await adminPage.getByRole('button', { name: /ingresar/i }).click()
-  await adminPage.waitForLoadState('networkidle')
+  await adminPage.waitForURL('**/registrar')
   await adminPage.context().storageState({ path: 'e2e/.auth/admin-horas.json' })
   await adminPage.close()
 
