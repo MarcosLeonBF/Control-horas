@@ -126,8 +126,14 @@ El admin ya puede operar el dinero desde el detalle del proyecto:
 - **Entrada unificada a Horas:** tras el login todos entran a Control de Horas; manager/admin acceden a HUCHA por un link en la barra. Logo de la empresa en ambas barras.
 - Corrección: el área de cada línea de horas se exige solo a **operativos**; manager/admin registran contra cualquier área.
 
+### HUCHA · Plan 3b-ii — Dashboard global (admin) — ✅ COMPLETADA (PDF §12)
+Vista solo-admin `/presupuestos/dashboard` con la foto de **todos** los proyectos, diseñada para ser legible y no redundante:
+- **KPIs** arriba: asignado / consumido / restante totales + conteo de **excedidos** y **bajos**, que se recalculan según los filtros.
+- **Tabla** con una **barra de consumo** coloreada por estado (restante / asignado) en vez de tres columnas de números; **ordenada por severidad** (los excedidos/bajos primero).
+- **Filtros**: búsqueda de proyecto/cliente, estado y manager.
+- Construida con shadcn (Card/Table/Input) + lucide, tipada; E2E admin verde.
+
 ### Próximo
-- **HUCHA · Plan 3b-ii** (Dashboard global): todos los proyectos con métricas y filtros (proyecto, manager, estado, fechas). ⏳ Por planificar.
 - **HUCHA · Plan 3b-iii** (Descargas): exports Excel/CSV (presupuestos, consumos, ampliaciones, excedidos, disponibles). ⏳ Por planificar.
 - **Horas v2 · Fase 2** (Bancos de horas): bancos por cliente/área alimentados desde el/los Excel de banco de horas, descuento por línea, movimientos, ampliaciones. ⏳ Por planificar.
 

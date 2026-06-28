@@ -16,7 +16,7 @@ export async function getDashboardRows(): Promise<DashboardRow[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('projects')
-    .select('id, name, client, hucha_banks!inner(assigned_total, consumed_total, remaining, status), project_assignments(profiles(full_name))')
+    .select('id, name, client, hucha_banks!inner(assigned_total, consumed_total, remaining, status), project_assignments(profiles!user_id(full_name))')
     .eq('status', 'activo')
     .order('name')
   if (error) throw error
