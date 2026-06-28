@@ -17,6 +17,17 @@ export interface ProjectWithBank {
   bank: HuchaBankRow
 }
 
+export interface DashboardRow {
+  projectId: string
+  name: string
+  client: string | null
+  managers: string[]
+  assigned: number
+  consumed: number
+  remaining: number
+  status: HuchaStatus
+}
+
 export interface HuchaMovementRow {
   id: string
   type: 'consumo' | 'ampliacion' | 'correccion' | 'anulacion'

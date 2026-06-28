@@ -16,8 +16,9 @@ export default function HuchaNav({ displayName, role }: { displayName: string; r
     router.refresh()
   }
 
-  const activePresupuestos = pathname === '/presupuestos' || (pathname.startsWith('/presupuestos') && !pathname.startsWith('/presupuestos/sincronizar'))
+  const activeDashboard = pathname.startsWith('/presupuestos/dashboard')
   const activeSincronizar = pathname.startsWith('/presupuestos/sincronizar')
+  const activePresupuestos = pathname.startsWith('/presupuestos') && !activeDashboard && !activeSincronizar
 
   return (
     <header className="border-b border-border bg-card/80 backdrop-blur">
@@ -36,6 +37,14 @@ export default function HuchaNav({ displayName, role }: { displayName: string; r
             >
               Presupuestos
             </Link>
+            {role === 'admin' && (
+              <Link
+                href="/presupuestos/dashboard"
+                className={`text-sm transition-colors ${activeDashboard ? 'text-foreground font-medium' : 'text-foreground/60 hover:text-foreground'}`}
+              >
+                Dashboard
+              </Link>
+            )}
             {role === 'admin' && (
               <Link
                 href="/presupuestos/sincronizar"
