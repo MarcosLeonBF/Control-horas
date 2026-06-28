@@ -15,7 +15,8 @@ export default async function DetallePage({ params }: { params: Promise<{ id: st
   const movements = await getMovements(project.bank.id)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: me } = await supabase.from('profiles').select('role').eq('id', user!.id).single()
+  if (!user) notFound()
+  const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const isAdmin = me?.role === 'admin'
   const anulledIds = new Set(movements.filter((m) => m.type === 'anulacion' && m.corrects_movement_id).map((m) => m.corrects_movement_id as string))
 

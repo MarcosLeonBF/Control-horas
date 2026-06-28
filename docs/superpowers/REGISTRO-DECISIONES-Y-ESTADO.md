@@ -5,7 +5,7 @@
 > - Diseño: [`specs/2026-06-23-hucha-presupuestos-design.md`](specs/2026-06-23-hucha-presupuestos-design.md)
 > - Plan de implementación 1: [`plans/2026-06-23-plan1-fundacion-datos-ledger.md`](plans/2026-06-23-plan1-fundacion-datos-ledger.md)
 
-**Última actualización:** 2026-06-25 (HUCHA Plan 2 + Horas v2 Fase 1 completados; definición del origen de datos vía Excel)
+**Última actualización:** 2026-06-28 (HUCHA Plan 3b completo: admin + dashboard + descargas. Confirmado el Excel real en SharePoint y sus tablas/columnas)
 
 ---
 
@@ -169,16 +169,22 @@ Todas las descargas viven en el **Dashboard**, en una barra única bajo los filt
 3. Los **consumos** los registran los managers dentro de HUCHA (van a la base de datos), nunca al Excel.
 4. **Ampliaciones / "valor agregado":** como no se escribe al Excel, el presupuesto extra se maneja en HUCHA y aparece en el **reporte descargado**, sumado al total y marcado como agregado. Se hace de **dos formas combinadas**: (a) el **admin registra ampliaciones** con su motivo/referencia, y (b) lo que un proyecto quede **excedido sin ampliación** se reporta **automáticamente** como valor agregado. Mismo criterio que el banco de horas.
 
-**Pendiente para construir el sincronizador (necesitamos el Excel, aún no existe):**
-- ¿Tabla/hoja nueva en el **mismo archivo** del banco de horas, o **archivo aparte**? Nombre de la tabla.
-- **Columnas**: proyecto, presupuesto asignado, la columna que marca "tiene HUCHA", ¿cliente?, ¿manager asignado?
-- **Clave de cruce**: ¿nombre de proyecto (como Horas) o un código?
-- La **asignación manager↔proyecto**, ¿viene del Excel o se gestiona en HUCHA?
+**El Excel SÍ existe y está cableado (Microsoft Graph).** Las 4 preguntas de abajo quedaron resueltas leyendo el archivo real (sincronización HUCHA ya corrida en producción):
+- **Archivo HUCHA aparte** (`SHAREPOINT_HUCHA_FILE_URL`), distinto del banco de horas (`SHAREPOINT_FILE_URL`).
+- **Tablas/columnas reales:**
+  - Banco de horas → `BancoHoras` = **[Proyecto, Horas CRM]** (total de horas por proyecto).
+  - HUCHA → `ProyectosHucha_1` = **[Proyecto, Hucha]** (presupuesto €; `Hucha > 0` marca "tiene HUCHA").
+  - Maestro común → `Clientes_Proyectos` (Proyecto, **Manager del proyecto**, Estado, Mostrar, "Cuenta como Proyecto"…) y `Facturas_Completas`.
+- **Clave de cruce**: nombre de proyecto (string), igual que el banco de horas.
+- **Manager↔proyecto**: viene del Excel (`Clientes_Proyectos` → "Manager del proyecto"; se matchea por nombre contra `profiles.full_name`).
+
+**Implicación para Horas Fase 2:** el banco de horas del Excel es **por proyecto** (Horas CRM), **no por área**. El Excel no tiene granularidad de área → un "banco por área" no sale del Excel tal cual. Decisión pendiente (ver sección 7).
 
 ---
 
 ## 7. Temas a confirmar en la reunión
-1. **Estructura del Excel de presupuestos** (las 4 preguntas pendientes de la sección 6) — es lo que destraba el Plan 3.
-2. **Descargas del manager** (D8) — ¿se mantiene o se restringe a solo admin?
-3. **¿Hace falta un 4º rol** (alguien que amplíe presupuesto sin ser admin completo)? (D9)
-4. Validar la frontera de alcance HUCHA vs Horas y el orden de fases.
+1. ✅ ~~Estructura del Excel de presupuestos~~ — **resuelto** (ver sección 6): el Excel existe y está cableado; HUCHA ya sincroniza.
+2. **Banco de horas por área (Fase 2):** el Excel solo trae **total por proyecto** (`BancoHoras` = [Proyecto, Horas CRM]), sin desglose por área. ¿El banco de horas es **por proyecto** (área = solo dimensión de la línea, como hoy) o se necesita presupuesto **por área**? Si es por área, ¿de dónde sale el reparto (otra tabla del Excel / manual en la app)?
+3. **Descargas del manager** (D8) — ¿se mantiene o se restringe a solo admin?
+4. **¿Hace falta un 4º rol** (alguien que amplíe presupuesto sin ser admin completo)? (D9)
+5. Validar la frontera de alcance HUCHA vs Horas y el orden de fases.

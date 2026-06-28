@@ -21,7 +21,7 @@ export default function AmpliarForm({ projectId }: { projectId: string }) {
     setSaving(false)
     if (!res.ok) { toast.error(res.error); return }
     toast.success('Presupuesto ampliado')
-    setMonto(''); setMotivo(''); setReferencia('')
+    setMonto(''); setMotivo(''); setReferencia(''); setFecha(today())
     router.refresh()
   }
 
