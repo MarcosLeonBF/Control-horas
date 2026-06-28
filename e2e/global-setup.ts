@@ -35,7 +35,7 @@ export default async function globalSetup() {
   await operativoPage.context().storageState({ path: 'e2e/.auth/operativo.json' })
   await operativoPage.close()
 
-  // Login admin (lands on /presupuestos per role redirect for now — just wait for networkidle)
+  // Login admin → /registrar (todos los roles entran a Horas tras login)
   const adminPage = await browser.newPage({ baseURL: 'http://localhost:3000' })
   await adminPage.goto('/login')
   await adminPage.getByLabel('Email').fill(horasFixture.adminEmail)

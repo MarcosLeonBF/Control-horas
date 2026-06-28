@@ -113,8 +113,22 @@ Con el Excel `Presupuestos Hucha.xlsx` provisto, se construyó el **sincronizado
 
 **Calidad:** modelo con test SQL, lógica con test de fixtures (incluye re-sync), lector verificado contra el Excel real, pantalla con E2E; revisión por tarea + review final ("listo para merge con fixes", sin defectos críticos).
 
-### Próximo (dos frentes)
-- **HUCHA · Plan 3b** (Admin + Dashboard + Descargas): ampliar/corregir presupuestos desde la UI, dashboard global, exports Excel/CSV, y la reconciliación/desactivación de proyectos que pierden su HUCHA. ⏳ Por planificar.
+### HUCHA · Plan 3b-i — Admin: ampliar + corregir/anular — ✅ COMPLETADA
+El admin ya puede operar el dinero desde el detalle del proyecto:
+- **Ampliar** presupuesto (valor agregado, con motivo/referencia/fecha) — sube el asignado sin tocar la base del Excel.
+- **Anular** movimientos (corregir = anular el equivocado + volver a registrar). El botón se inhabilita en anulaciones y en movimientos ya anulados.
+- Se cerró un hueco del motor: no se puede anular dos veces el mismo movimiento.
+
+**Calidad:** test SQL del guard + E2E de ampliar y anular (sesión admin); cada tarea revisada y aprobada.
+
+### Login y navegación (mejoras transversales)
+- **Login de pantalla completa** con identidad de marca (gradiente carmín→vino, logo, campos editoriales, ojo de contraseña), construido con shadcn/ui.
+- **Entrada unificada a Horas:** tras el login todos entran a Control de Horas; manager/admin acceden a HUCHA por un link en la barra. Logo de la empresa en ambas barras.
+- Corrección: el área de cada línea de horas se exige solo a **operativos**; manager/admin registran contra cualquier área.
+
+### Próximo
+- **HUCHA · Plan 3b-ii** (Dashboard global): todos los proyectos con métricas y filtros (proyecto, manager, estado, fechas). ⏳ Por planificar.
+- **HUCHA · Plan 3b-iii** (Descargas): exports Excel/CSV (presupuestos, consumos, ampliaciones, excedidos, disponibles). ⏳ Por planificar.
 - **Horas v2 · Fase 2** (Bancos de horas): bancos por cliente/área alimentados desde el/los Excel de banco de horas, descuento por línea, movimientos, ampliaciones. ⏳ Por planificar.
 
 ---
