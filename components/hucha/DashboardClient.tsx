@@ -1,14 +1,31 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Search, AlertTriangle, TrendingDown } from 'lucide-react'
+import { Search, AlertTriangle, TrendingDown, Download } from 'lucide-react'
+import { toast } from 'sonner'
 import type { DashboardRow, HuchaStatus } from '@/lib/hucha/types'
 import { formatEUR, STATUS_LABELS } from '@/lib/hucha/format'
+import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/hucha/export'
+import { getMovimientosExport } from '@/app/(hucha)/presupuestos/dashboard/actions'
 import StatusBadge from '@/components/hucha/StatusBadge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+
+function DownloadGroup({ label, onXlsx, onCsv }: { label: string; onXlsx: () => void; onCsv: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-foreground/70">{label}:</span>
+      <button onClick={onXlsx} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-foreground/70 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
+        <Download className="size-3" /> Excel
+      </button>
+      <button onClick={onCsv} className="rounded-md border border-border px-2 py-1 text-xs text-foreground/70 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
+        CSV
+      </button>
+    </span>
+  )
+}
 
 // Orden por severidad: lo que pide atención, arriba.
 const SEVERITY: Record<HuchaStatus, number> = {
@@ -75,6 +92,25 @@ export default function DashboardClient({ rows }: { rows: DashboardRow[] }) {
     return t
   }, [filtered])
 
+  const presupuestoRows: ExportRow[] = filtered.map((r) => ({
+    Proyecto: r.name, Cliente: r.client ?? '', Manager: r.managers.join(', '),
+    Asignado: r.assigned, Consumido: r.consumed, Restante: r.remaining, Estado: STATUS_LABELS[r.status],
+  }))
+
+  function descargarPresupuestos(fmt: 'xlsx' | 'csv') {
+    if (!presupuestoRows.length) { toast.error('No hay proyectos para descargar.'); return }
+    if (fmt === 'xlsx') void downloadXlsx('hucha-presupuestos.xlsx', presupuestoRows, 'Presupuestos')
+    else downloadCsv('hucha-presupuestos.csv', presupuestoRows)
+  }
+
+  async function descargarMov(type: 'consumo' | 'ampliacion', fmt: 'xlsx' | 'csv') {
+    const rows = await getMovimientosExport(type)
+    if (!rows.length) { toast.error(`No hay ${type === 'consumo' ? 'consumos' : 'ampliaciones'} para descargar.`); return }
+    const base = type === 'consumo' ? 'consumos' : 'ampliaciones'
+    if (fmt === 'xlsx') await downloadXlsx(`hucha-${base}.xlsx`, rows, base)
+    else downloadCsv(`hucha-${base}.csv`, rows)
+  }
+
   return (
     <div className="space-y-6">
       {/* KPIs */}
@@ -115,6 +151,14 @@ export default function DashboardClient({ rows }: { rows: DashboardRow[] }) {
         <span className="ml-auto text-sm text-muted-foreground">
           {filtered.length} de {rows.length} proyectos
         </span>
+      </div>
+
+      {/* Descargas (PDF §13) */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-border bg-card px-4 py-3 text-sm">
+        <span className="font-medium text-muted-foreground">Descargar</span>
+        <DownloadGroup label="Presupuestos" onXlsx={() => descargarPresupuestos('xlsx')} onCsv={() => descargarPresupuestos('csv')} />
+        <DownloadGroup label="Consumos" onXlsx={() => descargarMov('consumo', 'xlsx')} onCsv={() => descargarMov('consumo', 'csv')} />
+        <DownloadGroup label="Ampliaciones" onXlsx={() => descargarMov('ampliacion', 'xlsx')} onCsv={() => descargarMov('ampliacion', 'csv')} />
       </div>
 
       {/* Tabla */}
