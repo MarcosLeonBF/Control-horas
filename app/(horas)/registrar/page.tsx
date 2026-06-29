@@ -43,7 +43,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl">{initial ? 'Editar registro' : 'Registrar horas'}</h1>
-      <RegistroForm projects={projects} areas={selectableAreas} etapas={etapas} internalAreaId={internal.id} initial={initial} />
+      <RegistroForm projects={projects} areas={selectableAreas} etapas={etapas} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
     </div>
   )
 }

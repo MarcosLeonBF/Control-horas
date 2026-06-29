@@ -8,13 +8,15 @@ import type { AreaRow, EtapaRow } from '@/lib/horas/types'
 
 const DEPARTAMENTOS = ['Clientes', 'Ventas', 'Marketing', 'Todos'] as const
 const today = () => new Date().toISOString().slice(0, 10)
+const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 const emptyLine = (areaId: string): LineInput => ({ project: '', area_id: areaId, department: 'Clientes', etapa_id: '', hours: 0, description: '' })
 
 const field =
   'w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
 
-export default function RegistroForm({ projects, areas, etapas, internalAreaId, initial }: {
+export default function RegistroForm({ projects, areas, etapas, internalAreaId, canBackdate = false, initial }: {
   projects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; internalAreaId: string
+  canBackdate?: boolean // admin: puede registrar fuera del rango de 7 días (PDF §4)
   initial?: { id: string; entryDate: string; lines: LineInput[] }
 }) {
   const router = useRouter()
@@ -51,10 +53,11 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
       <div className="mb-5 flex items-center gap-3">
         <label htmlFor="fecha" className="text-sm font-medium text-foreground">Fecha</label>
         <input
-          id="fecha" type="date" value={entryDate} max={today()}
+          id="fecha" type="date" value={entryDate} max={today()} min={canBackdate ? undefined : daysAgo(7)}
           onChange={(e) => setEntryDate(e.target.value)}
           className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring"
         />
+        {!canBackdate && <span className="text-xs text-muted-foreground">Hasta 7 días atrás</span>}
       </div>
 
       <div className="overflow-x-auto">
