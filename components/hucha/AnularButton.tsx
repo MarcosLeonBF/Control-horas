@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { anularMovimiento } from '@/app/(hucha)/presupuestos/[id]/actions'
+import { Button } from '@/components/ui/button'
 
 export default function AnularButton({ projectId, movementId, disabled }: {
   projectId: string; movementId: string; disabled: boolean
@@ -20,8 +21,8 @@ export default function AnularButton({ projectId, movementId, disabled }: {
     router.refresh()
   }
   return (
-    <button onClick={onClick} disabled={loading} className="text-xs text-(--excedido) hover:underline">
+    <Button onClick={onClick} disabled={loading} variant="ghost" size="sm" className="text-(--status-excedido) hover:text-(--status-excedido)">
       {loading ? 'Anulando…' : 'Anular'}
-    </button>
+    </Button>
   )
 }

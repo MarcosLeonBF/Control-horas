@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { sincronizarHucha } from '@/app/(hucha)/presupuestos/sincronizar/actions'
 import type { SyncReport } from '@/lib/hucha/sync'
+import { Button } from '@/components/ui/button'
 
 export default function SincronizarButton() {
   const [loading, setLoading] = useState(false)
@@ -19,10 +20,9 @@ export default function SincronizarButton() {
 
   return (
     <div className="space-y-4">
-      <button onClick={onSync} disabled={loading}
-        className="rounded-lg bg-(--brand) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--brand-strong) disabled:cursor-not-allowed disabled:opacity-50">
+      <Button onClick={onSync} disabled={loading} size="lg">
         {loading ? 'Sincronizando…' : 'Sincronizar con Excel'}
-      </button>
+      </Button>
 
       {report && (
         <div className="rounded-lg border border-border p-4 text-sm">
@@ -32,7 +32,7 @@ export default function SincronizarButton() {
           <p>Saltados (sin HUCHA): <strong>{report.saltadosSinHucha}</strong></p>
           {report.managersNoEncontrados.length > 0 && (
             <div className="mt-2">
-              <p className="text-(--excedido)">Managers no encontrados ({report.managersNoEncontrados.length}):</p>
+              <p className="text-(--status-excedido)">Managers no encontrados ({report.managersNoEncontrados.length}):</p>
               <ul className="mt-1 list-disc pl-5 text-muted-foreground">
                 {report.managersNoEncontrados.map((m, i) => <li key={i}>{m.proyecto} — "{m.manager}"</li>)}
               </ul>

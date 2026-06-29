@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { anularAmpliacionHoras } from '@/app/(horas)/bancos/[project]/actions'
+import { Button } from '@/components/ui/button'
 
 export default function AnularAmpliacionButton({ id, project }: { id: string; project: string }) {
   const router = useRouter()
@@ -19,9 +20,8 @@ export default function AnularAmpliacionButton({ id, project }: { id: string; pr
   }
 
   return (
-    <button onClick={onClick} disabled={busy}
-      className="text-xs text-(--status-excedido) transition-colors hover:underline disabled:opacity-50">
+    <Button onClick={onClick} disabled={busy} variant="ghost" size="sm" className="text-(--status-excedido) hover:text-(--status-excedido)">
       {busy ? 'Anulando…' : 'Anular'}
-    </button>
+    </Button>
   )
 }
