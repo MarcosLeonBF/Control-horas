@@ -136,8 +136,8 @@ Vista solo-admin `/presupuestos/dashboard` con la foto de **todos** los proyecto
 ### HUCHA · Plan 3b-iii — Descargas (admin) — ✅ COMPLETADA (PDF §13)
 Todas las descargas viven en el **Dashboard**, en una barra única bajo los filtros, sin botones redundantes:
 - **Presupuestos**: exporta la **vista filtrada** de la tabla (proyecto, cliente, manager, asignado, consumido, restante, estado). Así los reportes de **excedidos** y **disponibles** del §13 salen filtrando el estado y descargando — un solo punto de descarga en lugar de un botón por cada caso.
-- **Consumos** y **Ampliaciones**: el monto y detalle de **todos** los proyectos, vía Server Action solo-admin (`getMovimientosExport`).
-- Cada dataset se baja en **Excel** (SheetJS, import dinámico) o **CSV** (con BOM para Excel/acentos). Utilidad común en `lib/hucha/export.ts`.
+- **Consumos** y **Ampliaciones**: el monto y detalle de **todos** los proyectos, vía Server Action solo-admin (`getMovimientosExport`), **acotables por rango de fechas** (§12 "rango de fechas") con los campos *Período*. La tabla de estado es a fecha de hoy (asignado/restante son punto-en-tiempo), así que el rango aplica a estas descargas de movimientos, que es donde tiene sentido.
+- Cada dataset se baja en **Excel** (SheetJS, import dinámico) o **CSV** (con BOM para Excel/acentos). Utilidad común en `lib/export.ts`.
 - Construido inline (sin sobre-planificar); E2E admin verde (descarga del CSV de presupuestos verificada por `suggestedFilename`).
 
 ### Horas v2 · Fase 2 — Paso 1: Bancos de horas (vista) — ✅ COMPLETADA

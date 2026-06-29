@@ -64,6 +64,8 @@ export default function DashboardClient({ rows }: { rows: DashboardRow[] }) {
   const [search, setSearch] = useState('')
   const [estado, setEstado] = useState<HuchaStatus | 'todos'>('todos')
   const [manager, setManager] = useState<string>('todos')
+  const [fromMov, setFromMov] = useState('')
+  const [toMov, setToMov] = useState('')
 
   const managers = useMemo(
     () => Array.from(new Set(rows.flatMap((r) => r.managers))).sort((a, b) => a.localeCompare(b)),
@@ -104,11 +106,12 @@ export default function DashboardClient({ rows }: { rows: DashboardRow[] }) {
   }
 
   async function descargarMov(type: 'consumo' | 'ampliacion', fmt: 'xlsx' | 'csv') {
-    const rows = await getMovimientosExport(type)
-    if (!rows.length) { toast.error(`No hay ${type === 'consumo' ? 'consumos' : 'ampliaciones'} para descargar.`); return }
+    const rows = await getMovimientosExport(type, fromMov || undefined, toMov || undefined)
+    if (!rows.length) { toast.error(`No hay ${type === 'consumo' ? 'consumos' : 'ampliaciones'} en el período.`); return }
+    const periodo = fromMov || toMov ? `_${fromMov || 'inicio'}_${toMov || 'hoy'}` : ''
     const base = type === 'consumo' ? 'consumos' : 'ampliaciones'
-    if (fmt === 'xlsx') await downloadXlsx(`hucha-${base}.xlsx`, rows, base)
-    else downloadCsv(`hucha-${base}.csv`, rows)
+    if (fmt === 'xlsx') await downloadXlsx(`hucha-${base}${periodo}.xlsx`, rows, base)
+    else downloadCsv(`hucha-${base}${periodo}.csv`, rows)
   }
 
   return (
@@ -159,6 +162,15 @@ export default function DashboardClient({ rows }: { rows: DashboardRow[] }) {
         <DownloadGroup label="Presupuestos" onXlsx={() => descargarPresupuestos('xlsx')} onCsv={() => descargarPresupuestos('csv')} />
         <DownloadGroup label="Consumos" onXlsx={() => descargarMov('consumo', 'xlsx')} onCsv={() => descargarMov('consumo', 'csv')} />
         <DownloadGroup label="Ampliaciones" onXlsx={() => descargarMov('ampliacion', 'xlsx')} onCsv={() => descargarMov('ampliacion', 'csv')} />
+        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+          <span>Período:</span>
+          <input aria-label="Desde" type="date" value={fromMov} max={toMov || undefined}
+            onChange={(e) => setFromMov(e.target.value)} className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground" />
+          <span>–</span>
+          <input aria-label="Hasta" type="date" value={toMov} min={fromMov || undefined}
+            onChange={(e) => setToMov(e.target.value)} className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground" />
+          <span className="text-foreground/45">(consumos/ampliaciones)</span>
+        </span>
       </div>
 
       {/* Tabla */}
