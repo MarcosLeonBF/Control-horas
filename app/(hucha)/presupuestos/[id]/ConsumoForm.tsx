@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { registrarConsumo } from './actions'
 import { formatEUR } from '@/lib/hucha/format'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 function todayISO() { return new Date().toISOString().slice(0, 10) }
 
@@ -48,14 +50,7 @@ export default function ConsumoForm({ projectId, remaining }: { projectId: strin
   }
 
   if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="rounded-lg bg-(--brand) px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-      >
-        Registrar consumo
-      </button>
-    )
+    return <Button onClick={() => setOpen(true)} size="lg">Registrar consumo</Button>
   }
 
   return (
@@ -67,28 +62,21 @@ export default function ConsumoForm({ projectId, remaining }: { projectId: strin
       <div className="space-y-3">
         <div>
           <label htmlFor="amount" className="mb-1 block text-sm font-medium">Importe (€)</label>
-          <input id="amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--brand)" placeholder="0,00" />
+          <Input id="amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" />
         </div>
         <div>
           <label htmlFor="description" className="mb-1 block text-sm font-medium">Descripción</label>
-          <input id="description" value={description} onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--brand)" placeholder="Motivo del consumo" />
+          <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Motivo del consumo" />
         </div>
         <div>
           <label htmlFor="entry_date" className="mb-1 block text-sm font-medium">Fecha</label>
-          <input id="entry_date" type="date" max={todayISO()} value={entryDate} onChange={(e) => setEntryDate(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--brand)" />
+          <Input id="entry_date" type="date" max={todayISO()} value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
         </div>
         {willExceed && <p className="text-xs text-amber-700">Atención: excede el presupuesto disponible.</p>}
         {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
         <div className="flex gap-2 pt-1">
-          <button type="submit" disabled={pending}
-            className="rounded-lg bg-(--brand) px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
-            {pending ? 'Guardando…' : 'Guardar'}
-          </button>
-          <button type="button" onClick={() => { reset(); setOpen(false) }}
-            className="rounded-lg px-4 py-2 text-sm text-foreground/60 hover:text-foreground">Cancelar</button>
+          <Button type="submit" disabled={pending} size="lg">{pending ? 'Guardando…' : 'Guardar'}</Button>
+          <Button type="button" variant="ghost" size="lg" onClick={() => { reset(); setOpen(false) }}>Cancelar</Button>
         </div>
       </div>
     </form>

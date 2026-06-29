@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ampliarPresupuesto } from './actions'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -29,19 +31,16 @@ export default function AmpliarForm({ projectId }: { projectId: string }) {
     <form onSubmit={onSubmit} className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
       <h3 className="font-display text-base font-semibold">Ampliar presupuesto</h3>
       <div className="grid gap-3 sm:grid-cols-2">
-        <input aria-label="Monto" type="number" step="0.01" min="0" placeholder="Monto (€)" value={monto}
-          onChange={(e) => setMonto(e.target.value)} className="rounded border border-border px-3 py-2" />
-        <input aria-label="Fecha" type="date" max={today()} value={fecha}
-          onChange={(e) => setFecha(e.target.value)} className="rounded border border-border px-3 py-2" />
-        <input aria-label="Motivo" placeholder="Motivo" value={motivo}
-          onChange={(e) => setMotivo(e.target.value)} className="rounded border border-border px-3 py-2 sm:col-span-2" />
-        <input aria-label="Referencia" placeholder="Referencia (opcional)" value={referencia}
-          onChange={(e) => setReferencia(e.target.value)} className="rounded border border-border px-3 py-2 sm:col-span-2" />
+        <Input aria-label="Monto" type="number" step="0.01" min="0" placeholder="Monto (€)" value={monto}
+          onChange={(e) => setMonto(e.target.value)} />
+        <Input aria-label="Fecha" type="date" max={today()} value={fecha}
+          onChange={(e) => setFecha(e.target.value)} />
+        <Input aria-label="Motivo" placeholder="Motivo" value={motivo}
+          onChange={(e) => setMotivo(e.target.value)} className="sm:col-span-2" />
+        <Input aria-label="Referencia" placeholder="Referencia (opcional)" value={referencia}
+          onChange={(e) => setReferencia(e.target.value)} className="sm:col-span-2" />
       </div>
-      <button type="submit" disabled={saving}
-        className="rounded-lg bg-(--brand) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--brand-strong) disabled:cursor-not-allowed disabled:opacity-50">
-        {saving ? 'Ampliando…' : 'Ampliar'}
-      </button>
+      <Button type="submit" disabled={saving} size="lg">{saving ? 'Ampliando…' : 'Ampliar'}</Button>
     </form>
   )
 }

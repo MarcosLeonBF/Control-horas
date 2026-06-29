@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { guardarRegistro, type LineInput } from '@/app/(horas)/registrar/actions'
 import { formatHoras } from '@/lib/horas/format'
 import type { AreaRow, EtapaRow } from '@/lib/horas/types'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 const DEPARTAMENTOS = ['Clientes', 'Ventas', 'Marketing', 'Todos'] as const
 const today = () => new Date().toISOString().slice(0, 10)
@@ -52,10 +54,9 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex items-center gap-3">
         <label htmlFor="fecha" className="text-sm font-medium text-foreground">Fecha</label>
-        <input
+        <Input
           id="fecha" type="date" value={entryDate} max={today()} min={canBackdate ? undefined : daysAgo(7)}
-          onChange={(e) => setEntryDate(e.target.value)}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring"
+          onChange={(e) => setEntryDate(e.target.value)} className="w-auto"
         />
         {!canBackdate && <span className="text-xs text-muted-foreground">Hasta 7 días atrás</span>}
       </div>
@@ -103,17 +104,16 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
                   </select>
                 </td>
                 <td className="w-24 pr-3 align-top">
-                  <input aria-label="Horas" type="number" step="0.5" min="0" value={l.hours || ''}
-                    onChange={(e) => update(i, { hours: Number(e.target.value) })} className={field} />
+                  <Input aria-label="Horas" type="number" step="0.5" min="0" value={l.hours || ''}
+                    onChange={(e) => update(i, { hours: Number(e.target.value) })} />
                 </td>
                 <td className="min-w-50 pr-3 align-top">
-                  <input aria-label="Descripción" value={l.description}
-                    onChange={(e) => update(i, { description: e.target.value })} placeholder="¿Qué hiciste?" className={field} />
+                  <Input aria-label="Descripción" value={l.description}
+                    onChange={(e) => update(i, { description: e.target.value })} placeholder="¿Qué hiciste?" />
                 </td>
                 <td className="align-middle">
-                  <button type="button" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
-                    disabled={lines.length === 1} aria-label="Eliminar línea"
-                    className="px-1 text-foreground/40 transition-colors hover:text-(--excedido) disabled:opacity-30">✕</button>
+                  <Button type="button" variant="ghost" size="icon-sm" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
+                    disabled={lines.length === 1} aria-label="Eliminar línea" className="text-foreground/40 hover:text-(--status-excedido)">✕</Button>
                 </td>
               </tr>
             ))}
@@ -122,17 +122,17 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-        <button type="button" onClick={() => setLines((p) => [...p, emptyLine(areas[0]?.id ?? '')])}
-          className="text-sm font-medium text-(--brand) transition-colors hover:text-(--brand-strong)">+ Añadir línea</button>
+        <Button type="button" variant="link" size="sm" className="px-0" onClick={() => setLines((p) => [...p, emptyLine(areas[0]?.id ?? '')])}>
+          + Añadir línea
+        </Button>
         <span className="text-sm text-muted-foreground">
           Total del día: <strong className="tabular-money ml-1 text-base text-foreground">{formatHoras(total)}</strong>
         </span>
       </div>
 
-      <button type="button" onClick={onSave} disabled={saving}
-        className="mt-6 rounded-lg bg-(--brand) px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-(--brand-strong) disabled:cursor-not-allowed disabled:opacity-50">
+      <Button type="button" onClick={onSave} disabled={saving} size="lg" className="mt-6">
         {saving ? 'Guardando…' : 'Guardar registro'}
-      </button>
+      </Button>
     </div>
   )
 }
