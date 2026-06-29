@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import type { ExportRow } from '@/lib/hucha/export'
+import type { ExportRow } from '@/lib/export'
 
 interface RawProject { name: string }
 interface RawBank { projects: RawProject | RawProject[] }

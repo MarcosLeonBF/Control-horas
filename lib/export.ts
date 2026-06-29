@@ -1,4 +1,4 @@
-// Utilidades de descarga (cliente). Excel vía SheetJS (import dinámico) + CSV.
+// Utilidades de descarga (cliente) compartidas. Excel vía SheetJS (import dinámico) + CSV.
 export type ExportRow = Record<string, string | number>
 
 function triggerDownload(blob: Blob, filename: string) {

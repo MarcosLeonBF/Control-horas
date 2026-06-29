@@ -152,8 +152,17 @@ El admin puede **ampliar el banco de horas** de un proyecto dentro de la app, so
 - **Ampliar** (form admin: horas + motivo + fecha) y **anular** (soft-delete; deja de sumar). Escrituras vía RPC `SECURITY DEFINER` solo-admin (`ampliar_horas`, `anular_ampliacion_horas`); tabla `horas_ampliaciones` con RLS (lectura manager/admin, sin escritura directa). Migraciones 0014 (tabla+RPCs) y 0015 (FKs `created_by/voided_by` → `ON DELETE SET NULL`).
 - **Calidad:** E2E admin (ampliar→anular, auto-limpiante) + test SQL del guard de rol (no-admin rechazado, sin fila residual); 9/9 del proyecto admin en verde.
 
+### Horas v2 · Fase 5 — Reportes (dashboard consolidado) — ✅ COMPLETADA (PDF §17)
+Pantalla **`/reportes`** (manager+admin), que el PDF llama "Dashboard / Reportes":
+- **Resumen**: total de horas, horas **cliente vs internas** (Departamento), nº de líneas; recalculado con los filtros.
+- **Agrupable** por **proyecto / usuario / área / departamento / etapa** (control segmentado), con barra de reparto y % sobre el total — cubre las vistas del §17 (consumo por proyecto/usuario/área/departamento, internas vs cliente).
+- **Filtros**: rango de fechas (servidor) + proyecto/usuario/área (cliente, instantáneos).
+- **Descargas Excel + CSV** de la vista agrupada actual (§17.5 pide ambos formatos). Utilidad de export ahora compartida en `lib/export.ts` (antes en `lib/hucha/`).
+- Construida con el sistema editorial de marca; E2E admin verde (agrupar + descargar CSV).
+- **Diferido:** el §17.6 pide que el manager vea solo su equipo/área; hoy manager+admin ven todo (igual que `/equipo`). Afinar el alcance por RLS queda para la fase de auditoría. "Consumo por cliente" no sale aún (el Excel de banco no trae cliente).
+
 ### Próximo
-- **Horas v2 · Fase 2 — Paso 3** (opcional): descargas de `/bancos` (Excel/CSV), alertas, y reporte de "horas valor agregado" análogo a HUCHA. ⏳ Por planificar.
+- **Horas · alertas** Slack al 80/100/exceso (PDF §15) y descargas adicionales del §17.5 (registros, líneas, movimientos). ⏳ Por planificar.
 
 ---
 

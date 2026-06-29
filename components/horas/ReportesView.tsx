@@ -1,0 +1,200 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { Download, Filter, X } from 'lucide-react'
+import type { ReporteLine, ReporteFilterOptions, GroupBy } from '@/lib/horas/reportes-types'
+import { GROUP_LABELS, GROUP_ORDER, aggregate } from '@/lib/horas/reportes-types'
+import { downloadXlsx, downloadCsv } from '@/lib/export'
+import { formatHoras } from '@/lib/horas/format'
+import { cn } from '@/lib/utils'
+
+const selectClass =
+  'h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: 'brand' | 'wine' | 'muted' }) {
+  return (
+    <div className="relative">
+      <div
+        className={cn(
+          'absolute left-0 top-1 h-9 w-1 rounded-full',
+          accent === 'brand' && 'bg-(--brand)',
+          accent === 'wine' && 'bg-(--wine)',
+          accent === 'muted' && 'bg-foreground/15',
+        )}
+      />
+      <div className="pl-4">
+        <p className="text-[0.7rem] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+        <p className="tabular-money mt-1 font-display text-2xl font-semibold tracking-tight">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+export default function ReportesView({
+  lines,
+  options,
+  from,
+  to,
+}: {
+  lines: ReporteLine[]
+  options: ReporteFilterOptions
+  from: string
+  to: string
+}) {
+  const [groupBy, setGroupBy] = useState<GroupBy>('project')
+  const [fProject, setFProject] = useState('')
+  const [fUser, setFUser] = useState('')
+  const [fArea, setFArea] = useState('')
+
+  const filtered = useMemo(
+    () =>
+      lines.filter(
+        (l) =>
+          (!fProject || l.project === fProject) &&
+          (!fUser || l.user === fUser) &&
+          (!fArea || l.area === fArea),
+      ),
+    [lines, fProject, fUser, fArea],
+  )
+
+  const rows = useMemo(() => aggregate(filtered, groupBy), [filtered, groupBy])
+
+  const totals = useMemo(() => {
+    let total = 0
+    let internas = 0
+    for (const l of filtered) {
+      total += l.hours
+      if (l.isInternal) internas += l.hours
+    }
+    return { total, internas, cliente: total - internas, lineas: filtered.length }
+  }, [filtered])
+
+  const max = rows[0]?.hours ?? 0
+  const hasFilters = fProject || fUser || fArea
+  const dimLabel = GROUP_LABELS[groupBy]
+
+  function buildRows() {
+    return rows.map((r) => ({ [dimLabel]: r.label, Horas: r.hours }))
+  }
+  const fileBase = `reporte-horas-por-${groupBy}_${from}_${to}`
+
+  return (
+    <div className="animate-fade-up space-y-7">
+      {/* Resumen */}
+      <div className="grid gap-5 rounded-2xl border border-border bg-card px-6 py-5 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="Total de horas" value={formatHoras(totals.total)} accent="brand" />
+        <Stat label="Horas cliente" value={formatHoras(totals.cliente)} accent="wine" />
+        <Stat label="Horas internas" value={formatHoras(totals.internas)} accent="muted" />
+        <Stat label="Líneas" value={String(totals.lineas)} accent="muted" />
+      </div>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Filter className="size-4" /> Filtrar
+        </span>
+        <select aria-label="Filtrar por proyecto" value={fProject} onChange={(e) => setFProject(e.target.value)} className={selectClass}>
+          <option value="">Todos los proyectos</option>
+          {options.projects.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select aria-label="Filtrar por usuario" value={fUser} onChange={(e) => setFUser(e.target.value)} className={selectClass}>
+          <option value="">Todos los usuarios</option>
+          {options.users.map((u) => <option key={u} value={u}>{u}</option>)}
+        </select>
+        <select aria-label="Filtrar por área" value={fArea} onChange={(e) => setFArea(e.target.value)} className={selectClass}>
+          <option value="">Todas las áreas</option>
+          {options.areas.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+        {hasFilters && (
+          <button
+            onClick={() => { setFProject(''); setFUser(''); setFArea('') }}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X className="size-3.5" /> Limpiar
+          </button>
+        )}
+      </div>
+
+      {/* Agrupar por + descargas */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Agrupar por</span>
+          <div className="inline-flex rounded-full border border-border bg-card p-1">
+            {GROUP_ORDER.map((g) => (
+              <button
+                key={g}
+                onClick={() => setGroupBy(g)}
+                className={cn(
+                  'rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
+                  groupBy === g ? 'bg-(--brand) text-white shadow-sm' : 'text-foreground/55 hover:text-foreground',
+                )}
+              >
+                {GROUP_LABELS[g]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="inline-flex items-center gap-2">
+          <button
+            onClick={() => void downloadXlsx(`${fileBase}.xlsx`, buildRows(), 'Reporte')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-foreground/70 transition-colors hover:bg-(--muted-surface) hover:text-foreground"
+          >
+            <Download className="size-3.5" /> Excel
+          </button>
+          <button
+            onClick={() => downloadCsv(`${fileBase}.csv`, buildRows())}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-(--brand) px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-(--brand-strong)"
+          >
+            <Download className="size-3.5" /> CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Tabla */}
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="grid grid-cols-[2.5rem_1fr_minmax(8rem,1.4fr)_5rem_3.5rem] items-center gap-3 border-b border-border bg-(--muted-surface) px-5 py-3 text-[0.7rem] uppercase tracking-[0.12em] text-muted-foreground">
+          <span className="text-right">#</span>
+          <span>{dimLabel}</span>
+          <span>Reparto</span>
+          <span className="text-right">Horas</span>
+          <span className="text-right">%</span>
+        </div>
+        {rows.length === 0 ? (
+          <p className="px-5 py-12 text-center text-sm text-muted-foreground">
+            No hay horas registradas con estos filtros en el rango seleccionado.
+          </p>
+        ) : (
+          <ul>
+            {rows.map((r, i) => {
+              const pct = totals.total > 0 ? (r.hours / totals.total) * 100 : 0
+              const barW = max > 0 ? (r.hours / max) * 100 : 0
+              return (
+                <li
+                  key={r.label}
+                  className="grid grid-cols-[2.5rem_1fr_minmax(8rem,1.4fr)_5rem_3.5rem] items-center gap-3 border-b border-border/60 px-5 py-3 text-sm transition-colors last:border-0 hover:bg-(--muted-surface)/60"
+                >
+                  <span className="text-right text-xs tabular-money text-muted-foreground">{i + 1}</span>
+                  <span className="truncate font-medium text-foreground" title={r.label}>{r.label}</span>
+                  <span className="h-2 overflow-hidden rounded-full bg-(--muted-surface)">
+                    <span className="block h-full rounded-full bg-(--brand)" style={{ width: `${barW}%` }} />
+                  </span>
+                  <span className="text-right tabular-money font-medium">{formatHoras(r.hours)}</span>
+                  <span className="text-right text-xs tabular-money text-muted-foreground">{pct.toFixed(0)}%</span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {rows.length > 0 && (
+          <div className="grid grid-cols-[2.5rem_1fr_minmax(8rem,1.4fr)_5rem_3.5rem] items-center gap-3 border-t border-border bg-(--muted-surface) px-5 py-3 text-sm">
+            <span />
+            <span className="font-display font-semibold">Total</span>
+            <span />
+            <span className="text-right tabular-money font-semibold">{formatHoras(totals.total)}</span>
+            <span className="text-right text-xs text-muted-foreground">100%</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
