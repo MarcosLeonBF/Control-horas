@@ -140,8 +140,14 @@ Todas las descargas viven en el **Dashboard**, en una barra única bajo los filt
 - Cada dataset se baja en **Excel** (SheetJS, import dinámico) o **CSV** (con BOM para Excel/acentos). Utilidad común en `lib/hucha/export.ts`.
 - Construido inline (sin sobre-planificar); E2E admin verde (descarga del CSV de presupuestos verificada por `suggestedFilename`).
 
+### Horas v2 · Fase 2 — Paso 1: Bancos de horas (vista) — ✅ COMPLETADA
+Decisión confirmada: **banco por proyecto** (el Excel de banco de horas — tabla `BancoHoras` = [Proyecto, Horas CRM] — da el total **por proyecto, no por área**; el área sigue siendo solo dimensión de la línea).
+- Nueva vista **`/bancos`** (manager+admin, enlazada en la nav de Horas): por proyecto, **asignado** (Excel, lectura en vivo) vs. **registrado** (suma de horas de logs no anulados), restante, estado y barra de consumo. KPIs + filtros (búsqueda/estado), mismo lenguaje visual que el dashboard HUCHA.
+- Estados con los **mismos umbrales** que `compute_hucha_status` (disponible/bajo/consumido/excedido), calculados en `lib/horas/bancos-status.ts`. Read-model en `lib/horas/bancos.ts`. **Sin migración** (solo lectura).
+- E2E admin verde. De paso se corrigió una fragilidad pre-existente: el E2E de ampliar HUCHA afirmaba un total absoluto del proyecto-fixture (compartido) → ahora afirma su propia fila de movimiento (a prueba de paralelismo).
+
 ### Próximo
-- **Horas v2 · Fase 2** (Bancos de horas): bancos por cliente/área alimentados desde el/los Excel de banco de horas, descuento por línea, movimientos, ampliaciones. ⏳ Por planificar.
+- **Horas v2 · Fase 2 — Paso 2** (Ampliaciones de horas): tabla + RPC para que el admin amplíe el banco de horas por proyecto (sobre la base del Excel), paralelo a HUCHA. ⏳ Por planificar.
 
 ---
 

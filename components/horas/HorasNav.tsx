@@ -37,6 +37,7 @@ export default function HorasNav({ displayName, role }: { displayName: string; r
             {link('/registrar', 'Registrar')}
             {link('/mis-registros', 'Mis registros')}
             {isManagerOrAdmin && link('/equipo', 'Equipo')}
+            {isManagerOrAdmin && link('/bancos', 'Bancos de horas')}
             {role === 'admin' && link('/admin/usuarios', 'Usuarios')}
             {isManagerOrAdmin && (
               <Link href="/presupuestos" className="text-sm text-(--brand) transition-colors hover:text-(--brand-strong)">
