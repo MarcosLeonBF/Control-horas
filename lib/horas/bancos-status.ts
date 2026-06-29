@@ -10,6 +10,26 @@ export interface BancoHorasRow {
   status: HorasStatus
 }
 
+export interface AmpliacionHoras {
+  id: string
+  project: string
+  hours: number
+  reason: string
+  entry_date: string
+  actor_name: string
+  active: boolean
+}
+
+export interface BancoHorasDetalle {
+  project: string
+  excelBase: number // Horas CRM del Excel
+  ampliaciones: AmpliacionHoras[]
+  assigned: number // excelBase + Σ ampliaciones activas
+  consumed: number
+  remaining: number
+  status: HorasStatus
+}
+
 export const HORAS_STATUS_LABELS: Record<HorasStatus, string> = {
   sin_asignacion: 'Sin asignación',
   disponible: 'Disponible',

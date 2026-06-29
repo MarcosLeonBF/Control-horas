@@ -17,12 +17,12 @@ export default defineConfig({
       name: 'chromium-horas',
       use: { storageState: 'e2e/.auth/operativo.json' },
       testMatch: '**/horas-*.spec.ts',
-      testIgnore: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos.spec.ts'],
+      testIgnore: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos*.spec.ts'],
     },
     {
       name: 'chromium-horas-admin',
       use: { storageState: 'e2e/.auth/admin-horas.json' },
-      testMatch: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos.spec.ts', '**/hucha-sync-ui.spec.ts', '**/hucha-admin-*.spec.ts'],
+      testMatch: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos*.spec.ts', '**/hucha-sync-ui.spec.ts', '**/hucha-admin-*.spec.ts'],
     },
   ],
   // Sin bloque `webServer`: el dev server lo gestiona el usuario.

@@ -1,10 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Search, AlertTriangle, TrendingDown } from 'lucide-react'
 import type { BancoHorasRow, HorasStatus } from '@/lib/horas/bancos-status'
 import { HORAS_STATUS_LABELS } from '@/lib/horas/bancos-status'
 import { formatHoras } from '@/lib/horas/format'
+import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
@@ -20,14 +22,6 @@ const BAR_COLOR: Record<HorasStatus, string> = {
   disponible: 'bg-(--status-disponible)',
   consumido: 'bg-(--status-consumido)',
   sin_asignacion: 'bg-(--status-sin)',
-}
-
-const BADGE: Record<HorasStatus, string> = {
-  disponible: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  bajo: 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  consumido: 'bg-slate-100 text-slate-600 ring-slate-500/20',
-  excedido: 'bg-rose-50 text-rose-700 ring-rose-600/20',
-  sin_asignacion: 'bg-neutral-100 text-neutral-500 ring-neutral-400/20',
 }
 
 const ESTADOS: HorasStatus[] = ['excedido', 'bajo', 'disponible', 'consumido', 'sin_asignacion']
@@ -127,7 +121,11 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
               const pct = r.assigned > 0 ? Math.min((r.consumed / r.assigned) * 100, 100) : 0
               return (
                 <TableRow key={r.project}>
-                  <TableCell className="py-3 font-medium text-foreground">{r.project}</TableCell>
+                  <TableCell className="py-3">
+                    <Link href={`/bancos/${encodeURIComponent(r.project)}`} className="font-medium text-foreground hover:text-(--brand) hover:underline">
+                      {r.project}
+                    </Link>
+                  </TableCell>
                   <TableCell className="py-3">
                     <div className="tabular-money text-sm">
                       <span className={cn('font-medium', r.remaining < 0 && 'text-(--status-excedido)')}>{formatHoras(r.remaining)}</span>
@@ -138,9 +136,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                     </div>
                   </TableCell>
                   <TableCell className="py-3 text-right">
-                    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset', BADGE[r.status])}>
-                      {HORAS_STATUS_LABELS[r.status]}
-                    </span>
+                    <HorasStatusBadge status={r.status} />
                   </TableCell>
                 </TableRow>
               )

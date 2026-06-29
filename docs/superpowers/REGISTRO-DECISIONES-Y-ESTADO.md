@@ -146,8 +146,14 @@ Decisión confirmada: **banco por proyecto** (el Excel de banco de horas — tab
 - Estados con los **mismos umbrales** que `compute_hucha_status` (disponible/bajo/consumido/excedido), calculados en `lib/horas/bancos-status.ts`. Read-model en `lib/horas/bancos.ts`. **Sin migración** (solo lectura).
 - E2E admin verde. De paso se corrigió una fragilidad pre-existente: el E2E de ampliar HUCHA afirmaba un total absoluto del proyecto-fixture (compartido) → ahora afirma su propia fila de movimiento (a prueba de paralelismo).
 
+### Horas v2 · Fase 2 — Paso 2: Ampliaciones de horas (admin) — ✅ COMPLETADA
+El admin puede **ampliar el banco de horas** de un proyecto dentro de la app, sobre la base del Excel (igual que las ampliaciones de HUCHA). El Excel sigue siendo de solo lectura.
+- **Detalle por proyecto** `/bancos/[proyecto]` (cada fila de `/bancos` enlaza aquí): asignado (Excel + ampliaciones), consumido, restante, estado, y el historial de ampliaciones. Asignado = **Horas CRM + Σ ampliaciones activas**.
+- **Ampliar** (form admin: horas + motivo + fecha) y **anular** (soft-delete; deja de sumar). Escrituras vía RPC `SECURITY DEFINER` solo-admin (`ampliar_horas`, `anular_ampliacion_horas`); tabla `horas_ampliaciones` con RLS (lectura manager/admin, sin escritura directa). Migraciones 0014 (tabla+RPCs) y 0015 (FKs `created_by/voided_by` → `ON DELETE SET NULL`).
+- **Calidad:** E2E admin (ampliar→anular, auto-limpiante) + test SQL del guard de rol (no-admin rechazado, sin fila residual); 9/9 del proyecto admin en verde.
+
 ### Próximo
-- **Horas v2 · Fase 2 — Paso 2** (Ampliaciones de horas): tabla + RPC para que el admin amplíe el banco de horas por proyecto (sobre la base del Excel), paralelo a HUCHA. ⏳ Por planificar.
+- **Horas v2 · Fase 2 — Paso 3** (opcional): descargas de `/bancos` (Excel/CSV), alertas, y reporte de "horas valor agregado" análogo a HUCHA. ⏳ Por planificar.
 
 ---
 

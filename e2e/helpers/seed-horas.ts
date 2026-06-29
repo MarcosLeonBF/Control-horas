@@ -47,12 +47,14 @@ export async function cleanupHorasFixture() {
   for (const u of list.users) {
     // Delete operativo
     if (u.email === OPERATIVO.email) {
+      await admin.from('horas_ampliaciones').delete().eq('created_by', u.id)
       await admin.from('time_logs').delete().eq('user_id', u.id)
       await admin.from('user_areas').delete().eq('user_id', u.id)
       await admin.auth.admin.deleteUser(u.id)
     }
     // Delete admin E2E user
     if (u.email === ADMIN_USER.email) {
+      await admin.from('horas_ampliaciones').delete().eq('created_by', u.id)
       await admin.from('time_logs').delete().eq('user_id', u.id)
       await admin.from('user_areas').delete().eq('user_id', u.id)
       await admin.auth.admin.deleteUser(u.id)
