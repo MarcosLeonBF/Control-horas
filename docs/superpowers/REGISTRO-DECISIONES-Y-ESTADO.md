@@ -199,13 +199,13 @@ Pantalla **`/reportes`** (manager+admin), que el PDF llama "Dashboard / Reportes
 - **Clave de cruce**: nombre de proyecto (string), igual que el banco de horas.
 - **Manager↔proyecto**: viene del Excel (`Clientes_Proyectos` → "Manager del proyecto"; se matchea por nombre contra `profiles.full_name`).
 
-**Implicación para Horas Fase 2:** el banco de horas del Excel es **por proyecto** (Horas CRM), **no por área**. El Excel no tiene granularidad de área → un "banco por área" no sale del Excel tal cual. Decisión pendiente (ver sección 7).
+**Modelo de banco de horas (aclarado 2026-06-29 por el usuario):** el banco es **por proyecto**. El archivo `Banco de Horas CRM.xlsx` (`BancoHoras` = [Proyecto, Horas CRM]) es el **banco general de todos los proyectos**; **"CRM" NO es un área**, es el total del proyecto. El **área es un atributo del usuario** (el admin la asigna al crearlo, una o varias). No hay bancos separados por área. Así el §9/§10 se cumple con un banco por proyecto: cada línea descuenta del banco del proyecto, sin importar el área. → Lo construido (banco por proyecto + áreas de usuario) es el modelo correcto y final.
 
 ---
 
 ## 7. Temas a confirmar en la reunión
 1. ✅ ~~Estructura del Excel de presupuestos~~ — **resuelto** (ver sección 6): el Excel existe y está cableado; HUCHA ya sincroniza.
-2. **Banco de horas por área (Fase 2):** el Excel solo trae **total por proyecto** (`BancoHoras` = [Proyecto, Horas CRM]), sin desglose por área. ¿El banco de horas es **por proyecto** (área = solo dimensión de la línea, como hoy) o se necesita presupuesto **por área**? Si es por área, ¿de dónde sale el reparto (otra tabla del Excel / manual en la app)?
+2. ✅ ~~Banco de horas por área~~ — **resuelto** (2026-06-29): el banco es **por proyecto** (`Horas CRM` = banco general del proyecto, no un área); el **área es atributo del usuario** que el admin asigna al crearlo. No hay bancos por área. Lo construido es el modelo final.
 3. **Descargas del manager** (D8) — ¿se mantiene o se restringe a solo admin?
 4. **¿Hace falta un 4º rol** (alguien que amplíe presupuesto sin ser admin completo)? (D9)
 5. Validar la frontera de alcance HUCHA vs Horas y el orden de fases.
