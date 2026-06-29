@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Search, AlertTriangle, TrendingDown } from 'lucide-react'
+import { Search, AlertTriangle, TrendingDown, Download } from 'lucide-react'
 import type { BancoHorasRow, HorasStatus } from '@/lib/horas/bancos-status'
 import { HORAS_STATUS_LABELS } from '@/lib/horas/bancos-status'
+import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras } from '@/lib/horas/format'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import { Card } from '@/components/ui/card'
@@ -63,6 +64,15 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
     return t
   }, [filtered])
 
+  // Descarga de la vista filtrada (§17.5: bancos de horas; excedidos/cerca = filtrar estado + descargar).
+  function buildRows(): ExportRow[] {
+    return filtered.map((r) => ({
+      Proyecto: r.project, Asignado: r.assigned, Consumido: r.consumed,
+      Restante: r.remaining, Estado: HORAS_STATUS_LABELS[r.status],
+    }))
+  }
+  const fileBase = `bancos-horas${estado === 'todos' ? '' : `-${estado}`}`
+
   return (
     <div className="space-y-6">
       {/* KPIs */}
@@ -97,6 +107,19 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
           {ESTADOS.map((s) => <option key={s} value={s}>{HORAS_STATUS_LABELS[s]}</option>)}
         </select>
         <span className="ml-auto text-sm text-muted-foreground">{filtered.length} de {rows.length} proyectos</span>
+      </div>
+
+      {/* Descargas (PDF §17.5) */}
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Descargar bancos:</span>
+        <button onClick={() => void downloadXlsx(`${fileBase}.xlsx`, buildRows(), 'Bancos')}
+          className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-foreground/70 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
+          <Download className="size-3.5" /> Excel
+        </button>
+        <button onClick={() => downloadCsv(`${fileBase}.csv`, buildRows())}
+          className="rounded-lg border border-border px-2.5 py-1.5 text-foreground/70 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
+          CSV
+        </button>
       </div>
 
       {/* Tabla */}

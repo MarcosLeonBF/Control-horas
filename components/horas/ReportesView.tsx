@@ -98,8 +98,22 @@ export default function ReportesView({
       Departamento: l.department, Etapa: l.etapa, Horas: l.hours, Descripción: l.description,
     }))
   }
+  // Registros de horas: totales diarios por usuario (§17.5 "descarga de registros de horas").
+  function buildRegistros(): ExportRow[] {
+    const map = new Map<string, { Fecha: string; Usuario: string; Total: number }>()
+    for (const l of filtered) {
+      const key = `${l.date}|${l.user}`
+      const cur = map.get(key) ?? { Fecha: l.date, Usuario: l.user, Total: 0 }
+      cur.Total += l.hours
+      map.set(key, cur)
+    }
+    return [...map.values()]
+      .map((r) => ({ ...r, Total: Math.round(r.Total * 100) / 100 }))
+      .sort((a, b) => (a.Fecha < b.Fecha ? 1 : a.Fecha > b.Fecha ? -1 : a.Usuario.localeCompare(b.Usuario)))
+  }
   const resumenBase = `reporte-horas-por-${groupBy}_${from}_${to}`
   const detalleBase = `detalle-horas_${from}_${to}`
+  const registrosBase = `registros-horas_${from}_${to}`
 
   return (
     <div className="animate-fade-up space-y-7">
@@ -167,6 +181,11 @@ export default function ReportesView({
             label="Detalle"
             onXlsx={() => void downloadXlsx(`${detalleBase}.xlsx`, buildDetalle(), 'Detalle')}
             onCsv={() => downloadCsv(`${detalleBase}.csv`, buildDetalle())}
+          />
+          <DownloadGroup
+            label="Registros"
+            onXlsx={() => void downloadXlsx(`${registrosBase}.xlsx`, buildRegistros(), 'Registros')}
+            onCsv={() => downloadCsv(`${registrosBase}.csv`, buildRegistros())}
           />
         </div>
       </div>

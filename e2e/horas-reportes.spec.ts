@@ -23,4 +23,12 @@ test('el admin ve el reporte consolidado, agrupa y descarga resumen y detalle', 
     detalle.getByRole('button', { name: 'CSV' }).click(),
   ])
   expect(dlDetalle.suggestedFilename()).toContain('detalle-horas')
+
+  // descargar el CSV de REGISTROS (totales diarios)
+  const registros = page.locator('span').filter({ hasText: 'Registros:' })
+  const [dlRegistros] = await Promise.all([
+    page.waitForEvent('download'),
+    registros.getByRole('button', { name: 'CSV' }).click(),
+  ])
+  expect(dlRegistros.suggestedFilename()).toContain('registros-horas')
 })
