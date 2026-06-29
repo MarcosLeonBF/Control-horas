@@ -176,10 +176,12 @@ La pantalla de Usuarios (admin) ya no solo da de alta — ahora **gestiona**:
 - **Activar/Desactivar** rápido (`cambiarEstadoUsuario`). El `status` ya gobernaba el acceso (el RPC de guardar rechaza usuarios inactivos).
 - Guardas: un admin **no puede desactivarse ni quitarse el rol** a sí mismo (evita auto-bloqueo). Escrituras solo-admin vía service role.
 - **Calidad:** E2E admin (crear → ver en panel → desactivar), auto-limpiante.
-- **Pendiente de Fase 3:** **auditoría** de correcciones (§7) y gestión de proyectos/etapas/departamentos desde la app.
+
+**Auditoría (§7) — ✅ COMPLETADA.** Toda **creación, edición y anulación** de registros queda trazada en la tabla `time_log_audit` (migración 0017), poblada **dentro de los RPC** (`guardar_registro_diario`, `anular_registro_diario`) — atómico con el cambio, guardando quién (actor), de quién es el registro (subject), acción, fecha y total. Vista **`/admin/auditoria`** (admin) con el historial. Test SQL (crear+editar+anular) verde + E2E de la pantalla.
+- **Pendiente de Fase 3:** gestión de proyectos/etapas/departamentos desde la app (hoy se administran fuera).
 
 ### Próximo
-- Auditoría de correcciones (§7), §17.6 (manager ve solo su equipo/área), descarga de movimientos de banco de horas. ⏳ Por planificar.
+- §17.6 (manager ve solo su equipo/área), descarga de movimientos de banco de horas, y la activación del webhook de Slack (lado del usuario). ⏳ Por planificar.
 
 ---
 
