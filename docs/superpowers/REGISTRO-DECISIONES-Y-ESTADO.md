@@ -169,8 +169,17 @@ Cuando alguien guarda/edita un registro, el sistema **recalcula el consumo de lo
 - **Calidad:** 7 unit tests del núcleo (umbrales + mensajes) en el proyecto `node-horas`; smoke del orquestador contra la DB real (siembra→verifica→limpia).
 - **Pendiente del usuario:** crear el Incoming Webhook en Slack y poner su URL en `SLACK_WEBHOOK_URL`.
 
+### Horas v2 · Fase 3 — Panel de usuarios — ✅ COMPLETADA (parcial; PDF §8/§19)
+La pantalla de Usuarios (admin) ya no solo da de alta — ahora **gestiona**:
+- **Panel** con la lista de usuarios (nombre, correo, posición, rol, áreas, estado).
+- **Editar** por fila: nombre, posición, rol, **estado activo/inactivo** y áreas asignadas (`actualizarUsuario`).
+- **Activar/Desactivar** rápido (`cambiarEstadoUsuario`). El `status` ya gobernaba el acceso (el RPC de guardar rechaza usuarios inactivos).
+- Guardas: un admin **no puede desactivarse ni quitarse el rol** a sí mismo (evita auto-bloqueo). Escrituras solo-admin vía service role.
+- **Calidad:** E2E admin (crear → ver en panel → desactivar), auto-limpiante.
+- **Pendiente de Fase 3:** **auditoría** de correcciones (§7) y gestión de proyectos/etapas/departamentos desde la app.
+
 ### Próximo
-- Descargas adicionales del §17.5 (registros, líneas, movimientos), filtro de fechas en el dashboard HUCHA, y auditoría/editar-desactivar usuarios (Fase 3). ⏳ Por planificar.
+- Auditoría de correcciones (§7), §17.6 (manager ve solo su equipo/área), descarga de movimientos de banco de horas. ⏳ Por planificar.
 
 ---
 
