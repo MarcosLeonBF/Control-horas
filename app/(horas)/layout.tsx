@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import HorasNav from '@/components/horas/HorasNav'
+import AppShell from '@/components/AppShell'
 
 export default async function HorasLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -10,9 +10,8 @@ export default async function HorasLayout({ children }: { children: React.ReactN
   if (!profile || profile.status !== 'activo') redirect('/login')
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <HorasNav displayName={profile.full_name || user.email!} role={profile.role} />
-      <main className="mx-auto max-w-5xl px-6 py-10">{children}</main>
-    </div>
+    <AppShell displayName={profile.full_name || user.email!} role={profile.role}>
+      {children}
+    </AppShell>
   )
 }

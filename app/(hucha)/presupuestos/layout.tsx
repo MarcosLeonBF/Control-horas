@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import HuchaNav from '@/components/hucha/HuchaNav'
+import AppShell from '@/components/AppShell'
 
 export default async function HuchaLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -13,9 +13,8 @@ export default async function HuchaLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <HuchaNav displayName={profile.full_name || user.email!} role={profile.role} />
-      <main className="mx-auto max-w-5xl px-6 py-10">{children}</main>
-    </div>
+    <AppShell displayName={profile.full_name || user.email!} role={profile.role}>
+      {children}
+    </AppShell>
   )
 }
