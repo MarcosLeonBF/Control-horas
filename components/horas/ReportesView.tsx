@@ -4,12 +4,26 @@ import { useMemo, useState } from 'react'
 import { Download, Filter, X } from 'lucide-react'
 import type { ReporteLine, ReporteFilterOptions, GroupBy } from '@/lib/horas/reportes-types'
 import { GROUP_LABELS, GROUP_ORDER, aggregate } from '@/lib/horas/reportes-types'
-import { downloadXlsx, downloadCsv } from '@/lib/export'
+import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras } from '@/lib/horas/format'
 import { cn } from '@/lib/utils'
 
 const selectClass =
   'h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
+
+function DownloadGroup({ label, onXlsx, onCsv }: { label: string; onXlsx: () => void; onCsv: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-sm text-muted-foreground">{label}:</span>
+      <button onClick={onXlsx} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-sm text-foreground/70 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
+        <Download className="size-3.5" /> Excel
+      </button>
+      <button onClick={onCsv} className="rounded-lg border border-border px-2.5 py-1.5 text-sm text-foreground/70 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
+        CSV
+      </button>
+    </span>
+  )
+}
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: 'brand' | 'wine' | 'muted' }) {
   return (
@@ -73,10 +87,19 @@ export default function ReportesView({
   const hasFilters = fProject || fUser || fArea
   const dimLabel = GROUP_LABELS[groupBy]
 
-  function buildRows() {
+  // Resumen agrupado (consumo por la dimensión elegida).
+  function buildResumen(): ExportRow[] {
     return rows.map((r) => ({ [dimLabel]: r.label, Horas: r.hours }))
   }
-  const fileBase = `reporte-horas-por-${groupBy}_${from}_${to}`
+  // Detalle: líneas de registro crudas (§17.5 "descarga de líneas de registro").
+  function buildDetalle(): ExportRow[] {
+    return filtered.map((l) => ({
+      Fecha: l.date, Usuario: l.user, Proyecto: l.project, Área: l.area,
+      Departamento: l.department, Etapa: l.etapa, Horas: l.hours, Descripción: l.description,
+    }))
+  }
+  const resumenBase = `reporte-horas-por-${groupBy}_${from}_${to}`
+  const detalleBase = `detalle-horas_${from}_${to}`
 
   return (
     <div className="animate-fade-up space-y-7">
@@ -134,19 +157,17 @@ export default function ReportesView({
             ))}
           </div>
         </div>
-        <div className="inline-flex items-center gap-2">
-          <button
-            onClick={() => void downloadXlsx(`${fileBase}.xlsx`, buildRows(), 'Reporte')}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-foreground/70 transition-colors hover:bg-(--muted-surface) hover:text-foreground"
-          >
-            <Download className="size-3.5" /> Excel
-          </button>
-          <button
-            onClick={() => downloadCsv(`${fileBase}.csv`, buildRows())}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-(--brand) px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-(--brand-strong)"
-          >
-            <Download className="size-3.5" /> CSV
-          </button>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <DownloadGroup
+            label="Resumen"
+            onXlsx={() => void downloadXlsx(`${resumenBase}.xlsx`, buildResumen(), 'Resumen')}
+            onCsv={() => downloadCsv(`${resumenBase}.csv`, buildResumen())}
+          />
+          <DownloadGroup
+            label="Detalle"
+            onXlsx={() => void downloadXlsx(`${detalleBase}.xlsx`, buildDetalle(), 'Detalle')}
+            onCsv={() => downloadCsv(`${detalleBase}.csv`, buildDetalle())}
+          />
         </div>
       </div>
 

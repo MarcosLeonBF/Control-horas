@@ -157,7 +157,7 @@ Pantalla **`/reportes`** (manager+admin), que el PDF llama "Dashboard / Reportes
 - **Resumen**: total de horas, horas **cliente vs internas** (Departamento), nº de líneas; recalculado con los filtros.
 - **Agrupable** por **proyecto / usuario / área / departamento / etapa** (control segmentado), con barra de reparto y % sobre el total — cubre las vistas del §17 (consumo por proyecto/usuario/área/departamento, internas vs cliente).
 - **Filtros**: rango de fechas (servidor) + proyecto/usuario/área (cliente, instantáneos).
-- **Descargas Excel + CSV** de la vista agrupada actual (§17.5 pide ambos formatos). Utilidad de export ahora compartida en `lib/export.ts` (antes en `lib/hucha/`).
+- **Descargas Excel + CSV** (§17.5 pide ambos): **Resumen** (la vista agrupada actual) y **Detalle** (las líneas de registro crudas: fecha, usuario, proyecto, área, departamento, etapa, horas, descripción) — respetando los filtros activos. Utilidad de export compartida en `lib/export.ts`.
 - Construida con el sistema editorial de marca; E2E admin verde (agrupar + descargar CSV).
 - **Diferido:** el §17.6 pide que el manager vea solo su equipo/área; hoy manager+admin ven todo (igual que `/equipo`). Afinar el alcance por RLS queda para la fase de auditoría. "Consumo por cliente" no sale aún (el Excel de banco no trae cliente).
 

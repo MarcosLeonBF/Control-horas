@@ -21,6 +21,7 @@ export interface ReporteLine {
   department: string
   user: string
   hours: number
+  description: string
   isInternal: boolean // project === 'Departamento'
 }
 

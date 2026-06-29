@@ -6,6 +6,7 @@ interface RawLine {
   project: string
   hours: number
   department: string
+  description: string | null
   areas: { name: string } | null
   etapas: { name: string } | null
   time_logs: { entry_date: string; profiles: { full_name: string } | null } | null
@@ -17,7 +18,7 @@ export async function getReporteLines(from: string, to: string): Promise<Reporte
   const { data } = await supabase
     .from('time_log_lines')
     .select(
-      'project, hours, department, areas(name), etapas(name), time_logs!inner(entry_date, status, user_id, profiles!time_logs_user_id_fkey(full_name))',
+      'project, hours, department, description, areas(name), etapas(name), time_logs!inner(entry_date, status, user_id, profiles!time_logs_user_id_fkey(full_name))',
     )
     .neq('time_logs.status', 'anulado')
     .gte('time_logs.entry_date', from)
@@ -32,6 +33,7 @@ export async function getReporteLines(from: string, to: string): Promise<Reporte
     department: l.department,
     user: l.time_logs?.profiles?.full_name ?? '—',
     hours: Number(l.hours),
+    description: l.description ?? '',
     isInternal: l.project === 'Departamento',
   }))
 }
