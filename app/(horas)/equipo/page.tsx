@@ -1,6 +1,12 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatHoras } from '@/lib/horas/format'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+
+const STATUS_VARIANT: Record<string, 'secondary' | 'outline' | 'destructive'> = {
+  guardado: 'secondary', editado: 'outline', anulado: 'destructive',
+}
 
 export default async function EquipoPage() {
   const supabase = await createClient()
@@ -14,20 +20,41 @@ export default async function EquipoPage() {
     .order('entry_date', { ascending: false })
     .limit(200)
 
+  type Log = { id: string; entry_date: string; total_hours: number; status: string; profiles: { full_name: string } | null }
+
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl">Registros del equipo</h1>
-      <table className="w-full text-sm">
-        <thead><tr className="text-left text-muted-foreground"><th>Fecha</th><th>Usuario</th><th>Total</th><th>Estado</th></tr></thead>
-        <tbody>
-          {(logs ?? []).map((l: { id: string; entry_date: string; total_hours: number; status: string; profiles: { full_name: string } | null }) => (
-            <tr key={l.id} className="border-t border-border">
-              <td>{l.entry_date}</td><td>{l.profiles?.full_name ?? '—'}</td>
-              <td className="tabular-money">{formatHoras(Number(l.total_hours))}</td><td>{l.status}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+
+      <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-(--muted-surface) hover:bg-(--muted-surface)">
+              <TableHead>Fecha</TableHead>
+              <TableHead>Usuario</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Estado</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(logs ?? []).length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="py-10 text-center text-muted-foreground">Aún no hay registros.</TableCell>
+              </TableRow>
+            )}
+            {((logs ?? []) as unknown as Log[]).map((l) => (
+              <TableRow key={l.id}>
+                <TableCell className="py-3">{l.entry_date}</TableCell>
+                <TableCell className="py-3 text-foreground/70">{l.profiles?.full_name ?? '—'}</TableCell>
+                <TableCell className="py-3 text-right tabular-money">{formatHoras(Number(l.total_hours))}</TableCell>
+                <TableCell className="py-3 text-right">
+                  <Badge variant={STATUS_VARIANT[l.status] ?? 'outline'} className="capitalize">{l.status}</Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }

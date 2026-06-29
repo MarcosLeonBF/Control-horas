@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatHoras } from '@/lib/horas/format'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 
 interface AuditRow {
   id: string; action: 'crear' | 'editar' | 'anular'
@@ -9,9 +11,9 @@ interface AuditRow {
 }
 
 const ACTION_STYLE: Record<AuditRow['action'], string> = {
-  crear: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  editar: 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  anular: 'bg-rose-50 text-rose-700 ring-rose-600/20',
+  crear: 'bg-emerald-50 text-emerald-700',
+  editar: 'bg-amber-50 text-amber-700',
+  anular: 'bg-rose-50 text-rose-700',
 }
 
 export default async function AuditoriaPage() {
@@ -36,39 +38,37 @@ export default async function AuditoriaPage() {
       </div>
 
       <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-(--muted-surface) text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-4 py-2.5 font-medium">Cuándo</th>
-              <th className="px-4 py-2.5 font-medium">Acción</th>
-              <th className="px-4 py-2.5 font-medium">Registro (fecha)</th>
-              <th className="px-4 py-2.5 font-medium">De</th>
-              <th className="px-4 py-2.5 font-medium">Por</th>
-              <th className="px-4 py-2.5 font-medium text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-(--muted-surface) hover:bg-(--muted-surface)">
+              <TableHead>Cuándo</TableHead>
+              <TableHead>Acción</TableHead>
+              <TableHead>Registro (fecha)</TableHead>
+              <TableHead>De</TableHead>
+              <TableHead>Por</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">Aún no hay movimientos registrados.</td></tr>
+              <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Aún no hay movimientos registrados.</TableCell></TableRow>
             )}
             {rows.map((r) => (
-              <tr key={r.id} className="border-t border-border">
-                <td className="px-4 py-2.5 text-foreground/70">
+              <TableRow key={r.id}>
+                <TableCell className="py-3 text-foreground/70">
                   {new Date(r.at).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
-                </td>
-                <td className="px-4 py-2.5">
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${ACTION_STYLE[r.action]}`}>
-                    {r.action}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-foreground/70">{r.entry_date ?? '—'}</td>
-                <td className="px-4 py-2.5 text-foreground/70">{r.subject_name ?? '—'}</td>
-                <td className="px-4 py-2.5 text-foreground/70">{r.actor_name ?? '—'}</td>
-                <td className="px-4 py-2.5 text-right tabular-money">{r.total_hours != null ? formatHoras(Number(r.total_hours)) : '—'}</td>
-              </tr>
+                </TableCell>
+                <TableCell className="py-3">
+                  <Badge className={`capitalize ${ACTION_STYLE[r.action]}`}>{r.action}</Badge>
+                </TableCell>
+                <TableCell className="py-3 text-foreground/70">{r.entry_date ?? '—'}</TableCell>
+                <TableCell className="py-3 text-foreground/70">{r.subject_name ?? '—'}</TableCell>
+                <TableCell className="py-3 text-foreground/70">{r.actor_name ?? '—'}</TableCell>
+                <TableCell className="py-3 text-right tabular-money">{r.total_hours != null ? formatHoras(Number(r.total_hours)) : '—'}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   )
