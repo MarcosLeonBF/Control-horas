@@ -14,8 +14,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" className={`${fraunces.variable} ${geistSans.variable} ${geistMono.variable}`}>
-      <body className="min-h-screen antialiased">
+    <html lang="es" suppressHydrationWarning className={`${fraunces.variable} ${geistSans.variable} ${geistMono.variable}`}>
+      <body suppressHydrationWarning className="min-h-screen antialiased">
         {children}
         <Toaster richColors position="top-center" />
       </body>
