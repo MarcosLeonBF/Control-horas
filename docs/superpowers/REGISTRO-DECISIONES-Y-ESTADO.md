@@ -161,8 +161,16 @@ Pantalla **`/reportes`** (manager+admin), que el PDF llama "Dashboard / Reportes
 - Construida con el sistema editorial de marca; E2E admin verde (agrupar + descargar CSV).
 - **Diferido:** el §17.6 pide que el manager vea solo su equipo/área; hoy manager+admin ven todo (igual que `/equipo`). Afinar el alcance por RLS queda para la fase de auditoría. "Consumo por cliente" no sale aún (el Excel de banco no trae cliente).
 
+### Horas v2 · Fase 4 — Alertas de banco (Slack) — ✅ COMPLETADA (PDF §13)
+Cuando alguien guarda/edita un registro, el sistema **recalcula el consumo de los proyectos afectados** y avisa a Slack si el banco cruza un umbral:
+- **80%** (banco casi agotado), **100%** (sin horas disponibles), **exceso** (consumió más de lo asignado). Mensajes con el formato de los ejemplos del §13.
+- **Dedupe**: cada umbral se avisa **una sola vez por proyecto** (tabla `horas_alertas`, migración 0016). Si un guardado salta varios umbrales, avisa solo el más severo y marca los demás.
+- Se dispara desde el Server Action de guardar (`checkHorasAlertas`); **nunca rompe el guardado** (todo en try/catch). El envío usa un **Incoming Webhook de Slack** (`SLACK_WEBHOOK_URL` en `.env.local`); si no está configurado, es un no-op.
+- **Calidad:** 7 unit tests del núcleo (umbrales + mensajes) en el proyecto `node-horas`; smoke del orquestador contra la DB real (siembra→verifica→limpia).
+- **Pendiente del usuario:** crear el Incoming Webhook en Slack y poner su URL en `SLACK_WEBHOOK_URL`.
+
 ### Próximo
-- **Horas · alertas** Slack al 80/100/exceso (PDF §15) y descargas adicionales del §17.5 (registros, líneas, movimientos). ⏳ Por planificar.
+- Descargas adicionales del §17.5 (registros, líneas, movimientos), filtro de fechas en el dashboard HUCHA, y auditoría/editar-desactivar usuarios (Fase 3). ⏳ Por planificar.
 
 ---
 

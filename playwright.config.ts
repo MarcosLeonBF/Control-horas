@@ -12,12 +12,16 @@ export default defineConfig({
       name: 'node-hucha',
       testMatch: ['**/hucha-sync.spec.ts'],
     },
+    {
+      name: 'node-horas',
+      testMatch: ['**/horas-alertas.spec.ts'],
+    },
     { name: 'chromium', use: { storageState: 'e2e/.auth/manager.json' }, testIgnore: ['**/horas-*.spec.ts', '**/hucha-sync.spec.ts', '**/hucha-sync-ui.spec.ts', '**/hucha-admin-*.spec.ts'] },
     {
       name: 'chromium-horas',
       use: { storageState: 'e2e/.auth/operativo.json' },
       testMatch: '**/horas-*.spec.ts',
-      testIgnore: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos*.spec.ts', '**/horas-reportes.spec.ts'],
+      testIgnore: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos*.spec.ts', '**/horas-reportes.spec.ts', '**/horas-alertas.spec.ts'],
     },
     {
       name: 'chromium-horas-admin',
