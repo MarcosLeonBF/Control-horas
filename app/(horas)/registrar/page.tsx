@@ -14,9 +14,9 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const internal = areas.find((a) => a.is_internal)
   if (!internal) throw new Error('No hay un área interna configurada (is_internal) para el proyecto "Departamento".')
   // Áreas seleccionables para proyectos de cliente (sin la interna):
-  // el operativo solo ve sus áreas asignadas; manager/admin ven todas.
+  // operativo y manager solo ven sus áreas asignadas (su alcance); el admin ve todas.
   const realAreas = areas.filter((a) => !a.is_internal)
-  const selectableAreas = me?.role === 'operativo' ? myAreas.filter((a) => !a.is_internal) : realAreas
+  const selectableAreas = me?.role === 'admin' ? realAreas : myAreas.filter((a) => !a.is_internal)
 
   let projects: string[] = []
   try { projects = (await getCachedBancoHoras()).map((b) => b.project) } catch { /* Excel caído: solo Departamento */ }
