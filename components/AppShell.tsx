@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   Clock, FileText, Users, Wallet, BarChart3, PiggyBank, LayoutDashboard,
-  RefreshCw, UserCog, History, LogOut, ChevronsLeft, ChevronsRight, Menu, X,
+  RefreshCw, UserCog, History, Tags, LogOut, ChevronsLeft, ChevronsRight, Menu, X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -41,6 +41,7 @@ function buildSections(role: string): Section[] {
       title: 'Administración',
       items: [
         { href: '/admin/usuarios', label: 'Usuarios', icon: UserCog, show: isAdmin },
+        { href: '/admin/catalogos', label: 'Catálogos', icon: Tags, show: isAdmin },
         { href: '/admin/auditoria', label: 'Auditoría', icon: History, show: isAdmin },
       ],
     },

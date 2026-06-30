@@ -20,10 +20,23 @@ export interface AmpliacionHoras {
   active: boolean
 }
 
+// Movimiento del banco (PDF §12): consumo o ampliación, con saldo antes/después
+// (horas disponibles). Calculado a partir de las líneas y las ampliaciones.
+export interface MovimientoBanco {
+  date: string
+  kind: 'consumo' | 'ampliacion'
+  hours: number // magnitud positiva
+  saldoAntes: number // horas disponibles antes del movimiento
+  saldoDespues: number // horas disponibles después
+  actor: string // usuario que registró (consumo) / responsable (ampliación)
+  detail: string // descripción (consumo) / motivo (ampliación)
+}
+
 export interface BancoHorasDetalle {
   project: string
   excelBase: number // Horas CRM del Excel
   ampliaciones: AmpliacionHoras[]
+  movimientos: MovimientoBanco[] // historial consumo + ampliación (más reciente primero)
   assigned: number // excelBase + Σ ampliaciones activas
   consumed: number
   remaining: number

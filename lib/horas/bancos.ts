@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedBancoHoras } from '@/lib/graph/client'
-import { computeHorasStatus, type BancoHorasRow, type BancoHorasDetalle, type AmpliacionHoras } from '@/lib/horas/bancos-status'
+import { computeHorasStatus, type BancoHorasRow, type BancoHorasDetalle, type AmpliacionHoras, type MovimientoBanco } from '@/lib/horas/bancos-status'
 
 // Alcance de quién mira los bancos (PDF §15: "ver bancos de su equipo o área").
 //   admin   → todos los proyectos
@@ -83,7 +83,7 @@ export async function getBancoHorasDetalle(
   const [{ data: lines }, { data: amps }] = await Promise.all([
     db
       .from('time_log_lines')
-      .select('hours, time_logs!inner(status, user_id)')
+      .select('hours, description, time_logs!inner(status, user_id, entry_date, profiles!time_logs_user_id_fkey(full_name))')
       .eq('project', name)
       .neq('time_logs.status', 'anulado'),
     db
@@ -93,7 +93,11 @@ export async function getBancoHorasDetalle(
       .order('entry_date', { ascending: false }),
   ])
 
-  const rawLines = (lines ?? []) as unknown as { hours: number; time_logs: { user_id: string } }[]
+  type RawLine = {
+    hours: number; description: string | null
+    time_logs: { user_id: string; entry_date: string; profiles: { full_name: string } | null }
+  }
+  const rawLines = (lines ?? []) as unknown as RawLine[]
   const consumed = rawLines.reduce((s, l) => s + Number(l.hours), 0)
   const inScope = scope.role === 'admin' || rawLines.some((l) => inTeam(scope, l.time_logs.user_id))
 
@@ -105,10 +109,49 @@ export async function getBancoHorasDetalle(
     project: name,
     excelBase,
     ampliaciones,
+    movimientos: buildMovimientos(excelBase, rawLines, ampliaciones),
     assigned,
     consumed,
     remaining: assigned - consumed,
     status: computeHorasStatus(assigned, consumed),
     inScope,
   }
+}
+
+// Historial de movimientos (PDF §12): interleva consumos (líneas) y ampliaciones
+// activas en orden cronológico y calcula el saldo de horas disponibles antes/después.
+// Empieza en la base del Excel; el saldo final coincide con "restante".
+function buildMovimientos(
+  excelBase: number,
+  lines: { hours: number; description: string | null; time_logs: { entry_date: string; profiles: { full_name: string } | null } }[],
+  ampliaciones: AmpliacionHoras[],
+): MovimientoBanco[] {
+  type Raw = { date: string; kind: 'consumo' | 'ampliacion'; hours: number; actor: string; detail: string }
+  const raw: Raw[] = [
+    ...lines.map((l) => ({
+      date: l.time_logs.entry_date,
+      kind: 'consumo' as const,
+      hours: Number(l.hours),
+      actor: l.time_logs.profiles?.full_name ?? '—',
+      detail: l.description ?? '',
+    })),
+    ...ampliaciones.filter((a) => a.active).map((a) => ({
+      date: a.entry_date,
+      kind: 'ampliacion' as const,
+      hours: Number(a.hours),
+      actor: a.actor_name,
+      detail: a.reason,
+    })),
+  ]
+
+  // Cronológico ascendente para acumular; la ampliación va antes que el consumo del mismo día.
+  raw.sort((x, y) => x.date.localeCompare(y.date) || (x.kind === y.kind ? 0 : x.kind === 'ampliacion' ? -1 : 1))
+
+  let saldo = excelBase
+  const asc = raw.map((m) => {
+    const antes = saldo
+    saldo += m.kind === 'ampliacion' ? m.hours : -m.hours
+    return { ...m, saldoAntes: antes, saldoDespues: saldo }
+  })
+  return asc.reverse() // más reciente primero para mostrar
 }

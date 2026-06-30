@@ -87,6 +87,51 @@ export default async function BancoDetallePage({ params }: { params: Promise<{ p
           </table>
         )}
       </section>
+
+      <section className="mt-10">
+        <h2 className="font-display mb-1 text-xl font-semibold">Movimientos</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Consumos y ampliaciones en orden cronológico, con el saldo de horas disponibles antes y después.
+        </p>
+        {d.movimientos.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sin movimientos todavía.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="py-2 font-medium">Fecha</th>
+                  <th className="py-2 font-medium">Acción</th>
+                  <th className="py-2 font-medium text-right">Horas</th>
+                  <th className="py-2 font-medium text-right">Antes</th>
+                  <th className="py-2 font-medium text-right">Después</th>
+                  <th className="py-2 font-medium">Por</th>
+                  <th className="py-2 font-medium">Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.movimientos.map((m, i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="py-2 whitespace-nowrap">{m.date}</td>
+                    <td className="py-2">
+                      <span className={m.kind === 'ampliacion' ? 'text-(--brand)' : 'text-foreground/70'}>
+                        {m.kind === 'ampliacion' ? 'Ampliación' : 'Consumo'}
+                      </span>
+                    </td>
+                    <td className={`tabular-money py-2 text-right ${m.kind === 'ampliacion' ? 'text-(--brand)' : ''}`}>
+                      {m.kind === 'ampliacion' ? '+' : '−'}{formatHoras(m.hours)}
+                    </td>
+                    <td className="tabular-money py-2 text-right text-foreground/55">{formatHoras(m.saldoAntes)}</td>
+                    <td className={`tabular-money py-2 text-right ${m.saldoDespues < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(m.saldoDespues)}</td>
+                    <td className="py-2">{m.actor}</td>
+                    <td className="py-2 text-foreground/70">{m.detail}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }
