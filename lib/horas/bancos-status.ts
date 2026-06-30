@@ -4,8 +4,9 @@ export type HorasStatus = 'sin_asignacion' | 'disponible' | 'bajo' | 'consumido'
 
 export interface BancoHorasRow {
   project: string
-  assigned: number // horas del Excel (columna "Horas CRM")
-  consumed: number // suma de horas registradas (logs no anulados)
+  position: string // posición = columna del Excel (CRM, SEO, Growth Strategists…)
+  assigned: number // horas del Excel para esa posición
+  consumed: number // horas registradas por usuarios de esa posición en el proyecto
   remaining: number
   status: HorasStatus
 }
@@ -34,7 +35,8 @@ export interface MovimientoBanco {
 
 export interface BancoHorasDetalle {
   project: string
-  excelBase: number // Horas CRM del Excel
+  posiciones: BancoHorasRow[] // desglose por posición (acotado al alcance del que mira)
+  excelBase: number // Σ horas del Excel de las posiciones visibles
   ampliaciones: AmpliacionHoras[]
   movimientos: MovimientoBanco[] // historial consumo + ampliación (más reciente primero)
   assigned: number // excelBase + Σ ampliaciones activas

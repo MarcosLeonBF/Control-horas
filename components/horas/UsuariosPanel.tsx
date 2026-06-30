@@ -9,17 +9,18 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 
+export interface PosicionOpt { id: string; name: string }
 export interface UsuarioRow {
-  id: string; full_name: string; email: string; position: string | null
+  id: string; full_name: string; email: string; positionId: string | null
   role: 'operativo' | 'manager' | 'admin'; status: 'activo' | 'inactivo'; areaIds: string[]
 }
 
 const selectClass = 'w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
-function Editor({ u, areas, onDone }: { u: UsuarioRow; areas: AreaRow[]; onDone: () => void }) {
+function Editor({ u, areas, posiciones, onDone }: { u: UsuarioRow; areas: AreaRow[]; posiciones: PosicionOpt[]; onDone: () => void }) {
   const router = useRouter()
   const [f, setF] = useState<EdicionUsuario>({
-    full_name: u.full_name, position: u.position ?? '', role: u.role, status: u.status, areaIds: u.areaIds,
+    full_name: u.full_name, positionId: u.positionId ?? '', role: u.role, status: u.status, areaIds: u.areaIds,
   })
   const [saving, setSaving] = useState(false)
 
@@ -37,8 +38,11 @@ function Editor({ u, areas, onDone }: { u: UsuarioRow; areas: AreaRow[]; onDone:
       <label className="space-y-1 text-xs text-muted-foreground">Nombre
         <Input aria-label="Editar nombre" value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} className="h-9" />
       </label>
-      <label className="space-y-1 text-xs text-muted-foreground">Posición
-        <Input aria-label="Editar posición" value={f.position} onChange={(e) => setF({ ...f, position: e.target.value })} className="h-9" />
+      <label className="space-y-1 text-xs text-muted-foreground">Posición (banco de horas)
+        <select aria-label="Editar posición" value={f.positionId} onChange={(e) => setF({ ...f, positionId: e.target.value })} className={selectClass}>
+          <option value="">— Sin posición —</option>
+          {posiciones.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
       </label>
       <label className="space-y-1 text-xs text-muted-foreground">Rol
         <select aria-label="Editar rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as EdicionUsuario['role'] })} className={selectClass}>
@@ -75,11 +79,12 @@ function Editor({ u, areas, onDone }: { u: UsuarioRow; areas: AreaRow[]; onDone:
   )
 }
 
-export default function UsuariosPanel({ usuarios, areas }: { usuarios: UsuarioRow[]; areas: AreaRow[] }) {
+export default function UsuariosPanel({ usuarios, areas, posiciones }: { usuarios: UsuarioRow[]; areas: AreaRow[]; posiciones: PosicionOpt[] }) {
   const router = useRouter()
   const [editing, setEditing] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const areaName = (id: string) => areas.find((a) => a.id === id)?.name ?? ''
+  const posName = (id: string | null) => (id ? posiciones.find((p) => p.id === id)?.name ?? '—' : '—')
 
   async function toggle(u: UsuarioRow) {
     setBusy(u.id)
@@ -111,7 +116,7 @@ export default function UsuariosPanel({ usuarios, areas }: { usuarios: UsuarioRo
                   <div className="font-medium text-foreground">{u.full_name}</div>
                   <div className="text-xs text-muted-foreground">{u.email}</div>
                 </TableCell>
-                <TableCell className="py-3 text-foreground/70">{u.position || '—'}</TableCell>
+                <TableCell className="py-3 text-foreground/70">{posName(u.positionId)}</TableCell>
                 <TableCell className="py-3 text-foreground/70 capitalize">{u.role}</TableCell>
                 <TableCell className="py-3 text-foreground/70">{u.areaIds.map(areaName).filter(Boolean).join(', ') || '—'}</TableCell>
                 <TableCell className="py-3">
@@ -126,7 +131,7 @@ export default function UsuariosPanel({ usuarios, areas }: { usuarios: UsuarioRo
               </TableRow>
               {editing === u.id && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-3"><Editor u={u} areas={areas} onDone={() => setEditing(null)} /></TableCell>
+                  <TableCell colSpan={6} className="py-3"><Editor u={u} areas={areas} posiciones={posiciones} onDone={() => setEditing(null)} /></TableCell>
                 </TableRow>
               )}
             </Fragment>

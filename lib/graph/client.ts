@@ -1,5 +1,5 @@
 import { unstable_cache } from 'next/cache'
-import type { BancoHorasItem } from '@/lib/types'
+import type { BancoHorasProyecto } from '@/lib/types'
 
 export const BANCO_HORAS_TAG = 'banco-horas'
 
@@ -55,34 +55,45 @@ async function resolveDriveItem(token: string, fileUrl: string) {
   return { driveId: item.parentReference.driveId, itemId: item.id }
 }
 
-// Paso 3: lee las filas de la tabla "BancoHoras" del Excel
+// Paso 3: lee la tabla "BancoHoras". La primera columna es el proyecto; cada
+// columna siguiente es una POSICIÓN (CRM, SEO, Growth Strategists…) con sus horas.
+// Las posiciones se leen de la cabecera, así que admite columnas nuevas sin tocar código.
 async function readBancoHorasTable(
   token: string,
   driveId: string,
   itemId: string
-): Promise<BancoHorasItem[]> {
-  const res = await fetch(
-    `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/workbook/tables/BancoHoras/rows`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  )
+): Promise<BancoHorasProyecto[]> {
+  const base = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/workbook/tables/BancoHoras`
+  const headers = { Authorization: `Bearer ${token}` }
+  const [headerRes, rowsRes] = await Promise.all([
+    fetch(`${base}/headerRowRange`, { headers }),
+    fetch(`${base}/rows`, { headers }),
+  ])
 
-  if (!res.ok) {
-    const err = await res.json() as { error?: { message?: string } }
-    throw new Error(`Error leyendo tabla BancoHoras: ${err?.error?.message ?? res.status}`)
+  if (!headerRes.ok || !rowsRes.ok) {
+    const bad = !headerRes.ok ? headerRes : rowsRes
+    const err = await bad.json().catch(() => ({})) as { error?: { message?: string } }
+    throw new Error(`Error leyendo tabla BancoHoras: ${err?.error?.message ?? bad.status}`)
   }
 
-  const data = await res.json() as { value: Array<{ values: unknown[][] }> }
+  const header = (await headerRes.json() as { values: unknown[][] }).values[0] ?? []
+  const positions = header.slice(1).map((h) => String(h ?? '').trim()) // columnas 1..n = posiciones
+  const rows = (await rowsRes.json() as { value: Array<{ values: unknown[][] }> }).value
 
-  return data.value
-    .map((row) => ({
-      project:    String(row.values[0][0] ?? '').trim(),
-      totalHours: Number(row.values[0][1] ?? 0),
-    }))
-    .filter((item) => item.project !== '' && !isNaN(item.totalHours) && item.totalHours > 0)
+  return rows
+    .map((row) => {
+      const cells = row.values[0]
+      const project = String(cells[0] ?? '').trim()
+      const list = positions
+        .map((position, i) => ({ position, hours: Number(cells[i + 1] ?? 0) }))
+        .filter((p) => p.position !== '' && !isNaN(p.hours))
+      return { project, positions: list }
+    })
+    .filter((item) => item.project !== '')
 }
 
 // Función principal que ejecuta los 3 pasos
-export async function fetchBancoHorasFromGraph(): Promise<BancoHorasItem[]> {
+export async function fetchBancoHorasFromGraph(): Promise<BancoHorasProyecto[]> {
   const fileUrl = process.env.SHAREPOINT_FILE_URL
   if (!fileUrl) throw new Error('SHAREPOINT_FILE_URL no está configurada')
 

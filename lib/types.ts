@@ -21,6 +21,17 @@ export interface BancoHorasItem {
   totalHours: number
 }
 
+// Banco de horas por POSICIÓN: cada columna del Excel (CRM, SEO, Growth Strategists…)
+// es una posición con sus horas asignadas por proyecto.
+export interface BancoPosicion {
+  position: string
+  hours: number
+}
+export interface BancoHorasProyecto {
+  project: string
+  positions: BancoPosicion[]
+}
+
 export interface ProjectSummary extends BancoHorasItem {
   consumedHours: number
   remainingHours: number

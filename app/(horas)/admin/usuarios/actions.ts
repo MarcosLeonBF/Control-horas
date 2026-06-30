@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export interface NuevoUsuario {
-  full_name: string; email: string; password: string; position: string
+  full_name: string; email: string; password: string; positionId: string
   role: 'operativo' | 'manager' | 'admin'; areaIds: string[]
 }
 
@@ -28,7 +28,7 @@ export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | 
   const id = created.user!.id
 
   const { error: profileError } = await admin.from('profiles').update({
-    full_name: input.full_name.trim(), email: input.email.trim(), position: input.position.trim(),
+    full_name: input.full_name.trim(), email: input.email.trim(), position_id: input.positionId || null,
     role: input.role, status: 'activo', created_by: user.id,
   }).eq('id', id)
   if (profileError) return { ok: false, error: `Usuario creado pero falló su perfil: ${profileError.message}` }
@@ -41,7 +41,7 @@ export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | 
 }
 
 export interface EdicionUsuario {
-  full_name: string; position: string
+  full_name: string; positionId: string
   role: 'operativo' | 'manager' | 'admin'; status: 'activo' | 'inactivo'; areaIds: string[]
 }
 
@@ -60,7 +60,7 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
 
   const admin = createAdminClient()
   const { error } = await admin.from('profiles').update({
-    full_name: input.full_name.trim(), position: input.position.trim(), role: input.role, status: input.status,
+    full_name: input.full_name.trim(), position_id: input.positionId || null, role: input.role, status: input.status,
   }).eq('id', id)
   if (error) return { ok: false, error: error.message }
 

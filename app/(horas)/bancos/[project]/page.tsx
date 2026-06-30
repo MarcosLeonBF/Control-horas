@@ -17,9 +17,9 @@ export default async function BancoDetallePage({ params }: { params: Promise<{ p
   const isAdmin = viewer.role === 'admin'
 
   const scope: BancosScope =
-    viewer.role === 'admin' ? { role: 'admin' } : { role: 'manager', teamUserIds: viewer.teamUserIds }
+    viewer.role === 'admin' ? { role: 'admin' } : { role: 'manager', areaIds: viewer.areaIds }
   const d = await getBancoHorasDetalle(project, scope)
-  // El manager solo accede a bancos de proyectos que su equipo registra.
+  // El manager solo accede a proyectos con posiciones de sus áreas.
   if (!d.inScope) redirect('/bancos')
   const ampliado = d.assigned - d.excelBase
 
@@ -53,6 +53,38 @@ export default async function BancoDetallePage({ params }: { params: Promise<{ p
           </p>
         </div>
       </div>
+
+      <section className="mb-10">
+        <h2 className="font-display mb-4 text-xl font-semibold">Por posición</h2>
+        {d.posiciones.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Este proyecto no tiene posiciones con banco.</p>
+        ) : (
+          <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-(--muted-surface) text-left text-muted-foreground">
+                  <th className="px-4 py-2.5 font-medium">Posición</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Asignado</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Consumido</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Restante</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.posiciones.map((p) => (
+                  <tr key={p.position} className="border-t border-border">
+                    <td className="px-4 py-2.5 font-medium">{p.position}</td>
+                    <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.assigned)}</td>
+                    <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.consumed)}</td>
+                    <td className={`tabular-money px-4 py-2.5 text-right ${p.remaining < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(p.remaining)}</td>
+                    <td className="px-4 py-2.5 text-right"><HorasStatusBadge status={p.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section>
         <h2 className="font-display mb-4 text-xl font-semibold">Ampliaciones</h2>

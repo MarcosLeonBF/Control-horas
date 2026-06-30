@@ -9,7 +9,7 @@ export default async function BancosPage() {
   if (viewer.role !== 'manager' && viewer.role !== 'admin') redirect('/registrar')
 
   const scope: BancosScope =
-    viewer.role === 'admin' ? { role: 'admin' } : { role: 'manager', teamUserIds: viewer.teamUserIds }
+    viewer.role === 'admin' ? { role: 'admin' } : { role: 'manager', areaIds: viewer.areaIds }
   const rows = await getBancosHoras(scope)
 
   return (

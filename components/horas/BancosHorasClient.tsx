@@ -10,6 +10,7 @@ import { formatHoras } from '@/lib/horas/format'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
@@ -47,11 +48,11 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
     const q = search.trim().toLowerCase()
     return rows
       .filter((r) => {
-        if (q && !r.project.toLowerCase().includes(q)) return false
+        if (q && !r.project.toLowerCase().includes(q) && !r.position.toLowerCase().includes(q)) return false
         if (estado !== 'todos' && r.status !== estado) return false
         return true
       })
-      .sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status] || a.project.localeCompare(b.project))
+      .sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status] || a.project.localeCompare(b.project) || a.position.localeCompare(b.position))
   }, [rows, search, estado])
 
   const totals = useMemo(() => {
@@ -67,7 +68,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   // Descarga de la vista filtrada (§17.5: bancos de horas; excedidos/cerca = filtrar estado + descargar).
   function buildRows(): ExportRow[] {
     return filtered.map((r) => ({
-      Proyecto: r.project, Asignado: r.assigned, Consumido: r.consumed,
+      Proyecto: r.project, Posición: r.position, Asignado: r.assigned, Consumido: r.consumed,
       Restante: r.remaining, Estado: HORAS_STATUS_LABELS[r.status],
     }))
   }
@@ -106,7 +107,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
           <option value="todos">Todos los estados</option>
           {ESTADOS.map((s) => <option key={s} value={s}>{HORAS_STATUS_LABELS[s]}</option>)}
         </select>
-        <span className="ml-auto text-sm text-muted-foreground">{filtered.length} de {rows.length} proyectos</span>
+        <span className="ml-auto text-sm text-muted-foreground">{filtered.length} de {rows.length} bancos</span>
       </div>
 
       {/* Descargas (PDF §17.5) */}
@@ -128,6 +129,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
           <TableHeader>
             <TableRow className="bg-(--muted-surface) hover:bg-(--muted-surface)">
               <TableHead>Proyecto</TableHead>
+              <TableHead>Posición</TableHead>
               <TableHead className="w-64">Horas</TableHead>
               <TableHead className="text-right">Estado</TableHead>
             </TableRow>
@@ -135,19 +137,22 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
           <TableBody>
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={3} className="py-10 text-center text-muted-foreground">
-                  No hay proyectos que coincidan con los filtros.
+                <TableCell colSpan={4} className="py-10 text-center text-muted-foreground">
+                  No hay bancos que coincidan con los filtros.
                 </TableCell>
               </TableRow>
             )}
             {filtered.map((r) => {
               const pct = r.assigned > 0 ? Math.min((r.consumed / r.assigned) * 100, 100) : 0
               return (
-                <TableRow key={r.project}>
+                <TableRow key={`${r.project}|${r.position}`}>
                   <TableCell className="py-3">
                     <Link href={`/bancos/${encodeURIComponent(r.project)}`} className="font-medium text-foreground hover:text-(--brand) hover:underline">
                       {r.project}
                     </Link>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <Badge variant="secondary">{r.position}</Badge>
                   </TableCell>
                   <TableCell className="py-3">
                     <div className="tabular-money text-sm">

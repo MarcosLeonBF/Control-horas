@@ -27,13 +27,14 @@ export async function checkHorasAlertas(projects: string[]): Promise<void> {
 
     const db = createAdminClient()
 
-    let excel: { project: string; totalHours: number }[] = []
+    let excel: { project: string; positions: { hours: number }[] }[] = []
     try {
       excel = await getCachedBancoHoras()
     } catch {
       excel = []
     }
-    const baseByProject = new Map(excel.map((e) => [e.project.trim(), Number(e.totalHours)]))
+    // Asignado del proyecto = suma de las horas de todas sus posiciones (Excel).
+    const baseByProject = new Map(excel.map((e) => [e.project.trim(), e.positions.reduce((s, p) => s + Number(p.hours), 0)]))
 
     for (const project of unique) {
       const { data: amps } = await db
