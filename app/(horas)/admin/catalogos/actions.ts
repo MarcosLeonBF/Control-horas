@@ -180,7 +180,7 @@ export async function setDepartamentoEtapasNombres(id: string, names: string[]):
     if (!n) continue
     
     // Buscar si existe (insensible a mayúsculas)
-    const { data: existing } = await supabase.from('etapas').select('id').ilike('name', n).single()
+    const { data: existing } = await supabase.from('etapas').select('id').ilike('name', n).maybeSingle()
     if (existing) {
       etapaIds.push(existing.id)
     } else {

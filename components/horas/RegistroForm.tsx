@@ -143,10 +143,16 @@ export default function RegistroForm({ projects, areas, etapas, departamentos, i
                   )}
                 </td>
                 <td className="min-w-35 pr-3 align-top">
-                  <select aria-label="Etapa" value={l.etapa_id} onChange={(e) => update(i, { etapa_id: e.target.value })} className={field}>
-                    <option value="">— Etapa —</option>
-                    {allowedEtapas.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
-                  </select>
+                  {isDep ? (
+                    <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/50">
+                      {allowedEtapas[0]?.name ?? '— Etapa —'}
+                    </span>
+                  ) : (
+                    <select aria-label="Etapa" value={l.etapa_id} onChange={(e) => update(i, { etapa_id: e.target.value })} className={field}>
+                      <option value="">— Etapa —</option>
+                      {etapas.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
+                    </select>
+                  )}
                 </td>
                 <td className="w-24 pr-3 align-top">
                   <Input aria-label="Horas" type="number" step="0.5" min="0" value={l.hours || ''}
