@@ -82,3 +82,76 @@ export async function toggleEtapa(id: string, active: boolean): Promise<Result> 
   if (e) return { ok: false, error: friendly(e) }
   return { ok: true }
 }
+
+// ── Posiciones ─────────────────────────────────────────────────────────────
+// El banco de horas es por posición (columnas del Excel). Cada posición se liga
+// a una o más áreas: un manager ve los bancos de las posiciones de sus áreas.
+export async function crearPosicion(name: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const n = name.trim()
+  if (!n) return { ok: false, error: 'El nombre es obligatorio.' }
+  const { error: e } = await supabase.from('positions').insert({ name: n })
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+export async function renombrarPosicion(id: string, name: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const n = name.trim()
+  if (!n) return { ok: false, error: 'El nombre es obligatorio.' }
+  const { error: e } = await supabase.from('positions').update({ name: n, updated_at: new Date().toISOString() }).eq('id', id)
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+export async function togglePosicion(id: string, active: boolean): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: e } = await supabase.from('positions').update({ active, updated_at: new Date().toISOString() }).eq('id', id)
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+// Reemplaza las áreas ligadas a una posición.
+export async function setPosicionAreas(id: string, areaIds: string[]): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: delErr } = await supabase.from('position_areas').delete().eq('position_id', id)
+  if (delErr) return { ok: false, error: friendly(delErr) }
+  if (areaIds.length) {
+    const { error: insErr } = await supabase.from('position_areas').insert(areaIds.map((area_id) => ({ position_id: id, area_id })))
+    if (insErr) return { ok: false, error: friendly(insErr) }
+  }
+  return { ok: true }
+}
+
+// ── Departamentos ──────────────────────────────────────────────────────────
+export async function crearDepartamento(name: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const n = name.trim()
+  if (!n) return { ok: false, error: 'El nombre es obligatorio.' }
+  const { error: e } = await supabase.from('departamentos').insert({ name: n })
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+export async function renombrarDepartamento(id: string, name: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const n = name.trim()
+  if (!n) return { ok: false, error: 'El nombre es obligatorio.' }
+  const { error: e } = await supabase.from('departamentos').update({ name: n, updated_at: new Date().toISOString() }).eq('id', id)
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+export async function toggleDepartamento(id: string, active: boolean): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: e } = await supabase.from('departamentos').update({ active, updated_at: new Date().toISOString() }).eq('id', id)
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
