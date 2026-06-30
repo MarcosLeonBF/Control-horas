@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 //   operativo→ solo lo suyo
 export type ViewerScope =
   | { role: 'admin'; userId: string }
-  | { role: 'manager'; userId: string; teamUserIds: string[] }
+  | { role: 'manager'; userId: string; areaIds: string[]; teamUserIds: string[] }
   | { role: 'operativo'; userId: string }
 
 // Equipo del manager: usuarios que comparten alguna de sus áreas (incluido él).
@@ -29,7 +29,7 @@ export async function getViewerScope(): Promise<ViewerScope | null> {
       const { data: peers } = await supabase.from('user_areas').select('user_id').in('area_id', areaIds)
       for (const p of (peers ?? []) as { user_id: string }[]) team.add(p.user_id)
     }
-    return { role: 'manager', userId: user.id, teamUserIds: [...team] }
+    return { role: 'manager', userId: user.id, areaIds, teamUserIds: [...team] }
   }
 
   return { role: 'operativo', userId: user.id }
