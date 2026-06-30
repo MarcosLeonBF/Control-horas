@@ -133,7 +133,9 @@ Columnas existentes: `id, email, full_name, position, role, status, created_by, 
 > **Divergencia deliberada del "modelo sugerido" (§14.3):** el PDF sugiere repetir `usuario` y `fecha` en cada línea y un `estado` por línea. Aquí se **normaliza**: `user_id`/`entry_date`/`status` viven en el padre `time_logs` (única fuente de verdad), y las líneas heredan ese contexto vía `log_id`. El §14 es explícitamente un "modelo **sugerido**"; esta normalización conserva la misma información sin duplicarla y evita inconsistencias.
 
 ### 4.7 Guardado transaccional
-El registro diario se guarda en **una sola operación atómica** (función RPC `security definer`): inserta/actualiza el `time_logs` y sus `time_log_lines` juntos, recalcula `total_hours`, valida permisos y rango de fecha. Alinea con §2.3 y §20 ("una sola experiencia para el usuario, varias líneas para el sistema"). Mismo patrón de RPC que el ledger de HUCHA.
+El registro se guarda en **una sola operación atómica** (función RPC `security definer`): valida permisos y la fecha por línea, **agrupa las líneas por fecha** y crea/actualiza **un `time_logs` por día** con sus `time_log_lines`, recalculando `total_hours`. Alinea con §2.3 y §20 ("una sola experiencia para el usuario, varias líneas para el sistema"). Mismo patrón de RPC que el ledger de HUCHA.
+
+> **Actualización 2026-06-29 (fecha por línea):** el RPC pasó de `guardar_registro_diario(p_log_id, p_entry_date, p_lines)` (una fecha) a **`guardar_registro(p_anchor_log_id, p_lines)`** (cada línea con su `entry_date`), migración **0019**. En alta crea un log por fecha; en edición reutiliza el log ancla para su día y crea logs nuevos para los demás (división). Ver §5.4/§5.6.
 
 ---
 
@@ -141,14 +143,15 @@ El registro diario se guarda en **una sola operación atómica** (función RPC `
 
 ### 5.1 Pantalla (§2.1, §2.3)
 Tabla editable. El usuario puede:
-- Seleccionar la fecha del registro (default hoy).
+- Seleccionar la **fecha por defecto** del registro (default hoy), que heredan las líneas.
+- Cambiar la **fecha de una línea concreta** (ver §5.4: fecha por línea, actualización 2026-06-29).
 - Ver su usuario cargado automáticamente.
 - Añadir / eliminar líneas antes de guardar.
-- Completar en cada línea: proyecto, banco/área, departamento, etapa, horas, descripción.
-- Ver el **total del día** acumulado antes de guardar.
-- Guardar todo el día en una sola acción.
+- Completar en cada línea: fecha, proyecto, banco/área, departamento, etapa, horas, descripción.
+- Ver el **total** acumulado antes de guardar (con desglose por fecha cuando hay más de una).
+- Guardar en una sola acción (las líneas se reparten por día; ver §5.4).
 
-Columnas de cada línea: **Proyecto · Banco/Área · Departamento · Etapa · Horas · Descripción · (eliminar)**.
+Columnas de cada línea: **Fecha · Proyecto · Banco/Área · Departamento · Etapa · Horas · Descripción · (eliminar)**.
 
 ### 5.2 Selectores y su origen
 - **Proyecto:** lista del Excel (solo lectura, vía Graph, como hoy) + el especial **"Departamento"**.
@@ -159,29 +162,31 @@ Columnas de cada línea: **Proyecto · Banco/Área · Departamento · Etapa · H
 ### 5.3 Campo Departamento condicional (§3)
 | Proyecto seleccionado | Comportamiento del campo Departamento |
 |---|---|
-| Proyecto de cliente | `Departamento = Clientes`, **no editable** |
-| "Departamento" (especial) | **Editable**: `Clientes` / `Ventas` / `Marketing` / `Todos` |
+| (sin proyecto) / Proyecto de cliente | **Oculto** (fijado a `Clientes`). *Antes salía deshabilitado; desde 2026-06-29 se oculta hasta elegir "Departamento".* |
+| "Departamento" (especial) | **Visible y editable**: `Clientes` / `Ventas` / `Marketing` / `Todos` |
 
 El proyecto "Departamento" representa trabajo interno ilimitado: en Fase 2 **no** descontará banco. En Fase 1 solo se registra.
 
-### 5.4 Fecha y ventana de 7 días (§4)
-- Default: fecha actual.
-- Operativo/manager: pueden registrar/corregir desde hoy hasta **7 días atrás**.
-- No se permiten fechas futuras ni con más de 7 días de antigüedad.
-- **Admin**: puede registrar/corregir fuera de ese rango.
+### 5.4 Fecha y ventana de 7 días (§4) — **fecha por línea (actualización 2026-06-29)**
+- Hay una **fecha por defecto** del registro (default hoy). Al cambiarla, arrastra a las líneas que aún la seguían; las líneas con fecha cambiada a mano la conservan.
+- **Cada línea puede llevar su propia fecha** (anotar algo de un día pasado sin abrir otro registro).
+- Operativo/manager: cada línea desde hoy hasta **7 días atrás** (validado **por línea**). **Admin** puede fuera de ese rango.
+- No se permiten fechas futuras ni con más de 7 días de antigüedad (no-admin).
+- **Modelo:** el guardado **agrupa las líneas por fecha** y crea/actualiza **un `time_logs` por día** (sigue siendo "un registro por día"; ver §4.7). Líneas con fechas distintas en un mismo envío se guardan como **entradas diarias separadas**.
 
 ### 5.5 Validaciones antes de guardar (§5)
 - Al menos una línea.
 - Cada línea con proyecto, banco/área, departamento, etapa.
 - Horas > 0 y numéricas.
 - Descripción completa (no vacía).
-- Fecha no futura y dentro del rango permitido (según rol).
-- Sin líneas duplicadas por error (misma combinación proyecto+área+departamento+etapa).
-- Total de horas del día visible antes de guardar.
+- Fecha no futura y dentro del rango permitido (según rol), **validada por línea**.
+- Sin líneas duplicadas por error (misma combinación **fecha**+proyecto+área+departamento+etapa; la misma combinación en días distintos **no** es duplicado).
+- Total de horas visible antes de guardar (con desglose por fecha si hay más de una).
 
 ### 5.6 Corrección / edición (§7)
 - El usuario corrige **registros propios** dentro de los 7 días; el **admin** corrige cualquiera, incluso fuera de rango.
 - Editar un registro actualiza sus líneas y marca el `time_logs` como `editado`.
+- **División por fecha (2026-06-29):** al editar también se puede cambiar la fecha de una línea; si queda en otro día, el registro se **divide** — el log editado se reutiliza para su día y se crean logs nuevos para los demás (auditoría: un asiento por día afectado).
 - **En Fase 1 no hay recálculo de bancos** (no existen aún); ese comportamiento (§7: devolver/descontar horas al cambiar proyecto/banco) se implementa en la Fase 2.
 - La auditoría completa (§7 "toda corrección registrada en auditoría") es de Fase 3; en Fase 1 se conserva `updated_by`/`updated_at` y el estado `editado`.
 

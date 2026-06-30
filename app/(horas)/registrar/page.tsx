@@ -23,7 +23,8 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   projects = [...projects, 'Departamento']
 
   // Modo edición: precargar el registro propio (RLS limita el acceso) si no está anulado.
-  let initial: { id: string; entryDate: string; lines: LineInput[] } | undefined
+  // Las líneas no tienen fecha propia: heredan la del log que se edita.
+  let initial: { id: string; lines: LineInput[] } | undefined
   if (edit) {
     const { data: log } = await supabase
       .from('time_logs')
@@ -31,9 +32,9 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
       .eq('id', edit).single()
     if (log && log.status !== 'anulado') {
       initial = {
-        id: log.id, entryDate: log.entry_date,
-        lines: (log.time_log_lines as LineInput[]).map((l) => ({
-          project: l.project, area_id: l.area_id, department: l.department,
+        id: log.id,
+        lines: (log.time_log_lines as Omit<LineInput, 'entry_date'>[]).map((l) => ({
+          entry_date: log.entry_date, project: l.project, area_id: l.area_id, department: l.department,
           etapa_id: l.etapa_id, hours: Number(l.hours), description: l.description,
         })),
       }

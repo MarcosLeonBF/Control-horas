@@ -5,7 +5,7 @@
 > - Diseño: [`specs/2026-06-23-hucha-presupuestos-design.md`](specs/2026-06-23-hucha-presupuestos-design.md)
 > - Plan de implementación 1: [`plans/2026-06-23-plan1-fundacion-datos-ledger.md`](plans/2026-06-23-plan1-fundacion-datos-ledger.md)
 
-**Última actualización:** 2026-06-28 (HUCHA Plan 3b completo: admin + dashboard + descargas. Confirmado el Excel real en SharePoint y sus tablas/columnas)
+**Última actualización:** 2026-06-29 (Horas · mejoras de registro: fecha por línea + selector Departamento condicional)
 
 ---
 
@@ -177,8 +177,15 @@ La pantalla de Usuarios (admin) ya no solo da de alta — ahora **gestiona**:
 - Guardas: un admin **no puede desactivarse ni quitarse el rol** a sí mismo (evita auto-bloqueo). Escrituras solo-admin vía service role.
 - **Calidad:** E2E admin (crear → ver en panel → desactivar), auto-limpiante.
 
-**Auditoría (§7) — ✅ COMPLETADA.** Toda **creación, edición y anulación** de registros queda trazada en la tabla `time_log_audit` (migración 0017), poblada **dentro de los RPC** (`guardar_registro_diario`, `anular_registro_diario`) — atómico con el cambio, guardando quién (actor), de quién es el registro (subject), acción, fecha y total. Vista **`/admin/auditoria`** (admin) con el historial. Test SQL (crear+editar+anular) verde + E2E de la pantalla.
+**Auditoría (§7) — ✅ COMPLETADA.** Toda **creación, edición y anulación** de registros queda trazada en la tabla `time_log_audit` (migración 0017), poblada **dentro de los RPC** (`guardar_registro`, `anular_registro_diario`) — atómico con el cambio, guardando quién (actor), de quién es el registro (subject), acción, fecha y total. Vista **`/admin/auditoria`** (admin) con el historial. Test SQL (crear+editar+anular) verde + E2E de la pantalla.
 - **Pendiente de Fase 3:** gestión de proyectos/etapas/departamentos desde la app (hoy se administran fuera).
+
+### Horas · Mejoras de registro (2026-06-29)
+Dos ajustes sobre la pantalla de **Registrar horas**, pedidos por el usuario:
+- **Fecha por línea.** Antes el registro tenía **una sola fecha** para todas las líneas. Ahora hay una **fecha por defecto** (hoy) que heredan todas las líneas, pero **cada línea puede llevar su propia fecha** — para anotar algo de un día pasado sin abrir otro registro. Al guardar, las líneas se **reparten por día**: cada fecha se guarda como su **propia entrada diaria** (el modelo "un registro por día" **no cambia**, así reportes/bancos/auditoría siguen igual). Al **editar**, también se puede mover una línea a otro día: el registro se **divide** en los días que toque, sin dejar registros vacíos. La **ventana de 7 días** (no-admin) se valida **por línea**; el admin puede saltarla.
+  - *Motor:* nuevo RPC `guardar_registro` (migración **0019**) que reemplaza a `guardar_registro_diario`: valida fecha/7 días por línea, **anti-duplicados por fecha+combinación** (la misma combinación en días distintos ya no es duplicado), agrupa por fecha y reconcilia (alta = un log por fecha; edición = reutiliza el registro editado para su día y crea logs nuevos para el resto). La **auditoría** escribe un asiento por día afectado.
+- **Selector "Departamento" condicional (UI).** El selector de Departamento (Clientes/Ventas/Marketing/Todos) ahora **permanece oculto** hasta elegir el proyecto **"Departamento"** (antes salía deshabilitado).
+- **Calidad:** test SQL del RPC ampliado (alta multifecha, 7 días por línea, dedup por fecha, edición con división) y E2E (dos fechas → dos entradas separadas).
 
 ### Próximo
 - §17.6 (manager ve solo su equipo/área), descarga de movimientos de banco de horas, y la activación del webhook de Slack (lado del usuario). ⏳ Por planificar.

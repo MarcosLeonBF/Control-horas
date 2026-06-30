@@ -6,8 +6,8 @@ begin
   select id into v_area from public.areas where name='CRM';
   select id into v_etapa from public.etapas where name='Setup';
   perform set_config('request.jwt.claims', json_build_object('sub', v_op::text,'role','authenticated')::text, true);
-  v_log := public.guardar_registro_diario(null, current_date,
-    jsonb_build_array(jsonb_build_object('project','C','area_id',v_area,'department','Clientes','etapa_id',v_etapa,'hours',1,'description','d')));
+  v_log := public.guardar_registro(null,
+    jsonb_build_array(jsonb_build_object('entry_date',current_date,'project','C','area_id',v_area,'department','Clientes','etapa_id',v_etapa,'hours',1,'description','d')));
   perform public.anular_registro_diario(v_log);
   if (select status from public.time_logs where id=v_log) <> 'anulado' then raise exception 'no anuló'; end if;
   delete from public.time_logs where id = v_log;
