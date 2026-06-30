@@ -43,6 +43,9 @@ function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'exc
 export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   const [search, setSearch] = useState('')
   const [estado, setEstado] = useState<HorasStatus | 'todos'>('todos')
+  const [posicion, setPosicion] = useState<string>('todas')
+
+  const positions = useMemo(() => [...new Set(rows.map((r) => r.position))].sort((a, b) => a.localeCompare(b)), [rows])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -50,10 +53,11 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
       .filter((r) => {
         if (q && !r.project.toLowerCase().includes(q) && !r.position.toLowerCase().includes(q)) return false
         if (estado !== 'todos' && r.status !== estado) return false
+        if (posicion !== 'todas' && r.position !== posicion) return false
         return true
       })
       .sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status] || a.project.localeCompare(b.project) || a.position.localeCompare(b.position))
-  }, [rows, search, estado])
+  }, [rows, search, estado, posicion])
 
   const totals = useMemo(() => {
     const t = { assigned: 0, consumed: 0, remaining: 0, excedidos: 0, bajos: 0 }
@@ -103,6 +107,10 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
             value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 pl-9"
           />
         </div>
+        <select aria-label="Posición" value={posicion} onChange={(e) => setPosicion(e.target.value)} className={selectClass}>
+          <option value="todas">Todas las posiciones</option>
+          {positions.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
         <select aria-label="Estado" value={estado} onChange={(e) => setEstado(e.target.value as HorasStatus | 'todos')} className={selectClass}>
           <option value="todos">Todos los estados</option>
           {ESTADOS.map((s) => <option key={s} value={s}>{HORAS_STATUS_LABELS[s]}</option>)}

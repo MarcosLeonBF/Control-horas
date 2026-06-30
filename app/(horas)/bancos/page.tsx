@@ -16,7 +16,7 @@ export default async function BancosPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl">Bancos de horas</h1>
-        <p className="text-sm text-muted-foreground">Horas asignadas (Excel) frente a las registradas, por proyecto.</p>
+        <p className="text-sm text-muted-foreground">Horas asignadas (Excel) frente a las registradas, por proyecto y posición.</p>
       </div>
       <BancosHorasClient rows={rows} />
     </div>
