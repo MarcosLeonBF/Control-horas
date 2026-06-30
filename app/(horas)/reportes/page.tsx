@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { getReporteLines, getReporteOptions } from '@/lib/horas/reportes'
+import { getViewerScope } from '@/lib/horas/scope'
 import ReportesView from '@/components/horas/ReportesView'
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -8,17 +8,15 @@ const localISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad
 
 export default async function ReportesPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
   const sp = await searchParams
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (me?.role !== 'manager' && me?.role !== 'admin') redirect('/registrar')
+  const viewer = await getViewerScope()
+  if (!viewer) redirect('/login')
+  if (viewer.role !== 'manager' && viewer.role !== 'admin') redirect('/registrar')
 
   const now = new Date()
   const from = sp.from || `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`
   const to = sp.to || localISO(now)
 
-  const [lines, options] = await Promise.all([getReporteLines(from, to), getReporteOptions()])
+  const [lines, options] = await Promise.all([getReporteLines(from, to), getReporteOptions(viewer)])
 
   return (
     <div className="space-y-7">

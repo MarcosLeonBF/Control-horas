@@ -41,8 +41,7 @@ export default async function EquipoPage() {
   if (!viewer) redirect('/login')
   if (viewer.role !== 'manager' && viewer.role !== 'admin') redirect('/registrar')
 
-  const composicion = await getEquipoComposicion(viewer)
-  const totalPersonas = composicion.reduce((s, a) => s + a.managers.length + a.operativos.length, 0)
+  const { areas: composicion, totalPersonas } = await getEquipoComposicion(viewer)
 
   const supabase = await createClient()
   const { data: logs } = await supabase

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCachedBancoHoras } from '@/lib/graph/client'
+import type { ViewerScope } from '@/lib/horas/scope'
 import type { ReporteLine, ReporteFilterOptions } from '@/lib/horas/reportes-types'
 
 interface RawLine {
@@ -39,12 +40,23 @@ export async function getReporteLines(from: string, to: string): Promise<Reporte
 }
 
 // Opciones para los filtros (derivadas del catálogo + Excel + perfiles).
-export async function getReporteOptions(): Promise<ReporteFilterOptions> {
+// El alcance del manager es por sus áreas: solo ve sus áreas asignadas en el filtro.
+// (Los usuarios ya quedan acotados por RLS al equipo del manager.)
+export async function getReporteOptions(scope: ViewerScope): Promise<ReporteFilterOptions> {
   const supabase = await createClient()
-  const [{ data: areas }, { data: profiles }] = await Promise.all([
-    supabase.from('areas').select('name').eq('active', true).order('name'),
-    supabase.from('profiles').select('full_name').not('full_name', 'is', null).order('full_name'),
-  ])
+
+  let areaNames: string[] = []
+  if (scope.role === 'manager') {
+    if (scope.areaIds.length) {
+      const { data } = await supabase.from('areas').select('name').in('id', scope.areaIds).eq('active', true).order('name')
+      areaNames = (data ?? []).map((a) => a.name as string)
+    }
+  } else {
+    const { data } = await supabase.from('areas').select('name').eq('active', true).order('name')
+    areaNames = (data ?? []).map((a) => a.name as string)
+  }
+
+  const { data: profiles } = await supabase.from('profiles').select('full_name').not('full_name', 'is', null).order('full_name')
 
   let projects: string[] = []
   try {
@@ -57,7 +69,7 @@ export async function getReporteOptions(): Promise<ReporteFilterOptions> {
   return {
     projects,
     users: (profiles ?? []).map((p) => p.full_name as string).filter(Boolean),
-    areas: (areas ?? []).map((a) => a.name as string),
+    areas: areaNames,
     departments: ['Clientes', 'Ventas', 'Marketing', 'Todos'],
   }
 }
