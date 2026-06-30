@@ -168,3 +168,37 @@ export async function setDepartamentoEtapas(id: string, etapaIds: string[]): Pro
   }
   return { ok: true }
 }
+
+// Sincroniza las etapas de un departamento a partir de nombres (creando las que no existan)
+export async function setDepartamentoEtapasNombres(id: string, names: string[]): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+
+  const etapaIds: string[] = []
+  for (const name of names) {
+    const n = name.trim()
+    if (!n) continue
+    
+    // Buscar si existe (insensible a mayúsculas)
+    const { data: existing } = await supabase.from('etapas').select('id').ilike('name', n).single()
+    if (existing) {
+      etapaIds.push(existing.id)
+    } else {
+      // Crear nueva
+      const { data: newEtapa, error: insErr } = await supabase.from('etapas').insert({ name: n }).select('id').single()
+      if (insErr) return { ok: false, error: friendly(insErr) }
+      if (newEtapa) etapaIds.push(newEtapa.id)
+    }
+  }
+
+  // Ahora enlazar con las IDs obtenidas
+  const { error: delErr } = await supabase.from('departamento_etapas').delete().eq('departamento_id', id)
+  if (delErr) return { ok: false, error: friendly(delErr) }
+  
+  if (etapaIds.length) {
+    const { error: linkErr } = await supabase.from('departamento_etapas').insert(etapaIds.map((etapa_id) => ({ departamento_id: id, etapa_id })))
+    if (linkErr) return { ok: false, error: friendly(linkErr) }
+  }
+  
+  return { ok: true }
+}

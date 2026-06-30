@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   crearArea, renombrarArea, toggleArea,
   crearEtapa, renombrarEtapa, toggleEtapa,
-  crearDepartamento, renombrarDepartamento, toggleDepartamento, setDepartamentoEtapas,
+  crearDepartamento, renombrarDepartamento, toggleDepartamento, setDepartamentoEtapasNombres,
   crearPosicion, renombrarPosicion, togglePosicion, setPosicionAreas,
 } from '@/app/(horas)/admin/catalogos/actions'
 import type { DepartamentoRow } from '@/lib/horas/types'
@@ -193,6 +193,7 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
   const [editVal, setEditVal] = useState('')
   const [etapasFor, setEtapasFor] = useState<string | null>(null)
   const [etapaSel, setEtapaSel] = useState<string[]>([])
+  const [newEtapaName, setNewEtapaName] = useState('')
 
   async function add() {
     if (!nuevo.trim()) return
@@ -202,7 +203,7 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
     if (await run(renombrarDepartamento(id, editVal), 'Renombrado')) setEditingId(null)
   }
   async function saveEtapas(id: string) {
-    if (await run(setDepartamentoEtapas(id, etapaSel), 'Etapas actualizadas')) setEtapasFor(null)
+    if (await run(setDepartamentoEtapasNombres(id, etapaSel), 'Etapas actualizadas')) setEtapasFor(null)
   }
 
   return (
@@ -235,7 +236,11 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
                       : d.etapaIds.map((id) => <Badge key={id} variant="secondary">{etapaName(id)}</Badge>)}
                     {!(d as any).active && <Badge variant="outline">inactivo</Badge>}
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => { setEtapasFor(etapasFor === d.id ? null : d.id); setEtapaSel(d.etapaIds) }}>Etapas</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { 
+                    setEtapasFor(etapasFor === d.id ? null : d.id); 
+                    setEtapaSel(d.etapaIds.map(id => etapaName(id)).filter(Boolean));
+                    setNewEtapaName('');
+                  }}>Etapas</Button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditingId(d.id); setEditVal(d.name) }}>Renombrar</Button>
                   <Button size="sm" variant="ghost" disabled={busy}
                     onClick={() => run(toggleDepartamento(d.id, !(d as any).active), (d as any).active ? 'Desactivado' : 'Activado')}>
@@ -248,16 +253,33 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
             {etapasFor === d.id && (
               <div className="mt-3 rounded-lg border border-border bg-(--muted-surface) p-3">
                 <p className="mb-2 text-xs text-muted-foreground">Etapas de este departamento</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                  {activeEtapas.map((et) => (
-                    <label key={et.id} className="flex items-center gap-1.5 text-sm">
-                      <input type="checkbox" checked={etapaSel.includes(et.id)}
-                        onChange={(e) => setEtapaSel((prev) => e.target.checked ? [...prev, et.id] : prev.filter((x) => x !== et.id))} />
-                      {et.name}
-                    </label>
+                <div className="flex flex-wrap gap-2">
+                  {etapaSel.map((name) => (
+                    <Badge key={name} variant="secondary" className="gap-1 pr-1.5 text-sm font-normal">
+                      {name}
+                      <button onClick={() => setEtapaSel(prev => prev.filter(n => n !== name))} className="text-muted-foreground hover:text-foreground p-0.5" aria-label="Quitar etapa">
+                        <span className="text-[10px] leading-none block">✕</span>
+                      </button>
+                    </Badge>
                   ))}
                 </div>
-                <div className="mt-3 flex gap-2">
+                <Input 
+                  value={newEtapaName} 
+                  onChange={e => setNewEtapaName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const val = newEtapaName.trim();
+                      if (val && !etapaSel.some(n => n.toLowerCase() === val.toLowerCase())) {
+                        setEtapaSel(prev => [...prev, val]);
+                      }
+                      setNewEtapaName('');
+                    }
+                  }}
+                  placeholder="Escribe una etapa y presiona Enter..."
+                  className="mt-3 text-sm h-9 bg-background max-w-sm"
+                />
+                <div className="mt-4 flex gap-2">
                   <Button size="sm" onClick={() => saveEtapas(d.id)} disabled={busy}>Guardar etapas</Button>
                   <Button size="sm" variant="ghost" onClick={() => setEtapasFor(null)}>Cancelar</Button>
                 </div>
