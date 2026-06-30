@@ -80,7 +80,6 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
             <tr className="text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <th className="pb-1 pr-3 font-medium">Fecha</th>
               <th className="pb-1 pr-3 font-medium">Proyecto</th>
-              <th className="pb-1 pr-3 font-medium">Área</th>
               <th className="pb-1 pr-3 font-medium">Departamento</th>
               <th className="pb-1 pr-3 font-medium">Etapa</th>
               <th className="pb-1 pr-3 font-medium">Horas</th>
@@ -99,14 +98,6 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
                   <select aria-label="Proyecto" value={l.project} onChange={(e) => update(i, { project: e.target.value })} className={field}>
                     <option value="">— Proyecto —</option>
                     {projects.map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </td>
-                <td className="min-w-32.5 pr-3 align-top">
-                  <select aria-label="Área" value={l.area_id} disabled={isDepartamento(l.project)}
-                    onChange={(e) => update(i, { area_id: e.target.value })} className={field}>
-                    {isDepartamento(l.project)
-                      ? <option value={internalAreaId}>Interno</option>
-                      : areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </td>
                 <td className="min-w-32.5 pr-3 align-top">
