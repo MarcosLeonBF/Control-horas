@@ -1,6 +1,6 @@
 // Tipos y agregación del reporte de horas. SIN imports de servidor (lo usa el
 // componente cliente y la página).
-export type GroupBy = 'project' | 'user' | 'area' | 'department' | 'etapa'
+export type GroupBy = 'project' | 'user' | 'area' | 'department' | 'etapa' | 'position'
 
 export const GROUP_LABELS: Record<GroupBy, string> = {
   project: 'Proyecto',
@@ -8,9 +8,10 @@ export const GROUP_LABELS: Record<GroupBy, string> = {
   area: 'Área',
   department: 'Departamento',
   etapa: 'Etapa',
+  position: 'Posición',
 }
 
-export const GROUP_ORDER: GroupBy[] = ['project', 'user', 'area', 'department', 'etapa']
+export const GROUP_ORDER: GroupBy[] = ['project', 'user', 'area', 'department', 'etapa', 'position']
 
 // Una línea de registro aplanada (con nombres ya resueltos), lista para agrupar.
 export interface ReporteLine {
@@ -20,6 +21,7 @@ export interface ReporteLine {
   etapa: string
   department: string
   user: string
+  position: string
   hours: number
   description: string
   isInternal: boolean // project === 'Departamento'
@@ -30,6 +32,7 @@ export interface ReporteFilterOptions {
   users: string[]
   areas: string[]
   departments: string[]
+  positions: string[]
 }
 
 const KEY: Record<GroupBy, (l: ReporteLine) => string> = {
@@ -38,6 +41,7 @@ const KEY: Record<GroupBy, (l: ReporteLine) => string> = {
   area: (l) => l.area || '—',
   department: (l) => l.department || '—',
   etapa: (l) => l.etapa || '—',
+  position: (l) => l.position || '—',
 }
 
 export interface AggRow {

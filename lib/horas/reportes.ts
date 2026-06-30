@@ -10,7 +10,7 @@ interface RawLine {
   description: string | null
   areas: { name: string } | null
   etapas: { name: string } | null
-  time_logs: { entry_date: string; profiles: { full_name: string } | null } | null
+  time_logs: { entry_date: string; profiles: { full_name: string; positions: { name: string } | null } | null } | null
 }
 
 // Líneas de registro (no anuladas) dentro de un rango de fechas, con nombres resueltos.
@@ -19,7 +19,7 @@ export async function getReporteLines(from: string, to: string): Promise<Reporte
   const { data } = await supabase
     .from('time_log_lines')
     .select(
-      'project, hours, department, description, areas(name), etapas(name), time_logs!inner(entry_date, status, user_id, profiles!time_logs_user_id_fkey(full_name))',
+      'project, hours, department, description, areas(name), etapas(name), time_logs!inner(entry_date, status, user_id, profiles!time_logs_user_id_fkey(full_name, positions(name)))',
     )
     .neq('time_logs.status', 'anulado')
     .gte('time_logs.entry_date', from)
@@ -33,6 +33,7 @@ export async function getReporteLines(from: string, to: string): Promise<Reporte
     etapa: l.etapas?.name ?? '—',
     department: l.department,
     user: l.time_logs?.profiles?.full_name ?? '—',
+    position: l.time_logs?.profiles?.positions?.name ?? '—',
     hours: Number(l.hours),
     description: l.description ?? '',
     isInternal: l.project === 'Departamento',
@@ -66,10 +67,13 @@ export async function getReporteOptions(scope: ViewerScope): Promise<ReporteFilt
   }
   projects = [...projects, 'Departamento'].sort((a, b) => a.localeCompare(b))
 
+  const { data: posiciones } = await supabase.from('positions').select('name').eq('active', true).order('name')
+
   return {
     projects,
     users: (profiles ?? []).map((p) => p.full_name as string).filter(Boolean),
     areas: areaNames,
-    departments: ['Clientes', 'Ventas', 'Marketing', 'Todos'],
+    departments: ['Clientes', 'Ventas', 'Marketing', 'Todos'], // TODO: Cargar de DB si es necesario, pero actualmente es estático en reportes
+    positions: (posiciones ?? []).map((p) => p.name as string),
   }
 }

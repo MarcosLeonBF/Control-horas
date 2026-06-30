@@ -59,6 +59,7 @@ export default function ReportesView({
   const [fProject, setFProject] = useState('')
   const [fUser, setFUser] = useState('')
   const [fArea, setFArea] = useState('')
+  const [fPosition, setFPosition] = useState('')
 
   const filtered = useMemo(
     () =>
@@ -66,9 +67,10 @@ export default function ReportesView({
         (l) =>
           (!fProject || l.project === fProject) &&
           (!fUser || l.user === fUser) &&
-          (!fArea || l.area === fArea),
+          (!fArea || l.area === fArea) &&
+          (!fPosition || l.position === fPosition),
       ),
-    [lines, fProject, fUser, fArea],
+    [lines, fProject, fUser, fArea, fPosition],
   )
 
   const rows = useMemo(() => aggregate(filtered, groupBy), [filtered, groupBy])
@@ -84,7 +86,7 @@ export default function ReportesView({
   }, [filtered])
 
   const max = rows[0]?.hours ?? 0
-  const hasFilters = fProject || fUser || fArea
+  const hasFilters = fProject || fUser || fArea || fPosition
   const dimLabel = GROUP_LABELS[groupBy]
 
   // Resumen agrupado (consumo por la dimensión elegida).
@@ -94,7 +96,7 @@ export default function ReportesView({
   // Detalle: líneas de registro crudas (§17.5 "descarga de líneas de registro").
   function buildDetalle(): ExportRow[] {
     return filtered.map((l) => ({
-      Fecha: l.date, Usuario: l.user, Proyecto: l.project, Área: l.area,
+      Fecha: l.date, Usuario: l.user, Posición: l.position, Proyecto: l.project, Área: l.area,
       Departamento: l.department, Etapa: l.etapa, Horas: l.hours, Descripción: l.description,
     }))
   }
@@ -142,9 +144,13 @@ export default function ReportesView({
           <option value="">Todas las áreas</option>
           {options.areas.map((a) => <option key={a} value={a}>{a}</option>)}
         </select>
+        <select aria-label="Filtrar por posición" value={fPosition} onChange={(e) => setFPosition(e.target.value)} className={selectClass}>
+          <option value="">Todas las posiciones</option>
+          {options.positions.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
         {hasFilters && (
           <button
-            onClick={() => { setFProject(''); setFUser(''); setFArea('') }}
+            onClick={() => { setFProject(''); setFUser(''); setFArea(''); setFPosition('') }}
             className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <X className="size-3.5" /> Limpiar
