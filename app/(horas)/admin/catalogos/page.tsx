@@ -19,7 +19,7 @@ export default async function CatalogosPage() {
       <header>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Catálogos</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Áreas y etapas del registro de horas. Los proyectos y bancos vienen del Excel; los departamentos son fijos (§3.2).
+          Áreas y etapas del registro de horas. Los proyectos y bancos vienen del Excel; los departamentos son fijos.
         </p>
       </header>
 

@@ -34,7 +34,7 @@ export default async function AuditoriaPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl">Auditoría</h1>
-        <p className="text-sm text-muted-foreground">Toda creación, edición o anulación de registros queda trazada (PDF §7).</p>
+        <p className="text-sm text-muted-foreground">Toda creación, edición o anulación de registros queda trazada.</p>
       </div>
 
       <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">

@@ -100,7 +100,7 @@ export default function CatalogosPanel({ areas, etapas }: { areas: CatalogoRow[]
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm lg:col-span-2">
         <h2 className="font-display text-lg font-semibold">Departamentos</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Fijos por especificación (§3.2): aplican al trabajo interno del proyecto «Departamento».
+          Fijos por especificación: aplican al trabajo interno del proyecto «Departamento».
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {DEPARTAMENTOS.map((d) => <Badge key={d} variant="secondary">{d}</Badge>)}
