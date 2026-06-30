@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge'
 import {
   crearArea, renombrarArea, toggleArea,
   crearEtapa, renombrarEtapa, toggleEtapa,
-  crearDepartamento, renombrarDepartamento, toggleDepartamento,
+  crearDepartamento, renombrarDepartamento, toggleDepartamento, setDepartamentoEtapas,
   crearPosicion, renombrarPosicion, togglePosicion, setPosicionAreas,
 } from '@/app/(horas)/admin/catalogos/actions'
+import type { DepartamentoRow } from '@/lib/horas/types'
 
 export interface CatalogoRow { id: string; name: string; active: boolean; is_internal?: boolean }
 export interface PosicionRow { id: string; name: string; active: boolean; areaIds: string[] }
@@ -183,8 +184,94 @@ function PosicionesSection({ posiciones, areas }: { posiciones: PosicionRow[]; a
   )
 }
 
+function DepartamentosSection({ departamentos, etapas }: { departamentos: DepartamentoRow[]; etapas: CatalogoRow[] }) {
+  const { busy, run } = useRun()
+  const activeEtapas = etapas.filter((e) => e.active)
+  const etapaName = (id: string) => etapas.find((e) => e.id === id)?.name ?? ''
+  const [nuevo, setNuevo] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editVal, setEditVal] = useState('')
+  const [etapasFor, setEtapasFor] = useState<string | null>(null)
+  const [etapaSel, setEtapaSel] = useState<string[]>([])
+
+  async function add() {
+    if (!nuevo.trim()) return
+    if (await run(crearDepartamento(nuevo), 'Departamento añadido')) setNuevo('')
+  }
+  async function saveEdit(id: string) {
+    if (await run(renombrarDepartamento(id, editVal), 'Renombrado')) setEditingId(null)
+  }
+  async function saveEtapas(id: string) {
+    if (await run(setDepartamentoEtapas(id, etapaSel), 'Etapas actualizadas')) setEtapasFor(null)
+  }
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <h2 className="font-display text-lg font-semibold">Departamentos</h2>
+
+      <div className="mt-4 flex gap-2">
+        <Input value={nuevo} onChange={(e) => setNuevo(e.target.value)} placeholder="Nuevo departamento…"
+          onKeyDown={(e) => { if (e.key === 'Enter') add() }} />
+        <Button onClick={add} disabled={busy || !nuevo.trim()}>Añadir</Button>
+      </div>
+
+      <ul className="mt-4 divide-y divide-border">
+        {departamentos.map((d) => (
+          <li key={d.id} className="py-2.5">
+            <div className="flex items-center gap-2">
+              {editingId === d.id ? (
+                <>
+                  <Input value={editVal} onChange={(e) => setEditVal(e.target.value)} className="h-8 max-w-xs" autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(d.id); if (e.key === 'Escape') setEditingId(null) }} />
+                  <Button size="sm" onClick={() => saveEdit(d.id)} disabled={busy}>Guardar</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancelar</Button>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                    <span className={`text-sm font-medium ${(d as any).active ? '' : 'text-muted-foreground line-through'}`}>{d.name}</span>
+                    {d.etapaIds.length === 0
+                      ? <Badge variant="outline" className="text-muted-foreground">sin etapas</Badge>
+                      : d.etapaIds.map((id) => <Badge key={id} variant="secondary">{etapaName(id)}</Badge>)}
+                    {!(d as any).active && <Badge variant="outline">inactivo</Badge>}
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => { setEtapasFor(etapasFor === d.id ? null : d.id); setEtapaSel(d.etapaIds) }}>Etapas</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setEditingId(d.id); setEditVal(d.name) }}>Renombrar</Button>
+                  <Button size="sm" variant="ghost" disabled={busy}
+                    onClick={() => run(toggleDepartamento(d.id, !(d as any).active), (d as any).active ? 'Desactivado' : 'Activado')}>
+                    {(d as any).active ? 'Desactivar' : 'Activar'}
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {etapasFor === d.id && (
+              <div className="mt-3 rounded-lg border border-border bg-(--muted-surface) p-3">
+                <p className="mb-2 text-xs text-muted-foreground">Etapas de este departamento</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                  {activeEtapas.map((et) => (
+                    <label key={et.id} className="flex items-center gap-1.5 text-sm">
+                      <input type="checkbox" checked={etapaSel.includes(et.id)}
+                        onChange={(e) => setEtapaSel((prev) => e.target.checked ? [...prev, et.id] : prev.filter((x) => x !== et.id))} />
+                      {et.name}
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" onClick={() => saveEtapas(d.id)} disabled={busy}>Guardar etapas</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEtapasFor(null)}>Cancelar</Button>
+                </div>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export default function CatalogosPanel({ areas, etapas, departamentos, posiciones }: {
-  areas: CatalogoRow[]; etapas: CatalogoRow[]; departamentos: CatalogoRow[]; posiciones: PosicionRow[]
+  areas: CatalogoRow[]; etapas: CatalogoRow[]; departamentos: DepartamentoRow[]; posiciones: PosicionRow[]
 }) {
   return (
     <div className="space-y-6">
@@ -195,8 +282,7 @@ export default function CatalogosPanel({ areas, etapas, departamentos, posicione
           ops={{ crear: crearArea, renombrar: renombrarArea, toggle: toggleArea }} />
         <Seccion title="Etapas" rows={etapas} addPlaceholder="Nueva etapa…"
           ops={{ crear: crearEtapa, renombrar: renombrarEtapa, toggle: toggleEtapa }} />
-        <Seccion title="Departamentos" rows={departamentos} addPlaceholder="Nuevo departamento…"
-          ops={{ crear: crearDepartamento, renombrar: renombrarDepartamento, toggle: toggleDepartamento }} />
+        <DepartamentosSection departamentos={departamentos} etapas={etapas} />
       </div>
     </div>
   )

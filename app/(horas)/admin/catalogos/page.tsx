@@ -9,12 +9,13 @@ export default async function CatalogosPage() {
   const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (me?.role !== 'admin') redirect('/registrar')
 
-  const [{ data: areas }, { data: etapas }, { data: departamentos }, { data: positions }, { data: posAreas }] = await Promise.all([
+  const [{ data: areas }, { data: etapas }, { data: departamentos }, { data: positions }, { data: posAreas }, { data: depEtapas }] = await Promise.all([
     supabase.from('areas').select('id, name, active, is_internal').order('name'),
     supabase.from('etapas').select('id, name, active').order('name'),
     supabase.from('departamentos').select('id, name, active').order('name'),
     supabase.from('positions').select('id, name, active').order('name'),
     supabase.from('position_areas').select('position_id, area_id'),
+    supabase.from('departamento_etapas').select('departamento_id, etapa_id'),
   ])
 
   const posiciones: PosicionRow[] = (positions ?? []).map((p) => ({
@@ -22,6 +23,13 @@ export default async function CatalogosPage() {
     name: p.name as string,
     active: p.active as boolean,
     areaIds: (posAreas ?? []).filter((pa) => pa.position_id === p.id).map((pa) => pa.area_id as string),
+  }))
+
+  const depsConEtapas = (departamentos ?? []).map((d) => ({
+    id: d.id as string,
+    name: d.name as string,
+    active: d.active as boolean,
+    etapaIds: (depEtapas ?? []).filter((de) => de.departamento_id === d.id).map((de) => de.etapa_id as string),
   }))
 
   return (
@@ -37,7 +45,7 @@ export default async function CatalogosPage() {
         posiciones={posiciones}
         areas={(areas ?? []) as CatalogoRow[]}
         etapas={(etapas ?? []) as CatalogoRow[]}
-        departamentos={(departamentos ?? []) as CatalogoRow[]}
+        departamentos={depsConEtapas}
       />
     </div>
   )

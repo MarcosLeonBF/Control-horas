@@ -155,3 +155,16 @@ export async function toggleDepartamento(id: string, active: boolean): Promise<R
   if (e) return { ok: false, error: friendly(e) }
   return { ok: true }
 }
+
+// Reemplaza las etapas ligadas a un departamento.
+export async function setDepartamentoEtapas(id: string, etapaIds: string[]): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: delErr } = await supabase.from('departamento_etapas').delete().eq('departamento_id', id)
+  if (delErr) return { ok: false, error: friendly(delErr) }
+  if (etapaIds.length) {
+    const { error: insErr } = await supabase.from('departamento_etapas').insert(etapaIds.map((etapa_id) => ({ departamento_id: id, etapa_id })))
+    if (insErr) return { ok: false, error: friendly(insErr) }
+  }
+  return { ok: true }
+}

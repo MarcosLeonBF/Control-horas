@@ -4,27 +4,27 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { guardarRegistro, type LineInput } from '@/app/(horas)/registrar/actions'
 import { formatHoras } from '@/lib/horas/format'
-import type { AreaRow, EtapaRow } from '@/lib/horas/types'
+import type { AreaRow, EtapaRow, DepartamentoRow } from '@/lib/horas/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
-const DEPARTAMENTOS = ['Clientes', 'Ventas', 'Marketing', 'Todos'] as const
 const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
-const emptyLine = (areaId: string, date: string): LineInput => ({ entry_date: date, project: '', area_id: areaId, department: 'Clientes', etapa_id: '', hours: 0, description: '' })
+const emptyLine = (areaId: string, date: string, dep: string): LineInput => ({ entry_date: date, project: '', area_id: areaId, department: dep, etapa_id: '', hours: 0, description: '' })
 
 const field =
   'w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
 
-export default function RegistroForm({ projects, areas, etapas, internalAreaId, canBackdate = false, initial }: {
-  projects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; internalAreaId: string
+export default function RegistroForm({ projects, areas, etapas, departamentos, internalAreaId, canBackdate = false, initial }: {
+  projects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
   canBackdate?: boolean // admin: puede registrar fuera del rango de 7 días (PDF §4)
   initial?: { id: string; lines: LineInput[] }
 }) {
   const router = useRouter()
   // Fecha por defecto: la heredan las líneas nuevas y las que aún la seguían.
   const [defaultDate, setDefaultDate] = useState(initial?.lines[0]?.entry_date ?? today())
-  const [lines, setLines] = useState<LineInput[]>(initial?.lines ?? [emptyLine(areas[0]?.id ?? '', today())])
+  const defaultDep = departamentos[0]?.name ?? 'Clientes'
+  const [lines, setLines] = useState<LineInput[]>(initial?.lines ?? [emptyLine(areas[0]?.id ?? '', today(), defaultDep)])
   const [saving, setSaving] = useState(false)
 
   const total = lines.reduce((s, l) => s + (Number(l.hours) || 0), 0)
@@ -39,10 +39,35 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
     setLines((prev) => prev.map((l, idx) => {
       if (idx !== i) return l
       const next = { ...l, ...patch }
+      
+      let checkEtapaForDep = false
+
       if (patch.project !== undefined) {
-        if (isDepartamento(patch.project)) { next.area_id = internalAreaId }
-        else { next.department = 'Clientes'; if (next.area_id === internalAreaId) next.area_id = areas[0]?.id ?? '' }
+        if (isDepartamento(patch.project)) { 
+          next.area_id = internalAreaId
+          if (!departamentos.some(d => d.name === next.department)) {
+            next.department = defaultDep
+          }
+          checkEtapaForDep = true
+        } else { 
+          next.department = defaultDep
+          if (next.area_id === internalAreaId) next.area_id = areas[0]?.id ?? '' 
+        }
       }
+
+      if (patch.department !== undefined && isDepartamento(next.project)) {
+        checkEtapaForDep = true
+      }
+
+      if (checkEtapaForDep) {
+        const dep = departamentos.find((d) => d.name === next.department)
+        if (dep && dep.etapaIds.length === 1) {
+          next.etapa_id = dep.etapaIds[0]
+        } else if (dep && !dep.etapaIds.includes(next.etapa_id)) {
+          next.etapa_id = '' // clear if current etapa is not allowed in this new department
+        }
+      }
+
       return next
     }))
   }
@@ -88,7 +113,14 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
             </tr>
           </thead>
           <tbody>
-            {lines.map((l, i) => (
+            {lines.map((l, i) => {
+              const isDep = isDepartamento(l.project)
+              const currentDep = departamentos.find(d => d.name === l.department)
+              const allowedEtapas = isDep && currentDep && currentDep.etapaIds.length > 0
+                ? etapas.filter(e => currentDep.etapaIds.includes(e.id))
+                : etapas
+
+              return (
               <tr key={i}>
                 <td className="min-w-37 pr-3 align-top">
                   <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : daysAgo(7)}
@@ -101,19 +133,19 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
                   </select>
                 </td>
                 <td className="min-w-32.5 pr-3 align-top">
-                  {isDepartamento(l.project) ? (
+                  {isDep ? (
                     <select aria-label="Departamento" value={l.department}
                       onChange={(e) => update(i, { department: e.target.value })} className={field}>
-                      {DEPARTAMENTOS.map((d) => <option key={d} value={d}>{d}</option>)}
+                      {departamentos.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
                     </select>
                   ) : (
-                    <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/50">—</span>
+                    <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/50">Clientes</span>
                   )}
                 </td>
                 <td className="min-w-35 pr-3 align-top">
                   <select aria-label="Etapa" value={l.etapa_id} onChange={(e) => update(i, { etapa_id: e.target.value })} className={field}>
                     <option value="">— Etapa —</option>
-                    {etapas.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
+                    {allowedEtapas.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
                   </select>
                 </td>
                 <td className="w-24 pr-3 align-top">
@@ -129,13 +161,14 @@ export default function RegistroForm({ projects, areas, etapas, internalAreaId, 
                     disabled={lines.length === 1} aria-label="Eliminar línea" className="text-foreground/40 hover:text-(--status-excedido)">✕</Button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
 
       <div className="mt-4 flex items-start justify-between border-t border-border pt-4">
-        <Button type="button" variant="link" size="sm" className="px-0" onClick={() => setLines((p) => [...p, emptyLine(areas[0]?.id ?? '', defaultDate)])}>
+        <Button type="button" variant="link" size="sm" className="px-0" onClick={() => setLines((p) => [...p, emptyLine(areas[0]?.id ?? '', defaultDate, defaultDep)])}>
           + Añadir línea
         </Button>
         <div className="text-right">

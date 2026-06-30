@@ -8,7 +8,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const { edit } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { areas, etapas } = await getCatalogos()
+  const { areas, etapas, departamentos } = await getCatalogos()
   const { data: me } = await supabase.from('profiles').select('role').eq('id', user!.id).single()
   const myAreas = await getMyAreas(user!.id)
   const internal = areas.find((a) => a.is_internal)
@@ -20,7 +20,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
 
   let projects: string[] = []
   try { projects = (await getCachedBancoHoras()).map((b) => b.project) } catch { /* Excel caído: solo Departamento */ }
-  projects = [...projects, 'Departamento']
+  projects = Array.from(new Set([...projects, 'Departamento']))
 
   // Modo edición: precargar el registro propio (RLS limita el acceso) si no está anulado.
   // Las líneas no tienen fecha propia: heredan la del log que se edita.
@@ -44,7 +44,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl">{initial ? 'Editar registro' : 'Registrar horas'}</h1>
-      <RegistroForm projects={projects} areas={selectableAreas} etapas={etapas} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
+      <RegistroForm projects={projects} areas={selectableAreas} etapas={etapas} departamentos={departamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
     </div>
   )
 }
