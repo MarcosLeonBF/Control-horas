@@ -52,6 +52,11 @@ function Editor({ u, areas, onDone }: { u: UsuarioRow; areas: AreaRow[]; onDone:
       </label>
       <fieldset className="sm:col-span-2">
         <legend className="text-xs text-muted-foreground">Áreas</legend>
+        {f.role === 'manager' && (
+          <p className="mb-1 text-xs text-foreground/55">
+            El manager gestiona estas áreas: verá los registros, bancos y reportes de los usuarios que las tengan asignadas.
+          </p>
+        )}
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
           {areas.filter((a) => !a.is_internal).map((a) => (
             <label key={a.id} className="flex items-center gap-1.5 text-sm">

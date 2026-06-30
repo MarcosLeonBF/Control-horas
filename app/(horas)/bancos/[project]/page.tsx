@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
-import { getBancoHorasDetalle } from '@/lib/horas/bancos'
+import { getBancoHorasDetalle, type BancosScope } from '@/lib/horas/bancos'
+import { getViewerScope } from '@/lib/horas/scope'
 import { formatHoras } from '@/lib/horas/format'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import AmpliarHorasForm from '@/components/horas/AmpliarHorasForm'
@@ -11,14 +11,16 @@ export default async function BancoDetallePage({ params }: { params: Promise<{ p
   const { project: raw } = await params
   const project = decodeURIComponent(raw)
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (me?.role !== 'manager' && me?.role !== 'admin') redirect('/registrar')
-  const isAdmin = me?.role === 'admin'
+  const viewer = await getViewerScope()
+  if (!viewer) redirect('/login')
+  if (viewer.role !== 'manager' && viewer.role !== 'admin') redirect('/registrar')
+  const isAdmin = viewer.role === 'admin'
 
-  const d = await getBancoHorasDetalle(project)
+  const scope: BancosScope =
+    viewer.role === 'admin' ? { role: 'admin' } : { role: 'manager', teamUserIds: viewer.teamUserIds }
+  const d = await getBancoHorasDetalle(project, scope)
+  // El manager solo accede a bancos de proyectos que su equipo registra.
+  if (!d.inScope) redirect('/bancos')
   const ampliado = d.assigned - d.excelBase
 
   return (

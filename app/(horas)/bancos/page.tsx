@@ -1,16 +1,16 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { getBancosHoras } from '@/lib/horas/bancos'
+import { getBancosHoras, type BancosScope } from '@/lib/horas/bancos'
+import { getViewerScope } from '@/lib/horas/scope'
 import BancosHorasClient from '@/components/horas/BancosHorasClient'
 
 export default async function BancosPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (me?.role !== 'manager' && me?.role !== 'admin') redirect('/registrar')
+  const viewer = await getViewerScope()
+  if (!viewer) redirect('/login')
+  if (viewer.role !== 'manager' && viewer.role !== 'admin') redirect('/registrar')
 
-  const rows = await getBancosHoras()
+  const scope: BancosScope =
+    viewer.role === 'admin' ? { role: 'admin' } : { role: 'manager', teamUserIds: viewer.teamUserIds }
+  const rows = await getBancosHoras(scope)
 
   return (
     <div className="space-y-6">
