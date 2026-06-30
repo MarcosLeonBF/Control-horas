@@ -16,5 +16,6 @@ export async function getMyAreas(userId: string): Promise<AreaRow[]> {
     .from('user_areas')
     .select('areas(id,name,is_internal)')
     .eq('user_id', userId)
-  return (data ?? []).map((r: { areas: AreaRow }) => r.areas)
+  // Supabase tipa el embed to-one como array; en runtime es un objeto. Cast como en reportes.ts/bancos.ts.
+  return ((data ?? []) as unknown as { areas: AreaRow }[]).map((r) => r.areas)
 }
