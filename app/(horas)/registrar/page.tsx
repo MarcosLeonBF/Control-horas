@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { getCatalogos, getMyAreas, getMyPositionEtapaIds } from '@/lib/horas/queries'
-import { getCachedBancoHoras } from '@/lib/graph/client'
+import { getCatalogos, getMyAreas, getMyPositionEtapaIds, getMyPositionDescripcionIds } from '@/lib/horas/queries'
+import { getCachedBancoHoras, getCachedProyectosEstado } from '@/lib/graph/client'
 import RegistroForm from '@/components/horas/RegistroForm'
 import type { LineInput } from '@/app/(horas)/registrar/actions'
 
@@ -8,7 +8,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const { edit } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { areas, etapas, departamentos } = await getCatalogos()
+  const { areas, etapas, descripciones, departamentos } = await getCatalogos()
   const { data: me } = await supabase.from('profiles').select('role').eq('id', user!.id).single()
   const myAreas = await getMyAreas(user!.id)
   const internal = areas.find((a) => a.is_internal)
@@ -21,12 +21,33 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   // Etapas seleccionables en proyecto cliente: las de la posición del usuario.
   // Admin ve todas (igual que con las áreas). Operativo/manager sin etapas de
   // posición → lista vacía (no puede registrar en cliente; PDF: estricto).
+  // Las etapas ligadas a un departamento son exclusivas del proyecto "Departamento":
+  // nunca deben aparecer en proyecto cliente (ni siquiera para el admin).
   const positionEtapaIds = await getMyPositionEtapaIds(user!.id)
-  const clientEtapas = me?.role === 'admin' ? etapas : etapas.filter((e) => positionEtapaIds.includes(e.id))
+  const departmentEtapaIds = new Set(departamentos.flatMap((d) => d.etapaIds))
+  const clientBase = me?.role === 'admin' ? etapas : etapas.filter((e) => positionEtapaIds.includes(e.id))
+  const clientEtapas = clientBase.filter((e) => !departmentEtapaIds.has(e.id))
+
+  // Descripciones seleccionables (todas las líneas): las de la posición del usuario.
+  // Admin ve todas; sin descripciones de posición → lista vacía (estricto).
+  const positionDescripcionIds = await getMyPositionDescripcionIds(user!.id)
+  const allowedDescripciones = me?.role === 'admin' ? descripciones : descripciones.filter((d) => positionDescripcionIds.includes(d.id))
 
   let projects: string[] = []
   try { projects = (await getCachedBancoHoras()).map((b) => b.project) } catch { /* Excel caído: solo Departamento */ }
   projects = Array.from(new Set([...projects, 'Departamento']))
+
+  // Estado de proyectos (tabla clientes_proyectos): avisamos al elegir uno finalizado.
+  let finishedProjects: string[] = []
+  try {
+    finishedProjects = (await getCachedProyectosEstado())
+      .filter((e) => e.estado.toLowerCase() === 'finalizado')
+      .map((e) => e.project)
+  } catch { /* tabla no disponible: sin estados, sin aviso */ }
+
+  // Orden en el selector: activos primero (alfabético), finalizados al fondo.
+  const finishedSet = new Set(finishedProjects)
+  projects.sort((a, b) => (finishedSet.has(a) ? 1 : 0) - (finishedSet.has(b) ? 1 : 0) || a.localeCompare(b))
 
   // Modo edición: precargar el registro propio (RLS limita el acceso) si no está anulado.
   // Las líneas no tienen fecha propia: heredan la del log que se edita.
@@ -50,7 +71,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl">{initial ? 'Editar registro' : 'Registrar horas'}</h1>
-      <RegistroForm projects={projects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} departamentos={departamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
+      <RegistroForm projects={projects} finishedProjects={finishedProjects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} descripciones={allowedDescripciones} departamentos={departamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
     </div>
   )
 }

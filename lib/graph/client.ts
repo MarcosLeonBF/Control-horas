@@ -110,3 +110,56 @@ export const getCachedBancoHoras = unstable_cache(
   ['banco-horas-data'],
   { revalidate: 300, tags: [BANCO_HORAS_TAG] }
 )
+
+// ── Estado de proyectos (hoja "Clientes_Proyectos" del mismo Excel) ──────────
+// Columnas: Proyecto | Tipo de Contrato | Estado. Traemos Proyecto→Estado para
+// distinguir proyectos finalizados al registrar. Se lee el usedRange de la hoja
+// (funciona sea o no una Tabla con nombre). El nombre de la hoja se puede
+// sobreescribir con SHAREPOINT_ESTADOS_SHEET (por defecto "Clientes_Proyectos").
+export interface ProyectoEstado { project: string; estado: string }
+
+async function readClientesProyectosSheet(
+  token: string,
+  driveId: string,
+  itemId: string,
+): Promise<ProyectoEstado[]> {
+  const sheet = process.env.SHAREPOINT_ESTADOS_SHEET ?? 'Clientes_Proyectos'
+  const url = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets/${encodeURIComponent(sheet)}/usedRange(valuesOnly=true)`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
+    throw new Error(`Error leyendo hoja ${sheet}: ${err?.error?.message ?? res.status}`)
+  }
+
+  const values = (await res.json() as { values: unknown[][] }).values ?? []
+  if (values.length < 2) return []
+
+  const header = values[0]
+  const norm = (s: unknown) => String(s ?? '').trim().toLowerCase()
+  const projIdx = header.findIndex((h) => norm(h) === 'proyecto')
+  const estadoIdx = header.findIndex((h) => norm(h) === 'estado')
+  if (projIdx === -1 || estadoIdx === -1) {
+    throw new Error(`La hoja ${sheet} necesita columnas "Proyecto" y "Estado".`)
+  }
+
+  return values
+    .slice(1)
+    .map((cells) => ({ project: String(cells[projIdx] ?? '').trim(), estado: String(cells[estadoIdx] ?? '').trim() }))
+    .filter((r) => r.project !== '')
+}
+
+export async function fetchProyectosEstadoFromGraph(): Promise<ProyectoEstado[]> {
+  const fileUrl = process.env.SHAREPOINT_FILE_URL
+  if (!fileUrl) throw new Error('SHAREPOINT_FILE_URL no está configurada')
+
+  const token               = await getToken()
+  const { driveId, itemId } = await resolveDriveItem(token, fileUrl)
+  return readClientesProyectosSheet(token, driveId, itemId)
+}
+
+export const getCachedProyectosEstado = unstable_cache(
+  fetchProyectosEstadoFromGraph,
+  ['proyectos-estado-data'],
+  { revalidate: 300, tags: [BANCO_HORAS_TAG] }
+)

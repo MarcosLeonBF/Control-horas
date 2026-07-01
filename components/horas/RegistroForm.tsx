@@ -4,9 +4,10 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { guardarRegistro, type LineInput } from '@/app/(horas)/registrar/actions'
 import { formatHoras } from '@/lib/horas/format'
-import type { AreaRow, EtapaRow, DepartamentoRow } from '@/lib/horas/types'
+import type { AreaRow, EtapaRow, DescripcionRow, DepartamentoRow } from '@/lib/horas/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import ProjectCombobox from '@/components/horas/ProjectCombobox'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
@@ -15,12 +16,13 @@ const emptyLine = (areaId: string, date: string, dep: string): LineInput => ({ e
 const field =
   'w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
 
-export default function RegistroForm({ projects, areas, etapas, clientEtapas, departamentos, internalAreaId, canBackdate = false, initial }: {
-  projects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
+export default function RegistroForm({ projects, finishedProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial }: {
+  projects: string[]; finishedProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: DescripcionRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
   canBackdate?: boolean // admin: puede registrar fuera del rango de 7 días (PDF §4)
   initial?: { id: string; lines: LineInput[] }
 }) {
   const router = useRouter()
+  const finishedSet = new Set(finishedProjects)
   // Fecha por defecto: la heredan las líneas nuevas y las que aún la seguían.
   const [defaultDate, setDefaultDate] = useState(initial?.lines[0]?.entry_date ?? today())
   const defaultDep = departamentos[0]?.name ?? 'Clientes'
@@ -124,6 +126,12 @@ export default function RegistroForm({ projects, areas, etapas, clientEtapas, de
               const lineClientEtapas = l.etapa_id && !clientEtapas.some(e => e.id === l.etapa_id)
                 ? [...clientEtapas, ...etapas.filter(e => e.id === l.etapa_id)]
                 : clientEtapas
+              // Descripción (todas las líneas): opciones de la posición del usuario.
+              // En edición, si la descripción guardada no está en la lista, se incluye
+              // para no perderla (los registros viejos tenían texto libre).
+              const lineDescripciones = l.description && !descripciones.some(d => d.name === l.description)
+                ? [...descripciones, { id: `__cur_${i}`, name: l.description }]
+                : descripciones
 
               return (
               <tr key={i}>
@@ -132,10 +140,16 @@ export default function RegistroForm({ projects, areas, etapas, clientEtapas, de
                     onChange={(e) => update(i, { entry_date: e.target.value })} />
                 </td>
                 <td className="min-w-45 pr-3 align-top">
-                  <select aria-label="Proyecto" value={l.project} onChange={(e) => update(i, { project: e.target.value })} className={field}>
-                    <option value="">— Proyecto —</option>
-                    {projects.map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
+                  <ProjectCombobox
+                    ariaLabel="Proyecto"
+                    value={l.project}
+                    projects={projects}
+                    finishedProjects={finishedSet}
+                    onValueChange={(v) => {
+                      if (v && finishedSet.has(v) && !confirm(`El proyecto "${v}" está finalizado. ¿Deseas continuar con el registro?`)) return
+                      update(i, { project: v })
+                    }}
+                  />
                 </td>
                 <td className="min-w-32.5 pr-3 align-top">
                   {isDep ? (
@@ -168,8 +182,16 @@ export default function RegistroForm({ projects, areas, etapas, clientEtapas, de
                     onChange={(e) => update(i, { hours: Number(e.target.value) })} />
                 </td>
                 <td className="min-w-50 pr-3 align-top">
-                  <Input aria-label="Descripción" value={l.description}
-                    onChange={(e) => update(i, { description: e.target.value })} placeholder="¿Qué hiciste?" />
+                  {lineDescripciones.length === 0 ? (
+                    <select aria-label="Descripción" value="" disabled className={field}>
+                      <option value="">— Sin descripciones (contacta al admin) —</option>
+                    </select>
+                  ) : (
+                    <select aria-label="Descripción" value={l.description} onChange={(e) => update(i, { description: e.target.value })} className={field}>
+                      <option value="">— Descripción —</option>
+                      {lineDescripciones.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                    </select>
+                  )}
                 </td>
                 <td className="align-middle">
                   <Button type="button" variant="ghost" size="icon-sm" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
