@@ -203,7 +203,14 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
     if (await run(renombrarDepartamento(id, editVal), 'Renombrado')) setEditingId(null)
   }
   async function saveEtapas(id: string) {
-    if (await run(setDepartamentoEtapasNombres(id, etapaSel), 'Etapas actualizadas')) setEtapasFor(null)
+    // Incluye lo que el usuario haya tecleado aunque no haya pulsado Enter.
+    const pending = newEtapaName.trim()
+    const names = pending && !etapaSel.some((n) => n.toLowerCase() === pending.toLowerCase())
+      ? [...etapaSel, pending]
+      : etapaSel
+    if (await run(setDepartamentoEtapasNombres(id, names), 'Etapas actualizadas')) {
+      setEtapasFor(null); setNewEtapaName('')
+    }
   }
 
   return (
