@@ -1,9 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatHoras } from '@/lib/horas/format'
-import MisRegistros, { type DiaView } from '@/components/horas/MisRegistros'
+import MisRegistros, { type RegistroRow } from '@/components/horas/MisRegistros'
 
-// Formateadores deterministas (locale + UTC fijos) → se calculan en el servidor.
-const WD = new Intl.DateTimeFormat('es-ES', { weekday: 'short', timeZone: 'UTC' })
+// Formateador determinista (locale + UTC fijos) → se calcula en el servidor.
 const MO = new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: 'UTC' })
 
 export default async function MisRegistrosPage() {
@@ -20,30 +19,22 @@ export default async function MisRegistrosPage() {
     time_log_lines: { project: string; hours: number; description: string }[]
   }
 
-  // Agrupar por fecha (ya vienen ordenados desc) y formatear en el servidor.
-  const dias: DiaView[] = []
+  // Una fila por línea de proyecto (los logs ya vienen ordenados por fecha desc).
+  const rows: RegistroRow[] = []
   for (const l of (logs ?? []) as RawLog[]) {
     const d = new Date(l.entry_date + 'T00:00:00Z')
-    let dia = dias.find((x) => x.date === l.entry_date)
-    if (!dia) {
-      dia = {
-        date: l.entry_date,
-        day: String(d.getUTCDate()),
-        weekday: WD.format(d).replace('.', ''),
-        month: MO.format(d).replace('.', ''),
-        registros: [],
-      }
-      dias.push(dia)
-    }
-    dia.registros.push({
-      id: l.id,
-      status: (l.status as DiaView['registros'][number]['status']) ?? 'guardado',
-      totalLabel: formatHoras(Number(l.total_hours)),
-      lines: (l.time_log_lines ?? []).map((ln) => ({
+    const dateLabel = `${String(d.getUTCDate()).padStart(2, '0')} ${MO.format(d).replace('.', '')} ${String(d.getUTCFullYear()).slice(2)}`
+    const status = ((l.status as RegistroRow['status']) ?? 'guardado')
+    ;(l.time_log_lines ?? []).forEach((ln, i) => {
+      rows.push({
+        key: `${l.id}:${i}`,
+        registroId: l.id,
+        status,
+        dateLabel,
         project: ln.project,
         hoursLabel: formatHoras(Number(ln.hours)),
         description: ln.description,
-      })),
+      })
     })
   }
 
@@ -52,9 +43,9 @@ export default async function MisRegistrosPage() {
       <header>
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-(--brand)">Control de Horas</p>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Mis registros</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Tu historial de jornadas registradas, día a día.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Tu historial de horas registradas por proyecto, de la más reciente a la más antigua.</p>
       </header>
-      <MisRegistros dias={dias} />
+      <MisRegistros rows={rows} />
     </div>
   )
 }
