@@ -22,7 +22,7 @@ export default async function DetallePage({ params }: { params: Promise<{ id: st
 
   return (
     <div>
-      <Link href="/presupuestos" className="text-xs text-foreground/55 hover:text-foreground">← Mis presupuestos</Link>
+      <Link href="/presupuestos" className="text-xs text-foreground/55 hover:text-foreground">← HUCHA</Link>
 
       <header className="mt-3 mb-8 flex items-start justify-between gap-4">
         <div>

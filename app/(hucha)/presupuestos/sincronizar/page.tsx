@@ -11,7 +11,7 @@ export default async function SincronizarPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl">Sincronizar presupuestos</h1>
+      <h1 className="font-display text-2xl">Sincronizar HUCHA</h1>
       <p className="text-muted-foreground">Trae proyectos y presupuestos HUCHA desde el Excel. Solo lectura: nunca escribe al Excel.</p>
       <SincronizarButton />
     </div>

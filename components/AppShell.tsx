@@ -30,9 +30,9 @@ function buildSections(role: string): Section[] {
       ],
     },
     {
-      title: 'Presupuestos',
+      title: 'HUCHA',
       items: [
-        { href: '/presupuestos', label: 'Presupuestos', icon: PiggyBank, show: isMgr },
+        { href: '/presupuestos', label: 'HUCHA', icon: PiggyBank, show: isMgr },
         { href: '/presupuestos/dashboard', label: 'Dashboard', icon: LayoutDashboard, show: isAdmin },
         { href: '/presupuestos/sincronizar', label: 'Sincronizar', icon: RefreshCw, show: isAdmin },
       ],

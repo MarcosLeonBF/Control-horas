@@ -67,7 +67,7 @@ export default function LoginPage() {
           <p className="font-display mt-7 text-2xl">Control de Horas</p>
           <div className="mt-5 h-px w-12 bg-white/40" />
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/75">
-            Registro de horas, bancos y presupuestos del equipo de Bastida &amp; Farina.
+            Registro de horas, bancos y HUCHA del equipo de Bastida &amp; Farina.
           </p>
         </div>
 

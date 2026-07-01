@@ -9,7 +9,7 @@ export default async function MisProyectosPage() {
   return (
     <div>
       <header className="mb-8">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Mis presupuestos</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">HUCHA</h1>
         <p className="mt-1 text-sm text-foreground/55">
           {projects.length} {projects.length === 1 ? 'proyecto' : 'proyectos'} asignado{projects.length === 1 ? '' : 's'}
         </p>
