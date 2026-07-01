@@ -9,12 +9,12 @@ import {
   crearArea, renombrarArea, toggleArea, eliminarArea,
   crearEtapa, renombrarEtapa, toggleEtapa, eliminarEtapa,
   crearDepartamento, renombrarDepartamento, toggleDepartamento, eliminarDepartamento, setDepartamentoEtapasNombres,
-  crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas,
+  crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas, setPosicionEtapas,
 } from '@/app/(horas)/admin/catalogos/actions'
 import type { DepartamentoRow } from '@/lib/horas/types'
 
 export interface CatalogoRow { id: string; name: string; active: boolean; is_internal?: boolean }
-export interface PosicionRow { id: string; name: string; active: boolean; areaIds: string[] }
+export interface PosicionRow { id: string; name: string; active: boolean; areaIds: string[]; etapaIds: string[] }
 
 type Result = { ok: true } | { ok: false; error: string }
 interface Ops {
@@ -101,15 +101,19 @@ function Seccion({ title, rows, ops, addPlaceholder }: { title: string; rows: Ca
   )
 }
 
-function PosicionesSection({ posiciones, areas }: { posiciones: PosicionRow[]; areas: CatalogoRow[] }) {
+function PosicionesSection({ posiciones, areas, etapas }: { posiciones: PosicionRow[]; areas: CatalogoRow[]; etapas: CatalogoRow[] }) {
   const { busy, run } = useRun()
   const selectableAreas = areas.filter((a) => !a.is_internal)
+  const selectableEtapas = etapas.filter((e) => e.active)
   const areaName = (id: string) => areas.find((a) => a.id === id)?.name ?? ''
+  const etapaName = (id: string) => etapas.find((e) => e.id === id)?.name ?? ''
   const [nuevo, setNuevo] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
   const [areasFor, setAreasFor] = useState<string | null>(null)
   const [areaSel, setAreaSel] = useState<string[]>([])
+  const [etapasFor, setEtapasFor] = useState<string | null>(null)
+  const [etapaSel, setEtapaSel] = useState<string[]>([])
 
   async function add() {
     if (!nuevo.trim()) return
@@ -120,6 +124,9 @@ function PosicionesSection({ posiciones, areas }: { posiciones: PosicionRow[]; a
   }
   async function saveAreas(id: string) {
     if (await run(setPosicionAreas(id, areaSel), 'Áreas actualizadas')) setAreasFor(null)
+  }
+  async function saveEtapas(id: string) {
+    if (await run(setPosicionEtapas(id, etapaSel), 'Etapas actualizadas')) setEtapasFor(null)
   }
 
   return (
@@ -153,9 +160,13 @@ function PosicionesSection({ posiciones, areas }: { posiciones: PosicionRow[]; a
                     {p.areaIds.length === 0
                       ? <Badge variant="outline" className="text-(--status-excedido)">sin áreas</Badge>
                       : p.areaIds.map((id) => <Badge key={id} variant="secondary">{areaName(id)}</Badge>)}
+                    {p.etapaIds.length === 0
+                      ? <Badge variant="outline" className="text-muted-foreground">sin etapas</Badge>
+                      : p.etapaIds.map((id) => <Badge key={id} variant="outline">{etapaName(id)}</Badge>)}
                     {!p.active && <Badge variant="outline">inactiva</Badge>}
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => { setAreasFor(areasFor === p.id ? null : p.id); setAreaSel(p.areaIds) }}>Áreas</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setEtapasFor(null); setAreasFor(areasFor === p.id ? null : p.id); setAreaSel(p.areaIds) }}>Áreas</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setAreasFor(null); setEtapasFor(etapasFor === p.id ? null : p.id); setEtapaSel(p.etapaIds) }}>Etapas</Button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditingId(p.id); setEditVal(p.name) }}>Renombrar</Button>
                   <Button size="sm" variant="ghost" disabled={busy}
                     onClick={() => run(togglePosicion(p.id, !p.active), p.active ? 'Desactivada' : 'Activada')}>
@@ -185,6 +196,29 @@ function PosicionesSection({ posiciones, areas }: { posiciones: PosicionRow[]; a
                 <div className="mt-3 flex gap-2">
                   <Button size="sm" onClick={() => saveAreas(p.id)} disabled={busy}>Guardar áreas</Button>
                   <Button size="sm" variant="ghost" onClick={() => setAreasFor(null)}>Cancelar</Button>
+                </div>
+              </div>
+            )}
+
+            {etapasFor === p.id && (
+              <div className="mt-3 rounded-lg border border-border bg-(--muted-surface) p-3">
+                <p className="mb-2 text-xs text-muted-foreground">Etapas seleccionables al registrar en proyecto cliente</p>
+                {selectableEtapas.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay etapas activas en el catálogo.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                    {selectableEtapas.map((e) => (
+                      <label key={e.id} className="flex items-center gap-1.5 text-sm">
+                        <input type="checkbox" checked={etapaSel.includes(e.id)}
+                          onChange={(ev) => setEtapaSel((prev) => ev.target.checked ? [...prev, e.id] : prev.filter((x) => x !== e.id))} />
+                        {e.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" onClick={() => saveEtapas(p.id)} disabled={busy}>Guardar etapas</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEtapasFor(null)}>Cancelar</Button>
                 </div>
               </div>
             )}
@@ -320,7 +354,7 @@ export default function CatalogosPanel({ areas, etapas, departamentos, posicione
 }) {
   return (
     <div className="space-y-6">
-      <PosicionesSection posiciones={posiciones} areas={areas} />
+      <PosicionesSection posiciones={posiciones} areas={areas} etapas={etapas} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Seccion title="Áreas" rows={areas} addPlaceholder="Nueva área…"

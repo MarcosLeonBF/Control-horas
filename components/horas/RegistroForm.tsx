@@ -15,8 +15,8 @@ const emptyLine = (areaId: string, date: string, dep: string): LineInput => ({ e
 const field =
   'w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
 
-export default function RegistroForm({ projects, areas, etapas, departamentos, internalAreaId, canBackdate = false, initial }: {
-  projects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
+export default function RegistroForm({ projects, areas, etapas, clientEtapas, departamentos, internalAreaId, canBackdate = false, initial }: {
+  projects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
   canBackdate?: boolean // admin: puede registrar fuera del rango de 7 días (PDF §4)
   initial?: { id: string; lines: LineInput[] }
 }) {
@@ -119,6 +119,11 @@ export default function RegistroForm({ projects, areas, etapas, departamentos, i
               const allowedEtapas = isDep && currentDep && currentDep.etapaIds.length > 0
                 ? etapas.filter(e => currentDep.etapaIds.includes(e.id))
                 : etapas
+              // Proyecto cliente: etapas de la posición del usuario. En edición, si la
+              // etapa ya guardada no está permitida, se incluye para no perderla.
+              const lineClientEtapas = l.etapa_id && !clientEtapas.some(e => e.id === l.etapa_id)
+                ? [...clientEtapas, ...etapas.filter(e => e.id === l.etapa_id)]
+                : clientEtapas
 
               return (
               <tr key={i}>
@@ -147,10 +152,14 @@ export default function RegistroForm({ projects, areas, etapas, departamentos, i
                     <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/50">
                       {allowedEtapas[0]?.name ?? '— Etapa —'}
                     </span>
+                  ) : lineClientEtapas.length === 0 ? (
+                    <select aria-label="Etapa" value="" disabled className={field}>
+                      <option value="">— Sin etapas asignadas (contacta al admin) —</option>
+                    </select>
                   ) : (
                     <select aria-label="Etapa" value={l.etapa_id} onChange={(e) => update(i, { etapa_id: e.target.value })} className={field}>
                       <option value="">— Etapa —</option>
-                      {etapas.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
+                      {lineClientEtapas.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
                     </select>
                   )}
                 </td>

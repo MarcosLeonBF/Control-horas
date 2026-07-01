@@ -158,6 +158,19 @@ export async function setPosicionAreas(id: string, areaIds: string[]): Promise<R
   return { ok: true }
 }
 
+// Reemplaza las etapas ligadas a una posición (etapas seleccionables al registrar en proyecto cliente).
+export async function setPosicionEtapas(id: string, etapaIds: string[]): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: delErr } = await supabase.from('position_etapas').delete().eq('position_id', id)
+  if (delErr) return { ok: false, error: friendly(delErr) }
+  if (etapaIds.length) {
+    const { error: insErr } = await supabase.from('position_etapas').insert(etapaIds.map((etapa_id) => ({ position_id: id, etapa_id })))
+    if (insErr) return { ok: false, error: friendly(insErr) }
+  }
+  return { ok: true }
+}
+
 // ── Departamentos ──────────────────────────────────────────────────────────
 export async function crearDepartamento(name: string): Promise<Result> {
   const { supabase, error } = await requireAdmin()

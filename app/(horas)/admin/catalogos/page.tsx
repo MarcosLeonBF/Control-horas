@@ -9,12 +9,13 @@ export default async function CatalogosPage() {
   const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (me?.role !== 'admin') redirect('/registrar')
 
-  const [{ data: areas }, { data: etapas }, { data: departamentos }, { data: positions }, { data: posAreas }, { data: depEtapas }] = await Promise.all([
+  const [{ data: areas }, { data: etapas }, { data: departamentos }, { data: positions }, { data: posAreas }, { data: posEtapas }, { data: depEtapas }] = await Promise.all([
     supabase.from('areas').select('id, name, active, is_internal').order('name'),
     supabase.from('etapas').select('id, name, active').order('name'),
     supabase.from('departamentos').select('id, name, active').order('name'),
     supabase.from('positions').select('id, name, active').order('name'),
     supabase.from('position_areas').select('position_id, area_id'),
+    supabase.from('position_etapas').select('position_id, etapa_id'),
     supabase.from('departamento_etapas').select('departamento_id, etapa_id'),
   ])
 
@@ -23,6 +24,7 @@ export default async function CatalogosPage() {
     name: p.name as string,
     active: p.active as boolean,
     areaIds: (posAreas ?? []).filter((pa) => pa.position_id === p.id).map((pa) => pa.area_id as string),
+    etapaIds: (posEtapas ?? []).filter((pe) => pe.position_id === p.id).map((pe) => pe.etapa_id as string),
   }))
 
   const depsConEtapas = (departamentos ?? []).map((d) => ({

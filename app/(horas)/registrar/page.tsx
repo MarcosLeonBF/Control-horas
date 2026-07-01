@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getCatalogos, getMyAreas } from '@/lib/horas/queries'
+import { getCatalogos, getMyAreas, getMyPositionEtapaIds } from '@/lib/horas/queries'
 import { getCachedBancoHoras } from '@/lib/graph/client'
 import RegistroForm from '@/components/horas/RegistroForm'
 import type { LineInput } from '@/app/(horas)/registrar/actions'
@@ -17,6 +17,12 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   // operativo y manager solo ven sus áreas asignadas (su alcance); el admin ve todas.
   const realAreas = areas.filter((a) => !a.is_internal)
   const selectableAreas = me?.role === 'admin' ? realAreas : myAreas.filter((a) => !a.is_internal)
+
+  // Etapas seleccionables en proyecto cliente: las de la posición del usuario.
+  // Admin ve todas (igual que con las áreas). Operativo/manager sin etapas de
+  // posición → lista vacía (no puede registrar en cliente; PDF: estricto).
+  const positionEtapaIds = await getMyPositionEtapaIds(user!.id)
+  const clientEtapas = me?.role === 'admin' ? etapas : etapas.filter((e) => positionEtapaIds.includes(e.id))
 
   let projects: string[] = []
   try { projects = (await getCachedBancoHoras()).map((b) => b.project) } catch { /* Excel caído: solo Departamento */ }
@@ -44,7 +50,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl">{initial ? 'Editar registro' : 'Registrar horas'}</h1>
-      <RegistroForm projects={projects} areas={selectableAreas} etapas={etapas} departamentos={departamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
+      <RegistroForm projects={projects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} departamentos={departamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
     </div>
   )
 }

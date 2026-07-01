@@ -28,3 +28,14 @@ export async function getMyAreas(userId: string): Promise<AreaRow[]> {
   // Supabase tipa el embed to-one como array; en runtime es un objeto. Cast como en reportes.ts/bancos.ts.
   return ((data ?? []) as unknown as { areas: AreaRow }[]).map((r) => r.areas)
 }
+
+// Ids de las etapas ligadas a la posición del usuario. Determinan las etapas
+// seleccionables al registrar horas en un proyecto cliente. Vacío si no tiene
+// posición o su posición no tiene etapas asignadas.
+export async function getMyPositionEtapaIds(userId: string): Promise<string[]> {
+  const supabase = await createClient()
+  const { data: me } = await supabase.from('profiles').select('position_id').eq('id', userId).single()
+  if (!me?.position_id) return []
+  const { data } = await supabase.from('position_etapas').select('etapa_id').eq('position_id', me.position_id)
+  return (data ?? []).map((r) => r.etapa_id as string)
+}
