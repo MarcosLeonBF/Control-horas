@@ -7,6 +7,8 @@ import { formatHoras } from '@/lib/horas/format'
 import type { AreaRow, EtapaRow, DescripcionRow, DepartamentoRow } from '@/lib/horas/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { TriangleAlert } from 'lucide-react'
 import ProjectCombobox from '@/components/horas/ProjectCombobox'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -23,6 +25,8 @@ export default function RegistroForm({ projects, finishedProjects, areas, etapas
 }) {
   const router = useRouter()
   const finishedSet = new Set(finishedProjects)
+  // Confirmación al elegir un proyecto finalizado (línea + proyecto pendiente).
+  const [pendingFinished, setPendingFinished] = useState<{ index: number; project: string } | null>(null)
   // Fecha por defecto: la heredan las líneas nuevas y las que aún la seguían.
   const [defaultDate, setDefaultDate] = useState(initial?.lines[0]?.entry_date ?? today())
   const defaultDep = departamentos[0]?.name ?? 'Clientes'
@@ -146,7 +150,7 @@ export default function RegistroForm({ projects, finishedProjects, areas, etapas
                     projects={projects}
                     finishedProjects={finishedSet}
                     onValueChange={(v) => {
-                      if (v && finishedSet.has(v) && !confirm(`El proyecto "${v}" está finalizado. ¿Deseas continuar con el registro?`)) return
+                      if (v && finishedSet.has(v)) { setPendingFinished({ index: i, project: v }); return }
                       update(i, { project: v })
                     }}
                   />
@@ -223,6 +227,31 @@ export default function RegistroForm({ projects, finishedProjects, areas, etapas
       <Button type="button" onClick={onSave} disabled={saving} size="lg" className="mt-6">
         {saving ? 'Guardando…' : 'Guardar registro'}
       </Button>
+
+      <Dialog open={pendingFinished !== null} onOpenChange={(open) => { if (!open) setPendingFinished(null) }}>
+        <DialogContent showCloseButton={false} className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TriangleAlert className="size-5 text-(--status-bajo)" />
+              Proyecto finalizado
+            </DialogTitle>
+            <DialogDescription>
+              El proyecto <strong className="font-medium text-foreground">{pendingFinished?.project}</strong> está marcado como finalizado en el Excel. ¿Deseas registrar horas de todas formas?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingFinished(null)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (pendingFinished) update(pendingFinished.index, { project: pendingFinished.project })
+                setPendingFinished(null)
+              }}
+            >
+              Registrar de todas formas
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
