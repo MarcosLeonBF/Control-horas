@@ -17,6 +17,7 @@ async function requireAdmin() {
 
 function friendly(error: { message: string; code?: string }) {
   if (error.code === '23505') return 'Ya existe un registro con ese nombre.'
+  if (error.code === '23503') return 'No se puede eliminar: está en uso (registros de horas o usuarios). Desactívalo en su lugar.'
   return error.message
 }
 
@@ -54,6 +55,17 @@ export async function toggleArea(id: string, active: boolean): Promise<Result> {
   return { ok: true }
 }
 
+export async function eliminarArea(id: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { data: a } = await supabase.from('areas').select('is_internal').eq('id', id).single()
+  if (a?.is_internal) return { ok: false, error: 'El área interna no se puede eliminar.' }
+  const { data, error: e } = await supabase.from('areas').delete().eq('id', id).select('id')
+  if (e) return { ok: false, error: friendly(e) }
+  if (!data?.length) return { ok: false, error: 'No se pudo eliminar (no existe o sin permisos).' }
+  return { ok: true }
+}
+
 // ── Etapas ───────────────────────────────────────────────────────────────
 export async function crearEtapa(name: string): Promise<Result> {
   const { supabase, error } = await requireAdmin()
@@ -80,6 +92,15 @@ export async function toggleEtapa(id: string, active: boolean): Promise<Result> 
   if (error) return { ok: false, error }
   const { error: e } = await supabase.from('etapas').update({ active, updated_at: new Date().toISOString() }).eq('id', id)
   if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+export async function eliminarEtapa(id: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { data, error: e } = await supabase.from('etapas').delete().eq('id', id).select('id')
+  if (e) return { ok: false, error: friendly(e) }
+  if (!data?.length) return { ok: false, error: 'No se pudo eliminar (no existe o sin permisos).' }
   return { ok: true }
 }
 
@@ -111,6 +132,16 @@ export async function togglePosicion(id: string, active: boolean): Promise<Resul
   if (error) return { ok: false, error }
   const { error: e } = await supabase.from('positions').update({ active, updated_at: new Date().toISOString() }).eq('id', id)
   if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+// Borra la posición. position_areas se limpia por cascade; profiles.position_id queda a null (SET NULL).
+export async function eliminarPosicion(id: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { data, error: e } = await supabase.from('positions').delete().eq('id', id).select('id')
+  if (e) return { ok: false, error: friendly(e) }
+  if (!data?.length) return { ok: false, error: 'No se pudo eliminar (no existe o sin permisos).' }
   return { ok: true }
 }
 
@@ -153,6 +184,16 @@ export async function toggleDepartamento(id: string, active: boolean): Promise<R
   if (error) return { ok: false, error }
   const { error: e } = await supabase.from('departamentos').update({ active, updated_at: new Date().toISOString() }).eq('id', id)
   if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+// Borra el departamento. departamento_etapas se limpia por cascade.
+export async function eliminarDepartamento(id: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { data, error: e } = await supabase.from('departamentos').delete().eq('id', id).select('id')
+  if (e) return { ok: false, error: friendly(e) }
+  if (!data?.length) return { ok: false, error: 'No se pudo eliminar (no existe o sin permisos).' }
   return { ok: true }
 }
 

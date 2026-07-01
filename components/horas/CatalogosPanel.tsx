@@ -6,10 +6,10 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  crearArea, renombrarArea, toggleArea,
-  crearEtapa, renombrarEtapa, toggleEtapa,
-  crearDepartamento, renombrarDepartamento, toggleDepartamento, setDepartamentoEtapasNombres,
-  crearPosicion, renombrarPosicion, togglePosicion, setPosicionAreas,
+  crearArea, renombrarArea, toggleArea, eliminarArea,
+  crearEtapa, renombrarEtapa, toggleEtapa, eliminarEtapa,
+  crearDepartamento, renombrarDepartamento, toggleDepartamento, eliminarDepartamento, setDepartamentoEtapasNombres,
+  crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas,
 } from '@/app/(horas)/admin/catalogos/actions'
 import type { DepartamentoRow } from '@/lib/horas/types'
 
@@ -21,6 +21,7 @@ interface Ops {
   crear: (name: string) => Promise<Result>
   renombrar: (id: string, name: string) => Promise<Result>
   toggle: (id: string, active: boolean) => Promise<Result>
+  eliminar: (id: string) => Promise<Result>
 }
 
 function useRun() {
@@ -83,6 +84,11 @@ function Seccion({ title, rows, ops, addPlaceholder }: { title: string; rows: Ca
                     <Button size="sm" variant="ghost" disabled={busy}
                       onClick={() => run(ops.toggle(r.id, !r.active), r.active ? 'Desactivado' : 'Activado')}>
                       {r.active ? 'Desactivar' : 'Activar'}
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={busy}
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => { if (confirm(`¿Eliminar "${r.name}" definitivamente? Esta acción no se puede deshacer.`)) run(ops.eliminar(r.id), 'Eliminado') }}>
+                      Eliminar
                     </Button>
                   </>
                 )}
@@ -154,6 +160,11 @@ function PosicionesSection({ posiciones, areas }: { posiciones: PosicionRow[]; a
                   <Button size="sm" variant="ghost" disabled={busy}
                     onClick={() => run(togglePosicion(p.id, !p.active), p.active ? 'Desactivada' : 'Activada')}>
                     {p.active ? 'Desactivar' : 'Activar'}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={busy}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => { if (confirm(`¿Eliminar la posición "${p.name}"? Se desasignará de los usuarios que la tengan. No se puede deshacer.`)) run(eliminarPosicion(p.id), 'Posición eliminada') }}>
+                    Eliminar
                   </Button>
                 </>
               )}
@@ -253,6 +264,11 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
                     onClick={() => run(toggleDepartamento(d.id, !(d as any).active), (d as any).active ? 'Desactivado' : 'Activado')}>
                     {(d as any).active ? 'Desactivar' : 'Activar'}
                   </Button>
+                  <Button size="sm" variant="ghost" disabled={busy}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => { if (confirm(`¿Eliminar el departamento "${d.name}"? No se puede deshacer.`)) run(eliminarDepartamento(d.id), 'Departamento eliminado') }}>
+                    Eliminar
+                  </Button>
                 </>
               )}
             </div>
@@ -308,9 +324,9 @@ export default function CatalogosPanel({ areas, etapas, departamentos, posicione
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Seccion title="Áreas" rows={areas} addPlaceholder="Nueva área…"
-          ops={{ crear: crearArea, renombrar: renombrarArea, toggle: toggleArea }} />
+          ops={{ crear: crearArea, renombrar: renombrarArea, toggle: toggleArea, eliminar: eliminarArea }} />
         <Seccion title="Etapas" rows={etapas} addPlaceholder="Nueva etapa…"
-          ops={{ crear: crearEtapa, renombrar: renombrarEtapa, toggle: toggleEtapa }} />
+          ops={{ crear: crearEtapa, renombrar: renombrarEtapa, toggle: toggleEtapa, eliminar: eliminarEtapa }} />
         <DepartamentosSection departamentos={departamentos} etapas={etapas} />
       </div>
     </div>
