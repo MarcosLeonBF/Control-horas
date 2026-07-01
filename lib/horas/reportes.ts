@@ -65,7 +65,8 @@ export async function getReporteOptions(scope: ViewerScope): Promise<ReporteFilt
   } catch {
     projects = []
   }
-  projects = [...projects, 'Departamento'].sort((a, b) => a.localeCompare(b))
+  // Dedup: el Excel puede traer "Departamento" (o proyectos repetidos); evita keys duplicadas.
+  projects = Array.from(new Set([...projects, 'Departamento'])).sort((a, b) => a.localeCompare(b))
 
   const { data: posiciones } = await supabase.from('positions').select('name').eq('active', true).order('name')
 
