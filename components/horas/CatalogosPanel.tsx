@@ -2,19 +2,21 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { ChevronRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   crearArea, renombrarArea, toggleArea, eliminarArea,
   crearEtapa, renombrarEtapa, toggleEtapa, eliminarEtapa,
+  crearDescripcion, renombrarDescripcion, toggleDescripcion, eliminarDescripcion,
   crearDepartamento, renombrarDepartamento, toggleDepartamento, eliminarDepartamento, setDepartamentoEtapasNombres,
-  crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas, setPosicionEtapas,
+  crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas, setPosicionEtapas, setPosicionDescripciones,
 } from '@/app/(horas)/admin/catalogos/actions'
 import type { DepartamentoRow } from '@/lib/horas/types'
 
 export interface CatalogoRow { id: string; name: string; active: boolean; is_internal?: boolean }
-export interface PosicionRow { id: string; name: string; active: boolean; areaIds: string[]; etapaIds: string[] }
+export interface PosicionRow { id: string; name: string; active: boolean; areaIds: string[]; etapaIds: string[]; descripcionIds: string[] }
 
 type Result = { ok: true } | { ok: false; error: string }
 interface Ops {
@@ -101,19 +103,25 @@ function Seccion({ title, rows, ops, addPlaceholder }: { title: string; rows: Ca
   )
 }
 
-function PosicionesSection({ posiciones, areas, etapas }: { posiciones: PosicionRow[]; areas: CatalogoRow[]; etapas: CatalogoRow[] }) {
+function PosicionesSection({ posiciones, areas, etapas, descripciones, departmentEtapaIds }: { posiciones: PosicionRow[]; areas: CatalogoRow[]; etapas: CatalogoRow[]; descripciones: CatalogoRow[]; departmentEtapaIds: Set<string> }) {
   const { busy, run } = useRun()
   const selectableAreas = areas.filter((a) => !a.is_internal)
-  const selectableEtapas = etapas.filter((e) => e.active)
-  const areaName = (id: string) => areas.find((a) => a.id === id)?.name ?? ''
-  const etapaName = (id: string) => etapas.find((e) => e.id === id)?.name ?? ''
+  // Etapas asignables a una posición = generales (activas). Se excluyen las etapas
+  // de departamento, que son exclusivas del proyecto "Departamento".
+  const selectableEtapas = etapas.filter((e) => e.active && !departmentEtapaIds.has(e.id))
+  const selectableDescripciones = descripciones.filter((d) => d.active)
   const [nuevo, setNuevo] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
-  const [areasFor, setAreasFor] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [areaSel, setAreaSel] = useState<string[]>([])
-  const [etapasFor, setEtapasFor] = useState<string | null>(null)
   const [etapaSel, setEtapaSel] = useState<string[]>([])
+  const [descripcionSel, setDescripcionSel] = useState<string[]>([])
+
+  function toggleExpand(p: PosicionRow) {
+    if (expandedId === p.id) { setExpandedId(null); return }
+    setExpandedId(p.id); setAreaSel(p.areaIds); setEtapaSel(p.etapaIds); setDescripcionSel(p.descripcionIds)
+  }
 
   async function add() {
     if (!nuevo.trim()) return
@@ -123,17 +131,20 @@ function PosicionesSection({ posiciones, areas, etapas }: { posiciones: Posicion
     if (await run(renombrarPosicion(id, editVal), 'Renombrada')) setEditingId(null)
   }
   async function saveAreas(id: string) {
-    if (await run(setPosicionAreas(id, areaSel), 'Áreas actualizadas')) setAreasFor(null)
+    await run(setPosicionAreas(id, areaSel), 'Áreas actualizadas')
   }
   async function saveEtapas(id: string) {
-    if (await run(setPosicionEtapas(id, etapaSel), 'Etapas actualizadas')) setEtapasFor(null)
+    await run(setPosicionEtapas(id, etapaSel), 'Etapas actualizadas')
+  }
+  async function saveDescripciones(id: string) {
+    await run(setPosicionDescripciones(id, descripcionSel), 'Descripciones actualizadas')
   }
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="font-display text-lg font-semibold">Posiciones</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        El banco de horas es por posición (columnas del Excel). Liga cada una a sus áreas: un manager verá los bancos de las posiciones de sus áreas.
+        El banco de horas es por posición (columnas del Excel). Abre cada una para ligar sus áreas (un manager verá los bancos de las posiciones de sus áreas) y las etapas que sus usuarios podrán elegir al registrar.
       </p>
 
       <div className="mt-4 flex gap-2">
@@ -144,7 +155,7 @@ function PosicionesSection({ posiciones, areas, etapas }: { posiciones: Posicion
 
       <ul className="mt-4 divide-y divide-border">
         {posiciones.map((p) => (
-          <li key={p.id} className="py-2.5">
+          <li key={p.id} className="py-1.5">
             <div className="flex items-center gap-2">
               {editingId === p.id ? (
                 <>
@@ -155,18 +166,25 @@ function PosicionesSection({ posiciones, areas, etapas }: { posiciones: Posicion
                 </>
               ) : (
                 <>
-                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => toggleExpand(p)} aria-expanded={expandedId === p.id}
+                    className="group flex flex-1 items-center gap-2 rounded-md py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <ChevronRight className={`size-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:text-foreground ${expandedId === p.id ? 'rotate-90' : ''}`} />
                     <span className={`text-sm font-medium ${p.active ? '' : 'text-muted-foreground line-through'}`}>{p.name}</span>
-                    {p.areaIds.length === 0
-                      ? <Badge variant="outline" className="text-(--status-excedido)">sin áreas</Badge>
-                      : p.areaIds.map((id) => <Badge key={id} variant="secondary">{areaName(id)}</Badge>)}
-                    {p.etapaIds.length === 0
-                      ? <Badge variant="outline" className="text-muted-foreground">sin etapas</Badge>
-                      : p.etapaIds.map((id) => <Badge key={id} variant="outline">{etapaName(id)}</Badge>)}
-                    {!p.active && <Badge variant="outline">inactiva</Badge>}
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => { setEtapasFor(null); setAreasFor(areasFor === p.id ? null : p.id); setAreaSel(p.areaIds) }}>Áreas</Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setAreasFor(null); setEtapasFor(etapasFor === p.id ? null : p.id); setEtapaSel(p.etapaIds) }}>Etapas</Button>
+                    <span className="text-xs text-muted-foreground">
+                      {p.areaIds.length === 0
+                        ? <span className="text-(--status-excedido)">Sin áreas</span>
+                        : <>{p.areaIds.length} {p.areaIds.length === 1 ? 'área' : 'áreas'}</>}
+                      <span className="px-1 text-foreground/25">·</span>
+                      {p.etapaIds.length === 0
+                        ? <span className="text-foreground/40">Sin etapas</span>
+                        : <>{p.etapaIds.length} {p.etapaIds.length === 1 ? 'etapa' : 'etapas'}</>}
+                      <span className="px-1 text-foreground/25">·</span>
+                      {p.descripcionIds.length === 0
+                        ? <span className="text-foreground/40">Sin descripciones</span>
+                        : <>{p.descripcionIds.length} {p.descripcionIds.length === 1 ? 'descripción' : 'descripciones'}</>}
+                    </span>
+                    {!p.active && <Badge variant="outline" className="text-muted-foreground">inactiva</Badge>}
+                  </button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditingId(p.id); setEditVal(p.name) }}>Renombrar</Button>
                   <Button size="sm" variant="ghost" disabled={busy}
                     onClick={() => run(togglePosicion(p.id, !p.active), p.active ? 'Desactivada' : 'Activada')}>
@@ -181,44 +199,68 @@ function PosicionesSection({ posiciones, areas, etapas }: { posiciones: Posicion
               )}
             </div>
 
-            {areasFor === p.id && (
-              <div className="mt-3 rounded-lg border border-border bg-(--muted-surface) p-3">
-                <p className="mb-2 text-xs text-muted-foreground">Áreas de esta posición</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                  {selectableAreas.map((a) => (
-                    <label key={a.id} className="flex items-center gap-1.5 text-sm">
-                      <input type="checkbox" checked={areaSel.includes(a.id)}
-                        onChange={(e) => setAreaSel((prev) => e.target.checked ? [...prev, a.id] : prev.filter((x) => x !== a.id))} />
-                      {a.name}
-                    </label>
-                  ))}
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <Button size="sm" onClick={() => saveAreas(p.id)} disabled={busy}>Guardar áreas</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setAreasFor(null)}>Cancelar</Button>
-                </div>
-              </div>
-            )}
-
-            {etapasFor === p.id && (
-              <div className="mt-3 rounded-lg border border-border bg-(--muted-surface) p-3">
-                <p className="mb-2 text-xs text-muted-foreground">Etapas seleccionables al registrar en proyecto cliente</p>
-                {selectableEtapas.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay etapas activas en el catálogo.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                    {selectableEtapas.map((e) => (
-                      <label key={e.id} className="flex items-center gap-1.5 text-sm">
-                        <input type="checkbox" checked={etapaSel.includes(e.id)}
-                          onChange={(ev) => setEtapaSel((prev) => ev.target.checked ? [...prev, e.id] : prev.filter((x) => x !== e.id))} />
-                        {e.name}
+            {expandedId === p.id && (
+              <div className="mt-2 mb-1 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 shrink-0 rounded-full bg-(--brand)" />
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Áreas</h4>
+                  </div>
+                  <p className="mt-1 mb-3 text-xs text-muted-foreground">Un manager verá los bancos de las posiciones de sus áreas.</p>
+                  <div className="flex flex-col gap-2">
+                    {selectableAreas.map((a) => (
+                      <label key={a.id} className="flex cursor-pointer items-center gap-2.5 text-sm text-foreground/80 hover:text-foreground">
+                        <input type="checkbox" className="size-4 accent-(--brand)" checked={areaSel.includes(a.id)}
+                          onChange={(e) => setAreaSel((prev) => e.target.checked ? [...prev, a.id] : prev.filter((x) => x !== a.id))} />
+                        {a.name}
                       </label>
                     ))}
                   </div>
-                )}
-                <div className="mt-3 flex gap-2">
-                  <Button size="sm" onClick={() => saveEtapas(p.id)} disabled={busy}>Guardar etapas</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEtapasFor(null)}>Cancelar</Button>
+                  <Button size="sm" className="mt-4" onClick={() => saveAreas(p.id)} disabled={busy}>Guardar áreas</Button>
+                </div>
+
+                <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 shrink-0 rounded-[3px] bg-foreground/40" />
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Etapas</h4>
+                  </div>
+                  <p className="mt-1 mb-3 text-xs text-muted-foreground">Seleccionables al registrar en proyecto cliente.</p>
+                  {selectableEtapas.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No hay etapas activas en el catálogo.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {selectableEtapas.map((e) => (
+                        <label key={e.id} className="flex cursor-pointer items-center gap-2.5 text-sm text-foreground/80 hover:text-foreground">
+                          <input type="checkbox" className="size-4 accent-(--brand)" checked={etapaSel.includes(e.id)}
+                            onChange={(ev) => setEtapaSel((prev) => ev.target.checked ? [...prev, e.id] : prev.filter((x) => x !== e.id))} />
+                          {e.name}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <Button size="sm" className="mt-4" onClick={() => saveEtapas(p.id)} disabled={busy}>Guardar etapas</Button>
+                </div>
+
+                <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="h-0.5 w-2.5 shrink-0 rounded-full bg-foreground/40" />
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Descripciones</h4>
+                  </div>
+                  <p className="mt-1 mb-3 text-xs text-muted-foreground">Opciones del desplegable de descripción al registrar.</p>
+                  {selectableDescripciones.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No hay descripciones en el catálogo.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {selectableDescripciones.map((d) => (
+                        <label key={d.id} className="flex cursor-pointer items-start gap-2.5 text-sm text-foreground/80 hover:text-foreground">
+                          <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-(--brand)" checked={descripcionSel.includes(d.id)}
+                            onChange={(ev) => setDescripcionSel((prev) => ev.target.checked ? [...prev, d.id] : prev.filter((x) => x !== d.id))} />
+                          {d.name}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <Button size="sm" className="mt-4" onClick={() => saveDescripciones(p.id)} disabled={busy}>Guardar descripciones</Button>
                 </div>
               </div>
             )}
@@ -349,18 +391,23 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
   )
 }
 
-export default function CatalogosPanel({ areas, etapas, departamentos, posiciones }: {
-  areas: CatalogoRow[]; etapas: CatalogoRow[]; departamentos: DepartamentoRow[]; posiciones: PosicionRow[]
+export default function CatalogosPanel({ areas, etapas, descripciones, departamentos, posiciones }: {
+  areas: CatalogoRow[]; etapas: CatalogoRow[]; descripciones: CatalogoRow[]; departamentos: DepartamentoRow[]; posiciones: PosicionRow[]
 }) {
+  // Etapas ligadas a un departamento: exclusivas del proyecto "Departamento", no
+  // asignables a posiciones (las de posición son las etapas generales).
+  const departmentEtapaIds = new Set(departamentos.flatMap((d) => d.etapaIds))
   return (
     <div className="space-y-6">
-      <PosicionesSection posiciones={posiciones} areas={areas} etapas={etapas} />
+      <PosicionesSection posiciones={posiciones} areas={areas} etapas={etapas} descripciones={descripciones} departmentEtapaIds={departmentEtapaIds} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Seccion title="Áreas" rows={areas} addPlaceholder="Nueva área…"
           ops={{ crear: crearArea, renombrar: renombrarArea, toggle: toggleArea, eliminar: eliminarArea }} />
         <Seccion title="Etapas" rows={etapas} addPlaceholder="Nueva etapa…"
           ops={{ crear: crearEtapa, renombrar: renombrarEtapa, toggle: toggleEtapa, eliminar: eliminarEtapa }} />
+        <Seccion title="Descripciones" rows={descripciones} addPlaceholder="Nueva descripción…"
+          ops={{ crear: crearDescripcion, renombrar: renombrarDescripcion, toggle: toggleDescripcion, eliminar: eliminarDescripcion }} />
         <DepartamentosSection departamentos={departamentos} etapas={etapas} />
       </div>
     </div>

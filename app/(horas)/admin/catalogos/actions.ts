@@ -104,6 +104,46 @@ export async function eliminarEtapa(id: string): Promise<Result> {
   return { ok: true }
 }
 
+// ── Descripciones ────────────────────────────────────────────────────────────
+// Descripciones predefinidas asignables a posiciones. Al registrar, el campo
+// Descripción es un desplegable con las descripciones de la posición del usuario.
+export async function crearDescripcion(name: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const n = name.trim()
+  if (!n) return { ok: false, error: 'El nombre es obligatorio.' }
+  const { error: e } = await supabase.from('descripciones').insert({ name: n })
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+export async function renombrarDescripcion(id: string, name: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const n = name.trim()
+  if (!n) return { ok: false, error: 'El nombre es obligatorio.' }
+  const { error: e } = await supabase.from('descripciones').update({ name: n, updated_at: new Date().toISOString() }).eq('id', id)
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+export async function toggleDescripcion(id: string, active: boolean): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: e } = await supabase.from('descripciones').update({ active, updated_at: new Date().toISOString() }).eq('id', id)
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+export async function eliminarDescripcion(id: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { data, error: e } = await supabase.from('descripciones').delete().eq('id', id).select('id')
+  if (e) return { ok: false, error: friendly(e) }
+  if (!data?.length) return { ok: false, error: 'No se pudo eliminar (no existe o sin permisos).' }
+  return { ok: true }
+}
+
 // ── Posiciones ─────────────────────────────────────────────────────────────
 // El banco de horas es por posición (columnas del Excel). Cada posición se liga
 // a una o más áreas: un manager ve los bancos de las posiciones de sus áreas.
@@ -166,6 +206,19 @@ export async function setPosicionEtapas(id: string, etapaIds: string[]): Promise
   if (delErr) return { ok: false, error: friendly(delErr) }
   if (etapaIds.length) {
     const { error: insErr } = await supabase.from('position_etapas').insert(etapaIds.map((etapa_id) => ({ position_id: id, etapa_id })))
+    if (insErr) return { ok: false, error: friendly(insErr) }
+  }
+  return { ok: true }
+}
+
+// Reemplaza las descripciones ligadas a una posición (desplegable de descripción al registrar).
+export async function setPosicionDescripciones(id: string, descripcionIds: string[]): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: delErr } = await supabase.from('position_descripciones').delete().eq('position_id', id)
+  if (delErr) return { ok: false, error: friendly(delErr) }
+  if (descripcionIds.length) {
+    const { error: insErr } = await supabase.from('position_descripciones').insert(descripcionIds.map((descripcion_id) => ({ position_id: id, descripcion_id })))
     if (insErr) return { ok: false, error: friendly(insErr) }
   }
   return { ok: true }
