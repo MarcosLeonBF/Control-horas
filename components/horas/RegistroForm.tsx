@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { guardarRegistro, type LineInput } from '@/app/(horas)/registrar/actions'
@@ -17,6 +17,16 @@ const emptyLine = (areaId: string, date: string, dep: string): LineInput => ({ e
 
 const field =
   'w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+
+// Campo etiquetado para la vista móvil (label arriba + control).
+function MobileField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block space-y-1">
+      <span className="block text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  )
+}
 
 export default function RegistroForm({ projects, finishedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial }: {
   projects: string[]; finishedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: DescripcionRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
@@ -44,6 +54,9 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
   // La columna Departamento solo aplica al proyecto interno "Departamento":
   // se muestra únicamente si alguna línea lo usa.
   const showDepartamento = lines.some((l) => isDepartamento(l.project))
+  // La columna Etapa solo aplica a proyectos cliente (en Departamento la etapa
+  // viene predefinida por el departamento): se oculta si todas las líneas son Departamento.
+  const showEtapa = lines.some((l) => !isDepartamento(l.project))
 
   function update(i: number, patch: Partial<LineInput>) {
     setLines((prev) => prev.map((l, idx) => {
@@ -101,9 +114,69 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
     router.push('/mis-registros')
   }
 
+  // Controles de una línea, reutilizados por la tabla (escritorio) y las tarjetas (móvil).
+  function lineControls(l: LineInput, i: number) {
+    const isDep = isDepartamento(l.project)
+    const lineClientEtapas = l.etapa_id && !clientEtapas.some((e) => e.id === l.etapa_id)
+      ? [...clientEtapas, ...etapas.filter((e) => e.id === l.etapa_id)]
+      : clientEtapas
+    const lineDescripciones = l.description && !descripciones.some((d) => d.name === l.description)
+      ? [...descripciones, { id: `__cur_${i}`, name: l.description }]
+      : descripciones
+
+    const fecha = (
+      <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : daysAgo(7)}
+        onChange={(e) => update(i, { entry_date: e.target.value })} />
+    )
+    const proyecto = (
+      <ProjectCombobox ariaLabel="Proyecto" value={l.project} projects={projects}
+        finishedProjects={finishedSet} exceededProjects={exceededSet}
+        onValueChange={(v) => {
+          const finished = !!v && finishedSet.has(v)
+          const exceeded = !!v && exceededSet.has(v)
+          if (finished || exceeded) { setProjectWarning({ index: i, project: v, finished, exceeded }); return }
+          update(i, { project: v })
+        }} />
+    )
+    const depto = departamentos.length === 0 ? (
+      <select aria-label="Departamento" value="" disabled className={field}><option value="">— Sin departamentos (contacta al admin) —</option></select>
+    ) : (
+      <select aria-label="Departamento" value={l.department} onChange={(e) => update(i, { department: e.target.value })} className={field}>
+        {departamentos.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+      </select>
+    )
+    const etapa = lineClientEtapas.length === 0 ? (
+      <select aria-label="Etapa" value="" disabled className={field}><option value="">— Sin etapas asignadas (contacta al admin) —</option></select>
+    ) : (
+      <select aria-label="Etapa" value={l.etapa_id} onChange={(e) => update(i, { etapa_id: e.target.value })} className={field}>
+        <option value="">— Etapa —</option>
+        {lineClientEtapas.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
+      </select>
+    )
+    const horas = (
+      <Input aria-label="Horas" type="number" step="0.5" min="0" value={l.hours || ''}
+        onChange={(e) => update(i, { hours: Number(e.target.value) })} />
+    )
+    const desc = lineDescripciones.length === 0 ? (
+      <select aria-label="Descripción" value="" disabled className={field}><option value="">— Sin descripciones (contacta al admin) —</option></select>
+    ) : (
+      <select aria-label="Descripción" value={l.description} onChange={(e) => update(i, { description: e.target.value })} className={field}>
+        <option value="">— Descripción —</option>
+        {lineDescripciones.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+      </select>
+    )
+    const emptyPlaceholder = <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/40">—</span>
+    return { isDep, fecha, proyecto, depto, etapa, horas, desc, emptyPlaceholder }
+  }
+
+  const removeBtn = (i: number) => (
+    <Button type="button" variant="ghost" size="icon-sm" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
+      disabled={lines.length === 1} aria-label="Eliminar línea" className="text-foreground/40 hover:text-(--status-excedido)">✕</Button>
+  )
+
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-      <div className="mb-5 flex items-center gap-3">
+      <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
         <label htmlFor="fecha" className="text-sm font-medium text-foreground">Fecha por defecto</label>
         <Input
           id="fecha" type="date" value={defaultDate} max={today()} min={canBackdate ? undefined : daysAgo(7)}
@@ -112,14 +185,15 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
         {!canBackdate && <span className="text-xs text-muted-foreground">Hasta 7 días atrás</span>}
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Escritorio: tabla */}
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full border-separate border-spacing-y-2 text-sm">
           <thead>
             <tr className="text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <th className="pb-1 pr-3 font-medium">Fecha</th>
               <th className="pb-1 pr-3 font-medium">Proyecto</th>
               {showDepartamento && <th className="pb-1 pr-3 font-medium">Departamento</th>}
-              <th className="pb-1 pr-3 font-medium">Etapa</th>
+              {showEtapa && <th className="pb-1 pr-3 font-medium">Etapa</th>}
               <th className="pb-1 pr-3 font-medium">Horas</th>
               <th className="pb-1 pr-3 font-medium">Descripción</th>
               <th className="w-8 pb-1"></th>
@@ -127,103 +201,43 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
           </thead>
           <tbody>
             {lines.map((l, i) => {
-              const isDep = isDepartamento(l.project)
-              const currentDep = departamentos.find(d => d.name === l.department)
-              const allowedEtapas = isDep && currentDep && currentDep.etapaIds.length > 0
-                ? etapas.filter(e => currentDep.etapaIds.includes(e.id))
-                : etapas
-              // Proyecto cliente: etapas de la posición del usuario. En edición, si la
-              // etapa ya guardada no está permitida, se incluye para no perderla.
-              const lineClientEtapas = l.etapa_id && !clientEtapas.some(e => e.id === l.etapa_id)
-                ? [...clientEtapas, ...etapas.filter(e => e.id === l.etapa_id)]
-                : clientEtapas
-              // Descripción (todas las líneas): opciones de la posición del usuario.
-              // En edición, si la descripción guardada no está en la lista, se incluye
-              // para no perderla (los registros viejos tenían texto libre).
-              const lineDescripciones = l.description && !descripciones.some(d => d.name === l.description)
-                ? [...descripciones, { id: `__cur_${i}`, name: l.description }]
-                : descripciones
-
+              const c = lineControls(l, i)
               return (
-              <tr key={i}>
-                <td className="min-w-37 pr-3 align-top">
-                  <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : daysAgo(7)}
-                    onChange={(e) => update(i, { entry_date: e.target.value })} />
-                </td>
-                <td className="min-w-45 pr-3 align-top">
-                  <ProjectCombobox
-                    ariaLabel="Proyecto"
-                    value={l.project}
-                    projects={projects}
-                    finishedProjects={finishedSet}
-                    exceededProjects={exceededSet}
-                    onValueChange={(v) => {
-                      const finished = !!v && finishedSet.has(v)
-                      const exceeded = !!v && exceededSet.has(v)
-                      if (finished || exceeded) { setProjectWarning({ index: i, project: v, finished, exceeded }); return }
-                      update(i, { project: v })
-                    }}
-                  />
-                </td>
-                {showDepartamento && (
-                  <td className="min-w-32.5 pr-3 align-top">
-                    {isDep ? (
-                      departamentos.length === 0 ? (
-                        <select aria-label="Departamento" value="" disabled className={field}>
-                          <option value="">— Sin departamentos (contacta al admin) —</option>
-                        </select>
-                      ) : (
-                        <select aria-label="Departamento" value={l.department}
-                          onChange={(e) => update(i, { department: e.target.value })} className={field}>
-                          {departamentos.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-                        </select>
-                      )
-                    ) : (
-                      <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/40">—</span>
-                    )}
-                  </td>
-                )}
-                <td className="min-w-35 pr-3 align-top">
-                  {isDep ? (
-                    <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/50">
-                      {allowedEtapas[0]?.name ?? '— Etapa —'}
-                    </span>
-                  ) : lineClientEtapas.length === 0 ? (
-                    <select aria-label="Etapa" value="" disabled className={field}>
-                      <option value="">— Sin etapas asignadas (contacta al admin) —</option>
-                    </select>
-                  ) : (
-                    <select aria-label="Etapa" value={l.etapa_id} onChange={(e) => update(i, { etapa_id: e.target.value })} className={field}>
-                      <option value="">— Etapa —</option>
-                      {lineClientEtapas.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
-                    </select>
-                  )}
-                </td>
-                <td className="w-24 pr-3 align-top">
-                  <Input aria-label="Horas" type="number" step="0.5" min="0" value={l.hours || ''}
-                    onChange={(e) => update(i, { hours: Number(e.target.value) })} />
-                </td>
-                <td className="min-w-50 pr-3 align-top">
-                  {lineDescripciones.length === 0 ? (
-                    <select aria-label="Descripción" value="" disabled className={field}>
-                      <option value="">— Sin descripciones (contacta al admin) —</option>
-                    </select>
-                  ) : (
-                    <select aria-label="Descripción" value={l.description} onChange={(e) => update(i, { description: e.target.value })} className={field}>
-                      <option value="">— Descripción —</option>
-                      {lineDescripciones.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-                    </select>
-                  )}
-                </td>
-                <td className="align-middle">
-                  <Button type="button" variant="ghost" size="icon-sm" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
-                    disabled={lines.length === 1} aria-label="Eliminar línea" className="text-foreground/40 hover:text-(--status-excedido)">✕</Button>
-                </td>
-              </tr>
+                <tr key={i}>
+                  <td className="min-w-37 pr-3 align-top">{c.fecha}</td>
+                  <td className="min-w-45 pr-3 align-top">{c.proyecto}</td>
+                  {showDepartamento && <td className="min-w-32.5 pr-3 align-top">{c.isDep ? c.depto : c.emptyPlaceholder}</td>}
+                  {showEtapa && <td className="min-w-35 pr-3 align-top">{c.isDep ? c.emptyPlaceholder : c.etapa}</td>}
+                  <td className="w-24 pr-3 align-top">{c.horas}</td>
+                  <td className="min-w-50 pr-3 align-top">{c.desc}</td>
+                  <td className="align-middle">{removeBtn(i)}</td>
+                </tr>
               )
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Móvil: una tarjeta por línea */}
+      <div className="space-y-3 md:hidden">
+        {lines.map((l, i) => {
+          const c = lineControls(l, i)
+          return (
+            <div key={i} className="rounded-xl border border-border bg-(--muted-surface) p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Línea {i + 1}</span>
+                {removeBtn(i)}
+              </div>
+              <div className="space-y-3">
+                <MobileField label="Fecha">{c.fecha}</MobileField>
+                <MobileField label="Proyecto">{c.proyecto}</MobileField>
+                {c.isDep ? <MobileField label="Departamento">{c.depto}</MobileField> : <MobileField label="Etapa">{c.etapa}</MobileField>}
+                <MobileField label="Horas">{c.horas}</MobileField>
+                <MobileField label="Descripción">{c.desc}</MobileField>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       <div className="mt-4 flex items-start justify-between border-t border-border pt-4">
