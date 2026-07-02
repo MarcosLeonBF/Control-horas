@@ -164,3 +164,8 @@
     html { font-size: 120%; } /* 16px → ~19.2px (monitores grandes) */
   }
 }
+
+/* Shimmer para skeletons de carga (barrido suave sobre el bloque). */
+@keyframes skeleton-shimmer {
+  100% { transform: translateX(100%); }
+}
