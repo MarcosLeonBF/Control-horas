@@ -68,13 +68,28 @@ export async function getReporteOptions(scope: ViewerScope): Promise<ReporteFilt
   // Dedup: el Excel puede traer "Departamento" (o proyectos repetidos); evita keys duplicadas.
   projects = Array.from(new Set([...projects, 'Departamento'])).sort((a, b) => a.localeCompare(b))
 
-  const { data: posiciones } = await supabase.from('positions').select('name').eq('active', true).order('name')
+  // Posiciones acotadas al alcance del manager: solo las ligadas a sus áreas
+  // (position_areas), igual que en Bancos. El admin ve todas.
+  let positionNames: string[] = []
+  if (scope.role === 'manager') {
+    if (scope.areaIds.length) {
+      const { data: pa } = await supabase.from('position_areas').select('position_id').in('area_id', scope.areaIds)
+      const posIds = Array.from(new Set((pa ?? []).map((r) => r.position_id as string)))
+      if (posIds.length) {
+        const { data } = await supabase.from('positions').select('name').in('id', posIds).eq('active', true).order('name')
+        positionNames = (data ?? []).map((p) => p.name as string)
+      }
+    }
+  } else {
+    const { data } = await supabase.from('positions').select('name').eq('active', true).order('name')
+    positionNames = (data ?? []).map((p) => p.name as string)
+  }
 
   return {
     projects,
     users: (profiles ?? []).map((p) => p.full_name as string).filter(Boolean),
     areas: areaNames,
     departments: ['Clientes', 'Ventas', 'Marketing', 'Todos'], // TODO: Cargar de DB si es necesario, pero actualmente es estático en reportes
-    positions: (posiciones ?? []).map((p) => p.name as string),
+    positions: positionNames,
   }
 }

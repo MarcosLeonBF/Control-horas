@@ -160,15 +160,15 @@ export default function ReportesView({
 
       {/* Agrupar por + descargas */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Agrupar por</span>
-          <div className="inline-flex rounded-full border border-border bg-card p-1">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+          <span className="shrink-0 text-sm text-muted-foreground">Agrupar por</span>
+          <div className="flex min-w-0 overflow-x-auto rounded-full border border-border bg-card p-1">
             {GROUP_ORDER.map((g) => (
               <button
                 key={g}
                 onClick={() => setGroupBy(g)}
                 className={cn(
-                  'rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
+                  'shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
                   groupBy === g ? 'bg-(--brand) text-white shadow-sm' : 'text-foreground/55 hover:text-foreground',
                 )}
               >
@@ -198,6 +198,8 @@ export default function ReportesView({
 
       {/* Tabla */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="overflow-x-auto">
+        <div className="min-w-136">
         <div className="grid grid-cols-[2.5rem_1fr_minmax(8rem,1.4fr)_5rem_3.5rem] items-center gap-3 border-b border-border bg-(--muted-surface) px-5 py-3 text-[0.7rem] uppercase tracking-[0.12em] text-muted-foreground">
           <span className="text-right">#</span>
           <span>{dimLabel}</span>
@@ -240,6 +242,8 @@ export default function ReportesView({
             <span className="text-right text-xs text-muted-foreground">100%</span>
           </div>
         )}
+        </div>
+        </div>
       </div>
     </div>
   )
