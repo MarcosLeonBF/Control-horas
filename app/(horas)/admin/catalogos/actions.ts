@@ -224,6 +224,19 @@ export async function setPosicionDescripciones(id: string, descripcionIds: strin
   return { ok: true }
 }
 
+// Reemplaza los departamentos ligados a una posición (desplegable de departamento en proyecto "Departamento").
+export async function setPosicionDepartamentos(id: string, departamentoIds: string[]): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: delErr } = await supabase.from('position_departamentos').delete().eq('position_id', id)
+  if (delErr) return { ok: false, error: friendly(delErr) }
+  if (departamentoIds.length) {
+    const { error: insErr } = await supabase.from('position_departamentos').insert(departamentoIds.map((departamento_id) => ({ position_id: id, departamento_id })))
+    if (insErr) return { ok: false, error: friendly(insErr) }
+  }
+  return { ok: true }
+}
+
 // ── Departamentos ──────────────────────────────────────────────────────────
 export async function crearDepartamento(name: string): Promise<Result> {
   const { supabase, error } = await requireAdmin()

@@ -11,12 +11,12 @@ import {
   crearEtapa, renombrarEtapa, toggleEtapa, eliminarEtapa,
   crearDescripcion, renombrarDescripcion, toggleDescripcion, eliminarDescripcion,
   crearDepartamento, renombrarDepartamento, toggleDepartamento, eliminarDepartamento, setDepartamentoEtapasNombres,
-  crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas, setPosicionEtapas, setPosicionDescripciones,
+  crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas, setPosicionEtapas, setPosicionDescripciones, setPosicionDepartamentos,
 } from '@/app/(horas)/admin/catalogos/actions'
 import type { DepartamentoRow } from '@/lib/horas/types'
 
 export interface CatalogoRow { id: string; name: string; active: boolean; is_internal?: boolean }
-export interface PosicionRow { id: string; name: string; active: boolean; areaIds: string[]; etapaIds: string[]; descripcionIds: string[] }
+export interface PosicionRow { id: string; name: string; active: boolean; areaIds: string[]; etapaIds: string[]; descripcionIds: string[]; departamentoIds: string[] }
 
 type Result = { ok: true } | { ok: false; error: string }
 interface Ops {
@@ -103,13 +103,14 @@ function Seccion({ title, rows, ops, addPlaceholder }: { title: string; rows: Ca
   )
 }
 
-function PosicionesSection({ posiciones, areas, etapas, descripciones, departmentEtapaIds }: { posiciones: PosicionRow[]; areas: CatalogoRow[]; etapas: CatalogoRow[]; descripciones: CatalogoRow[]; departmentEtapaIds: Set<string> }) {
+function PosicionesSection({ posiciones, areas, etapas, descripciones, departamentos, departmentEtapaIds }: { posiciones: PosicionRow[]; areas: CatalogoRow[]; etapas: CatalogoRow[]; descripciones: CatalogoRow[]; departamentos: DepartamentoRow[]; departmentEtapaIds: Set<string> }) {
   const { busy, run } = useRun()
   const selectableAreas = areas.filter((a) => !a.is_internal)
   // Etapas asignables a una posición = generales (activas). Se excluyen las etapas
   // de departamento, que son exclusivas del proyecto "Departamento".
   const selectableEtapas = etapas.filter((e) => e.active && !departmentEtapaIds.has(e.id))
   const selectableDescripciones = descripciones.filter((d) => d.active)
+  const selectableDepartamentos = departamentos.filter((d) => d.active)
   const [nuevo, setNuevo] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
@@ -117,10 +118,11 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departmen
   const [areaSel, setAreaSel] = useState<string[]>([])
   const [etapaSel, setEtapaSel] = useState<string[]>([])
   const [descripcionSel, setDescripcionSel] = useState<string[]>([])
+  const [departamentoSel, setDepartamentoSel] = useState<string[]>([])
 
   function toggleExpand(p: PosicionRow) {
     if (expandedId === p.id) { setExpandedId(null); return }
-    setExpandedId(p.id); setAreaSel(p.areaIds); setEtapaSel(p.etapaIds); setDescripcionSel(p.descripcionIds)
+    setExpandedId(p.id); setAreaSel(p.areaIds); setEtapaSel(p.etapaIds); setDescripcionSel(p.descripcionIds); setDepartamentoSel(p.departamentoIds)
   }
 
   async function add() {
@@ -138,6 +140,9 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departmen
   }
   async function saveDescripciones(id: string) {
     await run(setPosicionDescripciones(id, descripcionSel), 'Descripciones actualizadas')
+  }
+  async function saveDepartamentos(id: string) {
+    await run(setPosicionDepartamentos(id, departamentoSel), 'Departamentos actualizados')
   }
 
   return (
@@ -182,6 +187,10 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departmen
                       {p.descripcionIds.length === 0
                         ? <span className="text-foreground/40">Sin descripciones</span>
                         : <>{p.descripcionIds.length} {p.descripcionIds.length === 1 ? 'descripción' : 'descripciones'}</>}
+                      <span className="px-1 text-foreground/25">·</span>
+                      {p.departamentoIds.length === 0
+                        ? <span className="text-foreground/40">Sin departamentos</span>
+                        : <>{p.departamentoIds.length} {p.departamentoIds.length === 1 ? 'departamento' : 'departamentos'}</>}
                     </span>
                     {!p.active && <Badge variant="outline" className="text-muted-foreground">inactiva</Badge>}
                   </button>
@@ -200,7 +209,7 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departmen
             </div>
 
             {expandedId === p.id && (
-              <div className="mt-2 mb-1 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-2 mb-1 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
                   <div className="flex items-center gap-2">
                     <span className="size-2 shrink-0 rounded-full bg-(--brand)" />
@@ -261,6 +270,28 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departmen
                     </div>
                   )}
                   <Button size="sm" className="mt-4" onClick={() => saveDescripciones(p.id)} disabled={busy}>Guardar descripciones</Button>
+                </div>
+
+                <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 shrink-0 rounded-full border border-foreground/45" />
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Departamentos</h4>
+                  </div>
+                  <p className="mt-1 mb-3 text-xs text-muted-foreground">Seleccionables al registrar en el proyecto interno &quot;Departamento&quot;.</p>
+                  {selectableDepartamentos.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No hay departamentos activos en el catálogo.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {selectableDepartamentos.map((d) => (
+                        <label key={d.id} className="flex cursor-pointer items-center gap-2.5 text-sm text-foreground/80 hover:text-foreground">
+                          <input type="checkbox" className="size-4 shrink-0 accent-(--brand)" checked={departamentoSel.includes(d.id)}
+                            onChange={(ev) => setDepartamentoSel((prev) => ev.target.checked ? [...prev, d.id] : prev.filter((x) => x !== d.id))} />
+                          {d.name}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <Button size="sm" className="mt-4" onClick={() => saveDepartamentos(p.id)} disabled={busy}>Guardar departamentos</Button>
                 </div>
               </div>
             )}
@@ -324,11 +355,11 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
               ) : (
                 <>
                   <div className="flex flex-1 flex-wrap items-center gap-2">
-                    <span className={`text-sm font-medium ${(d as any).active ? '' : 'text-muted-foreground line-through'}`}>{d.name}</span>
+                    <span className={`text-sm font-medium ${d.active ? '' : 'text-muted-foreground line-through'}`}>{d.name}</span>
                     {d.etapaIds.length === 0
                       ? <Badge variant="outline" className="text-muted-foreground">sin etapas</Badge>
                       : d.etapaIds.map((id) => <Badge key={id} variant="secondary">{etapaName(id)}</Badge>)}
-                    {!(d as any).active && <Badge variant="outline">inactivo</Badge>}
+                    {!d.active && <Badge variant="outline">inactivo</Badge>}
                   </div>
                   <Button size="sm" variant="ghost" onClick={() => { 
                     setEtapasFor(etapasFor === d.id ? null : d.id); 
@@ -337,8 +368,8 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
                   }}>Etapas</Button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditingId(d.id); setEditVal(d.name) }}>Renombrar</Button>
                   <Button size="sm" variant="ghost" disabled={busy}
-                    onClick={() => run(toggleDepartamento(d.id, !(d as any).active), (d as any).active ? 'Desactivado' : 'Activado')}>
-                    {(d as any).active ? 'Desactivar' : 'Activar'}
+                    onClick={() => run(toggleDepartamento(d.id, !d.active), d.active ? 'Desactivado' : 'Activado')}>
+                    {d.active ? 'Desactivar' : 'Activar'}
                   </Button>
                   <Button size="sm" variant="ghost" disabled={busy}
                     className="text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -399,7 +430,7 @@ export default function CatalogosPanel({ areas, etapas, descripciones, departame
   const departmentEtapaIds = new Set(departamentos.flatMap((d) => d.etapaIds))
   return (
     <div className="space-y-6">
-      <PosicionesSection posiciones={posiciones} areas={areas} etapas={etapas} descripciones={descripciones} departmentEtapaIds={departmentEtapaIds} />
+      <PosicionesSection posiciones={posiciones} areas={areas} etapas={etapas} descripciones={descripciones} departamentos={departamentos} departmentEtapaIds={departmentEtapaIds} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Seccion title="Áreas" rows={areas} addPlaceholder="Nueva área…"

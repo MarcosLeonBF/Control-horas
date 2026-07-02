@@ -7,13 +7,14 @@ export async function getCatalogos(): Promise<{ areas: AreaRow[]; etapas: EtapaR
     supabase.from('areas').select('id,name,is_internal').eq('active', true).order('name'),
     supabase.from('etapas').select('id,name').eq('active', true).order('name'),
     supabase.from('descripciones').select('id,name').eq('active', true).order('name'),
-    supabase.from('departamentos').select('id,name').eq('active', true).order('name'),
+    supabase.from('departamentos').select('id,name,active').eq('active', true).order('name'),
     supabase.from('departamento_etapas').select('departamento_id,etapa_id')
   ])
 
   const departamentos = (deps ?? []).map(d => ({
     id: d.id as string,
     name: d.name as string,
+    active: d.active as boolean,
     etapaIds: (depEtapas ?? []).filter(de => de.departamento_id === d.id).map(de => de.etapa_id as string)
   }))
 
@@ -50,4 +51,14 @@ export async function getMyPositionDescripcionIds(userId: string): Promise<strin
   if (!me?.position_id) return []
   const { data } = await supabase.from('position_descripciones').select('descripcion_id').eq('position_id', me.position_id)
   return (data ?? []).map((r) => r.descripcion_id as string)
+}
+
+// Ids de los departamentos ligados a la posición del usuario. Determinan el
+// desplegable de departamento al registrar en el proyecto interno "Departamento".
+export async function getMyPositionDepartamentoIds(userId: string): Promise<string[]> {
+  const supabase = await createClient()
+  const { data: me } = await supabase.from('profiles').select('position_id').eq('id', userId).single()
+  if (!me?.position_id) return []
+  const { data } = await supabase.from('position_departamentos').select('departamento_id').eq('position_id', me.position_id)
+  return (data ?? []).map((r) => r.departamento_id as string)
 }
