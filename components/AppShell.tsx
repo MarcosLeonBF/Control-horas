@@ -178,8 +178,18 @@ export default function AppShell({ displayName, role, children }: { displayName:
       </aside>
 
       {/* Contenido */}
-      <div className={cn('transition-[padding] duration-300 ease-out', collapsed ? 'lg:pl-[76px]' : 'lg:pl-64')}>
-        <main className="mx-auto max-w-6xl px-5 py-8 sm:px-8">{children}</main>
+      <div className={cn('relative min-h-screen transition-[padding] duration-300 ease-out', collapsed ? 'lg:pl-[76px]' : 'lg:pl-64')}>
+        {/* Fondo decorativo: textura de puntos + glows + formas geométricas sutiles (profundidad) */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(rgba(189,8,66,0.05) 1px, transparent 1.4px)', backgroundSize: '26px 26px' }} />
+          <div className="absolute -right-48 -top-40 size-[34rem] rounded-full bg-(--brand)/[0.05] blur-3xl" />
+          <div className="absolute -bottom-56 -left-24 size-[36rem] rounded-full bg-(--brand)/[0.04] blur-3xl" />
+          <div className="absolute right-[8%] top-24 size-72 rounded-full border border-(--brand)/[0.07]" />
+          <div className="absolute right-[3%] top-52 size-44 rounded-full border border-(--brand)/[0.05]" />
+          <div className="absolute left-[6%] top-1/2 size-24 rotate-12 rounded-3xl border border-(--brand)/[0.06]" />
+          <div className="absolute bottom-28 left-1/3 size-3 rotate-45 bg-(--brand)/[0.12]" />
+        </div>
+        <main className="relative z-10 mx-auto max-w-6xl px-5 py-8 sm:px-8">{children}</main>
       </div>
     </div>
   )
