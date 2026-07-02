@@ -31,6 +31,14 @@ const ESTADOS: HorasStatus[] = ['excedido', 'bajo', 'disponible', 'consumido', '
 const selectClass =
   'rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
+// Estilo de la insignia según el estado del proyecto (Excel Clientes_Proyectos).
+function estadoProyectoClass(estado: string): string {
+  const e = estado.toLowerCase()
+  if (e === 'finalizado') return 'bg-foreground/[0.07] text-muted-foreground'
+  if (e === 'activo') return 'bg-(--status-disponible)/12 text-(--status-disponible)'
+  return 'bg-(--muted-surface) text-muted-foreground'
+}
+
 function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'excedido' }) {
   return (
     <Card className="gap-1 p-5">
@@ -72,8 +80,8 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   // Descarga de la vista filtrada (§17.5: bancos de horas; excedidos/cerca = filtrar estado + descargar).
   function buildRows(): ExportRow[] {
     return filtered.map((r) => ({
-      Proyecto: r.project, Posición: r.position, Asignado: r.assigned, Consumido: r.consumed,
-      Restante: r.remaining, Estado: HORAS_STATUS_LABELS[r.status],
+      Proyecto: r.project, 'Estado proyecto': r.projectEstado ?? '—', Posición: r.position,
+      Asignado: r.assigned, Consumido: r.consumed, Restante: r.remaining, 'Estado banco': HORAS_STATUS_LABELS[r.status],
     }))
   }
   const fileBase = `bancos-horas${estado === 'todos' ? '' : `-${estado}`}`
@@ -155,9 +163,16 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
               return (
                 <TableRow key={`${r.project}|${r.position}`}>
                   <TableCell className="py-3">
-                    <Link href={`/bancos/${encodeURIComponent(r.project)}`} className="font-medium text-foreground hover:text-(--brand) hover:underline">
-                      {r.project}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/bancos/${encodeURIComponent(r.project)}`} className="font-medium text-foreground hover:text-(--brand) hover:underline">
+                        {r.project}
+                      </Link>
+                      {r.projectEstado && (
+                        <span className={cn('shrink-0 rounded-full px-1.5 py-px text-[0.62rem] font-medium', estadoProyectoClass(r.projectEstado))}>
+                          {r.projectEstado}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="py-3">
                     <Badge variant="secondary">{r.position}</Badge>

@@ -9,6 +9,7 @@ export interface BancoHorasRow {
   consumed: number // horas registradas por usuarios de esa posición en el proyecto
   remaining: number
   status: HorasStatus
+  projectEstado?: string // estado del proyecto (Excel Clientes_Proyectos): Activo/Finalizado/…
 }
 
 export interface AmpliacionHoras {
