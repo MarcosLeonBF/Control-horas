@@ -150,6 +150,7 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
                     value={l.project}
                     projects={projects}
                     finishedProjects={finishedSet}
+                    exceededProjects={exceededSet}
                     onValueChange={(v) => {
                       const finished = !!v && finishedSet.has(v)
                       const exceeded = !!v && exceededSet.has(v)

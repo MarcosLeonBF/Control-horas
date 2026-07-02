@@ -55,7 +55,9 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const finishedSet = new Set(finishedProjects)
   projects.sort((a, b) => (finishedSet.has(a) ? 1 : 0) - (finishedSet.has(b) ? 1 : 0) || a.localeCompare(b))
 
-  // Proyectos con el banco de la posición del usuario excedido (aviso al registrar).
+  // El banco de horas es POR POSICIÓN: avisamos/marcamos "excedido" solo cuando el
+  // banco de la posición del usuario para ese proyecto está excedido. Admin usa su
+  // propia posición.
   let exceededProjects: string[] = []
   if (me?.position_id) {
     try {

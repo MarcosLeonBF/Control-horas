@@ -8,16 +8,31 @@ interface ProjectComboboxProps {
   onValueChange: (value: string) => void
   projects: string[]
   finishedProjects?: Set<string>
+  exceededProjects?: Set<string>
   placeholder?: string
   className?: string
   ariaLabel?: string
 }
 
+// Insignias de estado del proyecto. Excedido (rojo) va primero para que resalte.
+function ProjectBadges({ project, finished, exceeded }: { project: string; finished?: Set<string>; exceeded?: Set<string> }) {
+  return (
+    <>
+      {exceeded?.has(project) && (
+        <span className="shrink-0 rounded-full bg-(--status-excedido)/12 px-1.5 py-px text-[0.62rem] font-semibold text-(--status-excedido)">Excedido</span>
+      )}
+      {finished?.has(project) && (
+        <span className="shrink-0 rounded-full bg-foreground/[0.07] px-1.5 py-px text-[0.62rem] font-medium text-muted-foreground">Finalizado</span>
+      )}
+    </>
+  )
+}
+
 // Selector de proyecto con buscador (Base UI Combobox). Renderiza en portal, así
 // que no lo recorta el overflow de la tabla del formulario. Marca los proyectos
-// finalizados con una insignia.
+// finalizados y con banco excedido con insignias.
 export default function ProjectCombobox({
-  value, onValueChange, projects, finishedProjects, placeholder = '— Proyecto —', className, ariaLabel,
+  value, onValueChange, projects, finishedProjects, exceededProjects, placeholder = '— Proyecto —', className, ariaLabel,
 }: ProjectComboboxProps) {
   return (
     <Combobox.Root items={projects} value={value || null} onValueChange={(v) => onValueChange(v ?? '')}>
@@ -32,9 +47,7 @@ export default function ProjectCombobox({
           {(val: string | null) => (
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate">{val}</span>
-              {val && finishedProjects?.has(val) && (
-                <span className="shrink-0 rounded-full bg-foreground/[0.07] px-1.5 py-px text-[0.62rem] font-medium text-muted-foreground">Finalizado</span>
-              )}
+              {val && <ProjectBadges project={val} finished={finishedProjects} exceeded={exceededProjects} />}
             </span>
           )}
         </Combobox.Value>
@@ -69,9 +82,7 @@ export default function ProjectCombobox({
                     </Combobox.ItemIndicator>
                   </span>
                   <span className="min-w-0 flex-1 truncate">{item}</span>
-                  {finishedProjects?.has(item) && (
-                    <span className="shrink-0 rounded-full bg-foreground/[0.07] px-1.5 py-px text-[0.62rem] font-medium text-muted-foreground">Finalizado</span>
-                  )}
+                  <ProjectBadges project={item} finished={finishedProjects} exceeded={exceededProjects} />
                 </Combobox.Item>
               )}
             </Combobox.List>
