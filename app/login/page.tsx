@@ -64,7 +64,7 @@ export default function LoginPage() {
 
         <div className="animate-fade-up relative flex flex-col items-center text-center [animation-delay:120ms]">
           <Image src="/logo-blanco.png" alt="Bastida &amp; Farina" width={400} height={140} priority className="h-20 w-auto" />
-          <p className="font-display mt-7 text-2xl">Control de Horas</p>
+          <p className="font-display mt-7 text-2xl">Control de Gestión</p>
           <div className="mt-5 h-px w-12 bg-white/40" />
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/75">
             Registro de horas, bancos y HUCHA del equipo de Bastida &amp; Farina.

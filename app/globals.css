@@ -154,4 +154,13 @@
   html {
     @apply font-sans;
     }
+  /* Zoom en escritorio: al ser todo rem, agranda de forma uniforme la barra lateral
+     y el contenido (texto, inputs, espaciados y anchos). Escala con el tamaño de
+     pantalla (más en monitores grandes). Móvil (<1024px) sin cambios. */
+  @media (min-width: 1024px) {
+    html { font-size: 115%; } /* 16px → ~18.4px */
+  }
+  @media (min-width: 1536px) {
+    html { font-size: 120%; } /* 16px → ~19.2px (monitores grandes) */
+  }
 }
