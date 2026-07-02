@@ -65,7 +65,7 @@ function Seccion({ title, rows, ops, addPlaceholder }: { title: string; rows: Ca
 
       <ul className="mt-4 divide-y divide-border">
         {rows.map((r) => (
-          <li key={r.id} className="flex items-center gap-2 py-2.5">
+          <li key={r.id} className="flex flex-wrap items-center gap-2 py-2.5">
             {editingId === r.id ? (
               <>
                 <Input value={editVal} onChange={(e) => setEditVal(e.target.value)} className="h-8 max-w-xs" autoFocus
@@ -161,7 +161,7 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
       <ul className="mt-4 divide-y divide-border">
         {posiciones.map((p) => (
           <li key={p.id} className="py-1.5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {editingId === p.id ? (
                 <>
                   <Input value={editVal} onChange={(e) => setEditVal(e.target.value)} className="h-8 max-w-xs" autoFocus
@@ -211,7 +211,7 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
             {expandedId === p.id && (
               <div className="mt-2 mb-1 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="size-2 shrink-0 rounded-full bg-(--brand)" />
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Áreas</h4>
                   </div>
@@ -229,7 +229,7 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
                 </div>
 
                 <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="size-2 shrink-0 rounded-[3px] bg-foreground/40" />
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Etapas</h4>
                   </div>
@@ -251,7 +251,7 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
                 </div>
 
                 <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="h-0.5 w-2.5 shrink-0 rounded-full bg-foreground/40" />
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Descripciones</h4>
                   </div>
@@ -273,7 +273,7 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
                 </div>
 
                 <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="size-2 shrink-0 rounded-full border border-foreground/45" />
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Departamentos</h4>
                   </div>
@@ -344,7 +344,7 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
       <ul className="mt-4 divide-y divide-border">
         {departamentos.map((d) => (
           <li key={d.id} className="py-2.5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {editingId === d.id ? (
                 <>
                   <Input value={editVal} onChange={(e) => setEditVal(e.target.value)} className="h-8 max-w-xs" autoFocus

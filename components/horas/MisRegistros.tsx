@@ -48,7 +48,8 @@ export default function MisRegistros({ rows }: { rows: RegistroRow[] }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
+    <>
+    <div className="hidden overflow-hidden rounded-xl ring-1 ring-foreground/10 md:block">
       <Table>
         <TableHeader>
           <TableRow className="bg-(--muted-surface) hover:bg-(--muted-surface)">
@@ -109,5 +110,39 @@ export default function MisRegistros({ rows }: { rows: RegistroRow[] }) {
         </TableBody>
       </Table>
     </div>
+
+    {/* Móvil: una tarjeta por registro */}
+    <div className="space-y-2.5 md:hidden">
+      {rows.map((r) => {
+        const anulado = r.status === 'anulado'
+        return (
+          <div key={r.key} className={cn('rounded-xl border border-border bg-card p-4 shadow-sm', anulado && 'opacity-60')}>
+            <div className="flex items-start justify-between gap-2">
+              <span className={cn('min-w-0 flex-1 font-medium text-foreground/90', anulado && 'line-through')}>{r.project}</span>
+              <Badge variant={STATUS_VARIANT[r.status] ?? 'outline'} className="shrink-0 capitalize">{r.status}</Badge>
+            </div>
+            <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="tabular-nums">{r.dateLabel}</span>
+              <span className="text-foreground/25">·</span>
+              <span className={cn('tabular-money font-medium text-foreground/80', anulado && 'line-through')}>{r.hoursLabel}</span>
+            </div>
+            {r.description && <p className="mt-2 text-sm text-muted-foreground">{r.description}</p>}
+            {!anulado && (
+              <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
+                <Link href={`/registrar?edit=${r.registroId}`} aria-label="Editar registro"
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-(--brand) transition-colors hover:bg-(--brand)/10">
+                  <Pencil className="size-4" /> Editar
+                </Link>
+                <button onClick={() => onAnular(r.registroId)} disabled={busy === r.registroId} aria-label="Anular registro"
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50">
+                  <Ban className="size-4" /> {busy === r.registroId ? 'Anulando…' : 'Anular'}
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+    </>
   )
 }
