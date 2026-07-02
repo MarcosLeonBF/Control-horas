@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { getCatalogos, getMyAreas, getMyPositionEtapaIds, getMyPositionDescripcionIds } from '@/lib/horas/queries'
+import { getCatalogos, getMyAreas, getMyPositionEtapaIds, getMyPositionDescripcionIds, getMyPositionDepartamentoIds } from '@/lib/horas/queries'
 import { getCachedBancoHoras, getCachedProyectosEstado } from '@/lib/graph/client'
+import { getBancosHoras } from '@/lib/horas/bancos'
 import RegistroForm from '@/components/horas/RegistroForm'
 import type { LineInput } from '@/app/(horas)/registrar/actions'
 
@@ -9,7 +10,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const { areas, etapas, descripciones, departamentos } = await getCatalogos()
-  const { data: me } = await supabase.from('profiles').select('role').eq('id', user!.id).single()
+  const { data: me } = await supabase.from('profiles').select('role, position_id').eq('id', user!.id).single()
   const myAreas = await getMyAreas(user!.id)
   const internal = areas.find((a) => a.is_internal)
   if (!internal) throw new Error('No hay un área interna configurada (is_internal) para el proyecto "Departamento".')
@@ -33,6 +34,11 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const positionDescripcionIds = await getMyPositionDescripcionIds(user!.id)
   const allowedDescripciones = me?.role === 'admin' ? descripciones : descripciones.filter((d) => positionDescripcionIds.includes(d.id))
 
+  // Departamentos seleccionables (proyecto interno "Departamento"): los de la posición.
+  // Admin ve todos; sin departamentos de posición → lista vacía (estricto).
+  const positionDepartamentoIds = await getMyPositionDepartamentoIds(user!.id)
+  const allowedDepartamentos = me?.role === 'admin' ? departamentos : departamentos.filter((d) => positionDepartamentoIds.includes(d.id))
+
   let projects: string[] = []
   try { projects = (await getCachedBancoHoras()).map((b) => b.project) } catch { /* Excel caído: solo Departamento */ }
   projects = Array.from(new Set([...projects, 'Departamento']))
@@ -48,6 +54,20 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   // Orden en el selector: activos primero (alfabético), finalizados al fondo.
   const finishedSet = new Set(finishedProjects)
   projects.sort((a, b) => (finishedSet.has(a) ? 1 : 0) - (finishedSet.has(b) ? 1 : 0) || a.localeCompare(b))
+
+  // Proyectos con el banco de la posición del usuario excedido (aviso al registrar).
+  let exceededProjects: string[] = []
+  if (me?.position_id) {
+    try {
+      const { data: pos } = await supabase.from('positions').select('name').eq('id', me.position_id).single()
+      const positionName = pos?.name
+      if (positionName) {
+        exceededProjects = (await getBancosHoras({ role: 'admin' }))
+          .filter((b) => b.position === positionName && b.status === 'excedido')
+          .map((b) => b.project)
+      }
+    } catch { /* bancos/Excel no disponibles: sin aviso de excedido */ }
+  }
 
   // Modo edición: precargar el registro propio (RLS limita el acceso) si no está anulado.
   // Las líneas no tienen fecha propia: heredan la del log que se edita.
@@ -71,7 +91,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl">{initial ? 'Editar registro' : 'Registrar horas'}</h1>
-      <RegistroForm projects={projects} finishedProjects={finishedProjects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} descripciones={allowedDescripciones} departamentos={departamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
+      <RegistroForm projects={projects} finishedProjects={finishedProjects} exceededProjects={exceededProjects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} descripciones={allowedDescripciones} departamentos={allowedDepartamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
     </div>
   )
 }

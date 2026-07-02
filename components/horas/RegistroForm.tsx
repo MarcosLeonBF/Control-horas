@@ -18,15 +18,16 @@ const emptyLine = (areaId: string, date: string, dep: string): LineInput => ({ e
 const field =
   'w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
 
-export default function RegistroForm({ projects, finishedProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial }: {
-  projects: string[]; finishedProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: DescripcionRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
+export default function RegistroForm({ projects, finishedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial }: {
+  projects: string[]; finishedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: DescripcionRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
   canBackdate?: boolean // admin: puede registrar fuera del rango de 7 días (PDF §4)
   initial?: { id: string; lines: LineInput[] }
 }) {
   const router = useRouter()
   const finishedSet = new Set(finishedProjects)
-  // Confirmación al elegir un proyecto finalizado (línea + proyecto pendiente).
-  const [pendingFinished, setPendingFinished] = useState<{ index: number; project: string } | null>(null)
+  const exceededSet = new Set(exceededProjects)
+  // Confirmación al elegir un proyecto finalizado y/o con el banco excedido.
+  const [projectWarning, setProjectWarning] = useState<{ index: number; project: string; finished: boolean; exceeded: boolean } | null>(null)
   // Fecha por defecto: la heredan las líneas nuevas y las que aún la seguían.
   const [defaultDate, setDefaultDate] = useState(initial?.lines[0]?.entry_date ?? today())
   const defaultDep = departamentos[0]?.name ?? 'Clientes'
@@ -150,17 +151,25 @@ export default function RegistroForm({ projects, finishedProjects, areas, etapas
                     projects={projects}
                     finishedProjects={finishedSet}
                     onValueChange={(v) => {
-                      if (v && finishedSet.has(v)) { setPendingFinished({ index: i, project: v }); return }
+                      const finished = !!v && finishedSet.has(v)
+                      const exceeded = !!v && exceededSet.has(v)
+                      if (finished || exceeded) { setProjectWarning({ index: i, project: v, finished, exceeded }); return }
                       update(i, { project: v })
                     }}
                   />
                 </td>
                 <td className="min-w-32.5 pr-3 align-top">
                   {isDep ? (
-                    <select aria-label="Departamento" value={l.department}
-                      onChange={(e) => update(i, { department: e.target.value })} className={field}>
-                      {departamentos.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-                    </select>
+                    departamentos.length === 0 ? (
+                      <select aria-label="Departamento" value="" disabled className={field}>
+                        <option value="">— Sin departamentos (contacta al admin) —</option>
+                      </select>
+                    ) : (
+                      <select aria-label="Departamento" value={l.department}
+                        onChange={(e) => update(i, { department: e.target.value })} className={field}>
+                        {departamentos.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                      </select>
+                    )
                   ) : (
                     <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/50">Clientes</span>
                   )}
@@ -228,23 +237,33 @@ export default function RegistroForm({ projects, finishedProjects, areas, etapas
         {saving ? 'Guardando…' : 'Guardar registro'}
       </Button>
 
-      <Dialog open={pendingFinished !== null} onOpenChange={(open) => { if (!open) setPendingFinished(null) }}>
+      <Dialog open={projectWarning !== null} onOpenChange={(open) => { if (!open) setProjectWarning(null) }}>
         <DialogContent showCloseButton={false} className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <TriangleAlert className="size-5 text-(--status-bajo)" />
-              Proyecto finalizado
+              {projectWarning?.finished && projectWarning?.exceeded
+                ? 'Proyecto finalizado y excedido'
+                : projectWarning?.exceeded
+                ? 'Banco de horas excedido'
+                : 'Proyecto finalizado'}
             </DialogTitle>
             <DialogDescription>
-              El proyecto <strong className="font-medium text-foreground">{pendingFinished?.project}</strong> está marcado como finalizado en el Excel. ¿Deseas registrar horas de todas formas?
+              El proyecto <strong className="font-medium text-foreground">{projectWarning?.project}</strong>{' '}
+              {projectWarning?.finished && projectWarning?.exceeded
+                ? 'está marcado como finalizado y el banco de horas de tu posición está excedido.'
+                : projectWarning?.exceeded
+                ? 'tiene el banco de horas de tu posición excedido.'
+                : 'está marcado como finalizado en el Excel.'}{' '}
+              ¿Deseas registrar horas de todas formas?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPendingFinished(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setProjectWarning(null)}>Cancelar</Button>
             <Button
               onClick={() => {
-                if (pendingFinished) update(pendingFinished.index, { project: pendingFinished.project })
-                setPendingFinished(null)
+                if (projectWarning) update(projectWarning.index, { project: projectWarning.project })
+                setProjectWarning(null)
               }}
             >
               Registrar de todas formas
