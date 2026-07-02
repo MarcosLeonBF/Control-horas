@@ -1,5 +1,5 @@
 'use client'
-import { Fragment, useState } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { actualizarUsuario, cambiarEstadoUsuario, type EdicionUsuario } from '@/app/(horas)/admin/usuarios/actions'
@@ -15,7 +15,20 @@ export interface UsuarioRow {
   role: 'operativo' | 'manager' | 'admin'; status: 'activo' | 'inactivo'; areaIds: string[]
 }
 
-const selectClass = 'w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
+const fieldSelect = 'h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
+
+function initials(name: string) {
+  return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '·'
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  )
+}
 
 function Editor({ u, areas, posiciones, onDone }: { u: UsuarioRow; areas: AreaRow[]; posiciones: PosicionOpt[]; onDone: () => void }) {
   const router = useRouter()
@@ -23,6 +36,7 @@ function Editor({ u, areas, posiciones, onDone }: { u: UsuarioRow; areas: AreaRo
     full_name: u.full_name, positionId: u.positionId ?? '', role: u.role, status: u.status, areaIds: u.areaIds,
   })
   const [saving, setSaving] = useState(false)
+  const selectableAreas = areas.filter((a) => !a.is_internal)
 
   async function save() {
     setSaving(true)
@@ -34,46 +48,70 @@ function Editor({ u, areas, posiciones, onDone }: { u: UsuarioRow; areas: AreaRo
   }
 
   return (
-    <div className="grid gap-3 rounded-lg border border-border bg-(--muted-surface) p-4 sm:grid-cols-2">
-      <label className="space-y-1 text-xs text-muted-foreground">Nombre
-        <Input aria-label="Editar nombre" value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} className="h-9" />
-      </label>
-      <label className="space-y-1 text-xs text-muted-foreground">Posición (banco de horas)
-        <select aria-label="Editar posición" value={f.positionId} onChange={(e) => setF({ ...f, positionId: e.target.value })} className={selectClass}>
-          <option value="">— Sin posición —</option>
-          {posiciones.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </label>
-      <label className="space-y-1 text-xs text-muted-foreground">Rol
-        <select aria-label="Editar rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as EdicionUsuario['role'] })} className={selectClass}>
-          <option value="operativo">operativo</option><option value="manager">manager</option><option value="admin">admin</option>
-        </select>
-      </label>
-      <label className="space-y-1 text-xs text-muted-foreground">Estado
-        <select aria-label="Editar estado" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as EdicionUsuario['status'] })} className={selectClass}>
-          <option value="activo">activo</option><option value="inactivo">inactivo</option>
-        </select>
-      </label>
-      <fieldset className="sm:col-span-2">
-        <legend className="text-xs text-muted-foreground">Áreas</legend>
-        {f.role === 'manager' && (
-          <p className="mb-1 text-xs text-foreground/55">
-            El manager gestiona estas áreas: verá los registros, bancos y reportes de los usuarios que las tengan asignadas.
-          </p>
-        )}
-        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-          {areas.filter((a) => !a.is_internal).map((a) => (
-            <label key={a.id} className="flex items-center gap-1.5 text-sm">
-              <input type="checkbox" checked={f.areaIds.includes(a.id)}
-                onChange={(e) => setF({ ...f, areaIds: e.target.checked ? [...f.areaIds, a.id] : f.areaIds.filter((x) => x !== a.id) })} />
-              {a.name}
-            </label>
-          ))}
+    <div className="rounded-xl border border-border bg-(--muted-surface) p-5 shadow-sm">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-(--brand)/10 text-xs font-semibold text-(--brand-strong)">
+          {initials(f.full_name || u.full_name)}
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold leading-tight">Editar usuario</p>
+          <p className="truncate text-xs text-muted-foreground">{u.email}</p>
         </div>
-      </fieldset>
-      <div className="flex gap-2 sm:col-span-2">
-        <Button onClick={save} disabled={saving} size="lg">{saving ? 'Guardando…' : 'Guardar'}</Button>
-        <Button onClick={onDone} variant="outline" size="lg">Cancelar</Button>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Nombre">
+          <Input aria-label="Editar nombre" value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} className="h-9" />
+        </Field>
+        <Field label="Posición (banco de horas)">
+          <select aria-label="Editar posición" value={f.positionId} onChange={(e) => setF({ ...f, positionId: e.target.value })} className={fieldSelect}>
+            <option value="">— Sin posición —</option>
+            {posiciones.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Rol">
+          <select aria-label="Editar rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as EdicionUsuario['role'] })} className={fieldSelect}>
+            <option value="operativo">Operativo</option>
+            <option value="manager">Manager</option>
+            <option value="admin">Admin</option>
+          </select>
+        </Field>
+        <Field label="Estado">
+          <select aria-label="Editar estado" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as EdicionUsuario['status'] })} className={fieldSelect}>
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo</option>
+          </select>
+        </Field>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-border bg-card p-4">
+        <div className="flex items-center gap-2">
+          <span className="size-2 shrink-0 rounded-full bg-(--brand)" />
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Áreas</h4>
+        </div>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {f.role === 'manager'
+            ? 'El manager gestiona estas áreas: verá los registros, bancos y reportes de los usuarios que las tengan asignadas.'
+            : 'Áreas asignadas al usuario.'}
+        </p>
+        {selectableAreas.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">No hay áreas en el catálogo.</p>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+            {selectableAreas.map((a) => (
+              <label key={a.id} className="flex cursor-pointer items-center gap-2 text-sm text-foreground/80 hover:text-foreground">
+                <input type="checkbox" className="size-4 accent-(--brand)" checked={f.areaIds.includes(a.id)}
+                  onChange={(e) => setF({ ...f, areaIds: e.target.checked ? [...f.areaIds, a.id] : f.areaIds.filter((x) => x !== a.id) })} />
+                {a.name}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-5 flex gap-2">
+        <Button onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</Button>
+        <Button onClick={onDone} variant="outline">Cancelar</Button>
       </div>
     </div>
   )
