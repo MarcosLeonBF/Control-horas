@@ -59,9 +59,12 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
             next.department = defaultDep
           }
           checkEtapaForDep = true
-        } else { 
+        } else {
           next.department = defaultDep
-          if (next.area_id === internalAreaId) next.area_id = areas[0]?.id ?? '' 
+          if (next.area_id === internalAreaId) next.area_id = areas[0]?.id ?? ''
+          // Al salir de "Departamento", limpiar la etapa si no es válida para proyecto
+          // cliente (las etapas de departamento no aplican en proyectos generales).
+          if (next.etapa_id && !clientEtapas.some((e) => e.id === next.etapa_id)) next.etapa_id = ''
         }
       }
 
