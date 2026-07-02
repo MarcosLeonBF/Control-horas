@@ -41,6 +41,9 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
   }, {})
   const dates = Object.keys(byDate).sort()
   const isDepartamento = (p: string) => p === 'Departamento'
+  // La columna Departamento solo aplica al proyecto interno "Departamento":
+  // se muestra únicamente si alguna línea lo usa.
+  const showDepartamento = lines.some((l) => isDepartamento(l.project))
 
   function update(i: number, patch: Partial<LineInput>) {
     setLines((prev) => prev.map((l, idx) => {
@@ -112,7 +115,7 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
             <tr className="text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <th className="pb-1 pr-3 font-medium">Fecha</th>
               <th className="pb-1 pr-3 font-medium">Proyecto</th>
-              <th className="pb-1 pr-3 font-medium">Departamento</th>
+              {showDepartamento && <th className="pb-1 pr-3 font-medium">Departamento</th>}
               <th className="pb-1 pr-3 font-medium">Etapa</th>
               <th className="pb-1 pr-3 font-medium">Horas</th>
               <th className="pb-1 pr-3 font-medium">Descripción</th>
@@ -159,22 +162,24 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
                     }}
                   />
                 </td>
-                <td className="min-w-32.5 pr-3 align-top">
-                  {isDep ? (
-                    departamentos.length === 0 ? (
-                      <select aria-label="Departamento" value="" disabled className={field}>
-                        <option value="">— Sin departamentos (contacta al admin) —</option>
-                      </select>
+                {showDepartamento && (
+                  <td className="min-w-32.5 pr-3 align-top">
+                    {isDep ? (
+                      departamentos.length === 0 ? (
+                        <select aria-label="Departamento" value="" disabled className={field}>
+                          <option value="">— Sin departamentos (contacta al admin) —</option>
+                        </select>
+                      ) : (
+                        <select aria-label="Departamento" value={l.department}
+                          onChange={(e) => update(i, { department: e.target.value })} className={field}>
+                          {departamentos.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                        </select>
+                      )
                     ) : (
-                      <select aria-label="Departamento" value={l.department}
-                        onChange={(e) => update(i, { department: e.target.value })} className={field}>
-                        {departamentos.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-                      </select>
-                    )
-                  ) : (
-                    <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/50">Clientes</span>
-                  )}
-                </td>
+                      <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/40">—</span>
+                    )}
+                  </td>
+                )}
                 <td className="min-w-35 pr-3 align-top">
                   {isDep ? (
                     <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/50">
