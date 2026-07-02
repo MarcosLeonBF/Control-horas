@@ -179,15 +179,21 @@ export default function AppShell({ displayName, role, children }: { displayName:
 
       {/* Contenido */}
       <div className={cn('relative min-h-screen transition-[padding] duration-300 ease-out', collapsed ? 'lg:pl-[76px]' : 'lg:pl-64')}>
-        {/* Fondo decorativo: textura de puntos + glows + formas geométricas sutiles (profundidad) */}
+        {/* Fondo decorativo: mismo sistema que el login (glow + anillos concéntricos + grano). */}
         <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(rgba(189,8,66,0.05) 1px, transparent 1.4px)', backgroundSize: '26px 26px' }} />
-          <div className="absolute -right-48 -top-40 size-[34rem] rounded-full bg-(--brand)/[0.05] blur-3xl" />
-          <div className="absolute -bottom-56 -left-24 size-[36rem] rounded-full bg-(--brand)/[0.04] blur-3xl" />
-          <div className="absolute right-[8%] top-24 size-72 rounded-full border border-(--brand)/[0.07]" />
-          <div className="absolute right-[3%] top-52 size-44 rounded-full border border-(--brand)/[0.05]" />
-          <div className="absolute left-[6%] top-1/2 size-24 rotate-12 rounded-3xl border border-(--brand)/[0.06]" />
-          <div className="absolute bottom-28 left-1/3 size-3 rotate-45 bg-(--brand)/[0.12]" />
+          {/* Glow de marca */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_-8%,rgba(189,8,66,0.06),transparent_44%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_-8%_108%,rgba(189,8,66,0.04),transparent_48%)]" />
+          {/* Anillos concéntricos finos sangrando por las esquinas (motivo del login) */}
+          <div className="absolute -right-44 -top-52 size-168 rounded-full border border-(--brand)/7" />
+          <div className="absolute -right-28 -top-40 size-168 rounded-full border border-(--brand)/5" />
+          <div className="absolute -bottom-56 -left-48 size-176 rounded-full border border-(--brand)/6" />
+          <div className="absolute -bottom-40 -left-32 size-176 rounded-full border border-(--brand)/4" />
+          {/* Grano sutil */}
+          <svg className="absolute inset-0 size-full opacity-[0.025] mix-blend-multiply">
+            <filter id="app-grain"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" stitchTiles="stitch" /></filter>
+            <rect width="100%" height="100%" filter="url(#app-grain)" />
+          </svg>
         </div>
         <main className="relative z-10 mx-auto max-w-6xl px-5 py-8 sm:px-8">{children}</main>
       </div>
