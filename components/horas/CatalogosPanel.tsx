@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ChevronRight } from 'lucide-react'
@@ -9,14 +9,14 @@ import { Badge } from '@/components/ui/badge'
 import {
   crearArea, renombrarArea, toggleArea, eliminarArea,
   crearEtapa, renombrarEtapa, toggleEtapa, eliminarEtapa,
-  crearDescripcion, renombrarDescripcion, toggleDescripcion, eliminarDescripcion,
-  crearDepartamento, renombrarDepartamento, toggleDepartamento, eliminarDepartamento, setDepartamentoEtapasNombres,
-  crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas, setPosicionEtapas, setPosicionDescripciones, setPosicionDepartamentos,
+  crearDepartamento, renombrarDepartamento, toggleDepartamento, eliminarDepartamento,
+  setDepartamentoEtapasNombres, setDepartamentoDescripcionesNombres,
+  crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas, setPosicionEtapas, setPosicionDepartamentos,
 } from '@/app/(horas)/admin/catalogos/actions'
 import type { DepartamentoRow } from '@/lib/horas/types'
 
 export interface CatalogoRow { id: string; name: string; active: boolean; is_internal?: boolean }
-export interface PosicionRow { id: string; name: string; active: boolean; areaIds: string[]; etapaIds: string[]; descripcionIds: string[]; departamentoIds: string[] }
+export interface PosicionRow { id: string; name: string; active: boolean; areaIds: string[]; etapaIds: string[]; departamentoIds: string[] }
 
 type Result = { ok: true } | { ok: false; error: string }
 interface Ops {
@@ -103,13 +103,51 @@ function Seccion({ title, rows, ops, addPlaceholder }: { title: string; rows: Ca
   )
 }
 
-function PosicionesSection({ posiciones, areas, etapas, descripciones, departamentos, departmentEtapaIds }: { posiciones: PosicionRow[]; areas: CatalogoRow[]; etapas: CatalogoRow[]; descripciones: CatalogoRow[]; departamentos: DepartamentoRow[]; departmentEtapaIds: Set<string> }) {
+// Tarjeta de edición por chips ("escribe y Enter"), reutilizada por Etapas y Descripciones
+// dentro del acordeón de un departamento. Mantiene el lenguaje visual de las tarjetas de Posiciones.
+function ChipCard({ dot, title, hint, chips, setChips, value, setValue, onSave, busy, emptyLabel }: {
+  dot: ReactNode; title: string; hint: string
+  chips: string[]; setChips: Dispatch<SetStateAction<string[]>>
+  value: string; setValue: (v: string) => void; onSave: () => void; busy: boolean; emptyLabel: string
+}) {
+  function addChip() {
+    const v = value.trim()
+    if (v && !chips.some((n) => n.toLowerCase() === v.toLowerCase())) setChips((prev) => [...prev, v])
+    setValue('')
+  }
+  return (
+    <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {dot}
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">{title}</h4>
+      </div>
+      <p className="mt-1 mb-3 text-xs text-muted-foreground">{hint}</p>
+      <div className="flex flex-wrap gap-2">
+        {chips.length === 0 && <span className="text-sm text-muted-foreground">{emptyLabel}</span>}
+        {chips.map((name) => (
+          <Badge key={name} variant="secondary" className="gap-1 pr-1.5 text-sm font-normal">
+            {name}
+            <button onClick={() => setChips((prev) => prev.filter((n) => n !== name))}
+              className="p-0.5 text-muted-foreground hover:text-foreground" aria-label={`Quitar ${name}`}>
+              <span className="block text-[10px] leading-none">✕</span>
+            </button>
+          </Badge>
+        ))}
+      </div>
+      <Input value={value} onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addChip() } }}
+        placeholder="Escribe y presiona Enter…" className="mt-3 h-9 max-w-sm bg-background text-sm" />
+      <Button size="sm" className="mt-4" onClick={onSave} disabled={busy}>Guardar</Button>
+    </div>
+  )
+}
+
+function PosicionesSection({ posiciones, areas, etapas, departamentos, departmentEtapaIds }: { posiciones: PosicionRow[]; areas: CatalogoRow[]; etapas: CatalogoRow[]; departamentos: DepartamentoRow[]; departmentEtapaIds: Set<string> }) {
   const { busy, run } = useRun()
   const selectableAreas = areas.filter((a) => !a.is_internal)
   // Etapas asignables a una posición = generales (activas). Se excluyen las etapas
   // de departamento, que son exclusivas del proyecto "Departamento".
   const selectableEtapas = etapas.filter((e) => e.active && !departmentEtapaIds.has(e.id))
-  const selectableDescripciones = descripciones.filter((d) => d.active)
   const selectableDepartamentos = departamentos.filter((d) => d.active)
   const [nuevo, setNuevo] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -117,12 +155,11 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [areaSel, setAreaSel] = useState<string[]>([])
   const [etapaSel, setEtapaSel] = useState<string[]>([])
-  const [descripcionSel, setDescripcionSel] = useState<string[]>([])
   const [departamentoSel, setDepartamentoSel] = useState<string[]>([])
 
   function toggleExpand(p: PosicionRow) {
     if (expandedId === p.id) { setExpandedId(null); return }
-    setExpandedId(p.id); setAreaSel(p.areaIds); setEtapaSel(p.etapaIds); setDescripcionSel(p.descripcionIds); setDepartamentoSel(p.departamentoIds)
+    setExpandedId(p.id); setAreaSel(p.areaIds); setEtapaSel(p.etapaIds); setDepartamentoSel(p.departamentoIds)
   }
 
   async function add() {
@@ -137,9 +174,6 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
   }
   async function saveEtapas(id: string) {
     await run(setPosicionEtapas(id, etapaSel), 'Etapas actualizadas')
-  }
-  async function saveDescripciones(id: string) {
-    await run(setPosicionDescripciones(id, descripcionSel), 'Descripciones actualizadas')
   }
   async function saveDepartamentos(id: string) {
     await run(setPosicionDepartamentos(id, departamentoSel), 'Departamentos actualizados')
@@ -184,10 +218,6 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
                         ? <span className="text-foreground/40">Sin etapas</span>
                         : <>{p.etapaIds.length} {p.etapaIds.length === 1 ? 'etapa' : 'etapas'}</>}
                       <span className="px-1 text-foreground/25">·</span>
-                      {p.descripcionIds.length === 0
-                        ? <span className="text-foreground/40">Sin descripciones</span>
-                        : <>{p.descripcionIds.length} {p.descripcionIds.length === 1 ? 'descripción' : 'descripciones'}</>}
-                      <span className="px-1 text-foreground/25">·</span>
                       {p.departamentoIds.length === 0
                         ? <span className="text-foreground/40">Sin departamentos</span>
                         : <>{p.departamentoIds.length} {p.departamentoIds.length === 1 ? 'departamento' : 'departamentos'}</>}
@@ -209,7 +239,7 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
             </div>
 
             {expandedId === p.id && (
-              <div className="mt-2 mb-1 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-2 mb-1 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="size-2 shrink-0 rounded-full bg-(--brand)" />
@@ -252,28 +282,6 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
 
                 <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="h-0.5 w-2.5 shrink-0 rounded-full bg-foreground/40" />
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Descripciones</h4>
-                  </div>
-                  <p className="mt-1 mb-3 text-xs text-muted-foreground">Opciones del desplegable de descripción al registrar.</p>
-                  {selectableDescripciones.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No hay descripciones en el catálogo.</p>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {selectableDescripciones.map((d) => (
-                        <label key={d.id} className="flex cursor-pointer items-start gap-2.5 text-sm text-foreground/80 hover:text-foreground">
-                          <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-(--brand)" checked={descripcionSel.includes(d.id)}
-                            onChange={(ev) => setDescripcionSel((prev) => ev.target.checked ? [...prev, d.id] : prev.filter((x) => x !== d.id))} />
-                          {d.name}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  <Button size="sm" className="mt-4" onClick={() => saveDescripciones(p.id)} disabled={busy}>Guardar descripciones</Button>
-                </div>
-
-                <div className="rounded-xl border border-border bg-(--muted-surface) p-4">
-                  <div className="flex flex-wrap items-center gap-2">
                     <span className="size-2 shrink-0 rounded-full border border-foreground/45" />
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Departamentos</h4>
                   </div>
@@ -304,14 +312,24 @@ function PosicionesSection({ posiciones, areas, etapas, descripciones, departame
 
 function DepartamentosSection({ departamentos, etapas }: { departamentos: DepartamentoRow[]; etapas: CatalogoRow[] }) {
   const { busy, run } = useRun()
-  const activeEtapas = etapas.filter((e) => e.active)
   const etapaName = (id: string) => etapas.find((e) => e.id === id)?.name ?? ''
   const [nuevo, setNuevo] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
-  const [etapasFor, setEtapasFor] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [etapaSel, setEtapaSel] = useState<string[]>([])
-  const [newEtapaName, setNewEtapaName] = useState('')
+  const [newEtapa, setNewEtapa] = useState('')
+  const [descSel, setDescSel] = useState<string[]>([])
+  const [newDesc, setNewDesc] = useState('')
+
+  function toggleExpand(d: DepartamentoRow) {
+    if (expandedId === d.id) { setExpandedId(null); return }
+    setExpandedId(d.id)
+    setEtapaSel(d.etapaIds.map((id) => etapaName(id)).filter(Boolean))
+    setNewEtapa('')
+    setDescSel(d.descripciones)
+    setNewDesc('')
+  }
 
   async function add() {
     if (!nuevo.trim()) return
@@ -321,19 +339,22 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
     if (await run(renombrarDepartamento(id, editVal), 'Renombrado')) setEditingId(null)
   }
   async function saveEtapas(id: string) {
-    // Incluye lo que el usuario haya tecleado aunque no haya pulsado Enter.
-    const pending = newEtapaName.trim()
-    const names = pending && !etapaSel.some((n) => n.toLowerCase() === pending.toLowerCase())
-      ? [...etapaSel, pending]
-      : etapaSel
-    if (await run(setDepartamentoEtapasNombres(id, names), 'Etapas actualizadas')) {
-      setEtapasFor(null); setNewEtapaName('')
-    }
+    const pending = newEtapa.trim()
+    const names = pending && !etapaSel.some((n) => n.toLowerCase() === pending.toLowerCase()) ? [...etapaSel, pending] : etapaSel
+    if (await run(setDepartamentoEtapasNombres(id, names), 'Etapas actualizadas')) setNewEtapa('')
+  }
+  async function saveDescripciones(id: string) {
+    const pending = newDesc.trim()
+    const names = pending && !descSel.some((n) => n.toLowerCase() === pending.toLowerCase()) ? [...descSel, pending] : descSel
+    if (await run(setDepartamentoDescripcionesNombres(id, names), 'Descripciones actualizadas')) setNewDesc('')
   }
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="font-display text-lg font-semibold">Departamentos</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Solo aplican al proyecto interno &quot;Departamento&quot;. Abre cada uno para definir sus etapas y las descripciones que se podrán elegir al registrar en ese departamento.
+      </p>
 
       <div className="mt-4 flex gap-2">
         <Input value={nuevo} onChange={(e) => setNuevo(e.target.value)} placeholder="Nuevo departamento…"
@@ -343,7 +364,7 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
 
       <ul className="mt-4 divide-y divide-border">
         {departamentos.map((d) => (
-          <li key={d.id} className="py-2.5">
+          <li key={d.id} className="py-1.5">
             <div className="flex flex-wrap items-center gap-2">
               {editingId === d.id ? (
                 <>
@@ -354,18 +375,21 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
                 </>
               ) : (
                 <>
-                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => toggleExpand(d)} aria-expanded={expandedId === d.id}
+                    className="group flex flex-1 items-center gap-2 rounded-md py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <ChevronRight className={`size-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:text-foreground ${expandedId === d.id ? 'rotate-90' : ''}`} />
                     <span className={`text-sm font-medium ${d.active ? '' : 'text-muted-foreground line-through'}`}>{d.name}</span>
-                    {d.etapaIds.length === 0
-                      ? <Badge variant="outline" className="text-muted-foreground">sin etapas</Badge>
-                      : d.etapaIds.map((id) => <Badge key={id} variant="secondary">{etapaName(id)}</Badge>)}
-                    {!d.active && <Badge variant="outline">inactivo</Badge>}
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => { 
-                    setEtapasFor(etapasFor === d.id ? null : d.id); 
-                    setEtapaSel(d.etapaIds.map(id => etapaName(id)).filter(Boolean));
-                    setNewEtapaName('');
-                  }}>Etapas</Button>
+                    <span className="text-xs text-muted-foreground">
+                      {d.etapaIds.length === 0
+                        ? <span className="text-foreground/40">Sin etapas</span>
+                        : <>{d.etapaIds.length} {d.etapaIds.length === 1 ? 'etapa' : 'etapas'}</>}
+                      <span className="px-1 text-foreground/25">·</span>
+                      {d.descripciones.length === 0
+                        ? <span className="text-foreground/40">Sin descripciones</span>
+                        : <>{d.descripciones.length} {d.descripciones.length === 1 ? 'descripción' : 'descripciones'}</>}
+                    </span>
+                    {!d.active && <Badge variant="outline" className="text-muted-foreground">inactivo</Badge>}
+                  </button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditingId(d.id); setEditVal(d.name) }}>Renombrar</Button>
                   <Button size="sm" variant="ghost" disabled={busy}
                     onClick={() => run(toggleDepartamento(d.id, !d.active), d.active ? 'Desactivado' : 'Activado')}>
@@ -380,39 +404,18 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
               )}
             </div>
 
-            {etapasFor === d.id && (
-              <div className="mt-3 rounded-lg border border-border bg-(--muted-surface) p-3">
-                <p className="mb-2 text-xs text-muted-foreground">Etapas de este departamento</p>
-                <div className="flex flex-wrap gap-2">
-                  {etapaSel.map((name) => (
-                    <Badge key={name} variant="secondary" className="gap-1 pr-1.5 text-sm font-normal">
-                      {name}
-                      <button onClick={() => setEtapaSel(prev => prev.filter(n => n !== name))} className="text-muted-foreground hover:text-foreground p-0.5" aria-label="Quitar etapa">
-                        <span className="text-[10px] leading-none block">✕</span>
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                <Input 
-                  value={newEtapaName} 
-                  onChange={e => setNewEtapaName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      const val = newEtapaName.trim();
-                      if (val && !etapaSel.some(n => n.toLowerCase() === val.toLowerCase())) {
-                        setEtapaSel(prev => [...prev, val]);
-                      }
-                      setNewEtapaName('');
-                    }
-                  }}
-                  placeholder="Escribe una etapa y presiona Enter..."
-                  className="mt-3 text-sm h-9 bg-background max-w-sm"
-                />
-                <div className="mt-4 flex gap-2">
-                  <Button size="sm" onClick={() => saveEtapas(d.id)} disabled={busy}>Guardar etapas</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEtapasFor(null)}>Cancelar</Button>
-                </div>
+            {expandedId === d.id && (
+              <div className="mt-2 mb-1 grid gap-3 sm:grid-cols-2">
+                <ChipCard
+                  dot={<span className="size-2 shrink-0 rounded-[3px] bg-foreground/40" />}
+                  title="Etapas" hint="Etapas de este departamento (se derivan al registrar en Departamento)."
+                  chips={etapaSel} setChips={setEtapaSel} value={newEtapa} setValue={setNewEtapa}
+                  onSave={() => saveEtapas(d.id)} busy={busy} emptyLabel="Ninguna etapa todavía." />
+                <ChipCard
+                  dot={<span className="h-0.5 w-2.5 shrink-0 rounded-full bg-foreground/40" />}
+                  title="Descripciones" hint="Opciones del desplegable de descripción al registrar en este departamento."
+                  chips={descSel} setChips={setDescSel} value={newDesc} setValue={setNewDesc}
+                  onSave={() => saveDescripciones(d.id)} busy={busy} emptyLabel="Ninguna descripción todavía." />
               </div>
             )}
           </li>
@@ -422,24 +425,23 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
   )
 }
 
-export default function CatalogosPanel({ areas, etapas, descripciones, departamentos, posiciones }: {
-  areas: CatalogoRow[]; etapas: CatalogoRow[]; descripciones: CatalogoRow[]; departamentos: DepartamentoRow[]; posiciones: PosicionRow[]
+export default function CatalogosPanel({ areas, etapas, departamentos, posiciones }: {
+  areas: CatalogoRow[]; etapas: CatalogoRow[]; departamentos: DepartamentoRow[]; posiciones: PosicionRow[]
 }) {
   // Etapas ligadas a un departamento: exclusivas del proyecto "Departamento", no
   // asignables a posiciones (las de posición son las etapas generales).
   const departmentEtapaIds = new Set(departamentos.flatMap((d) => d.etapaIds))
   return (
     <div className="space-y-6">
-      <PosicionesSection posiciones={posiciones} areas={areas} etapas={etapas} descripciones={descripciones} departamentos={departamentos} departmentEtapaIds={departmentEtapaIds} />
+      <PosicionesSection posiciones={posiciones} areas={areas} etapas={etapas} departamentos={departamentos} departmentEtapaIds={departmentEtapaIds} />
+
+      <DepartamentosSection departamentos={departamentos} etapas={etapas} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Seccion title="Áreas" rows={areas} addPlaceholder="Nueva área…"
           ops={{ crear: crearArea, renombrar: renombrarArea, toggle: toggleArea, eliminar: eliminarArea }} />
         <Seccion title="Etapas" rows={etapas} addPlaceholder="Nueva etapa…"
           ops={{ crear: crearEtapa, renombrar: renombrarEtapa, toggle: toggleEtapa, eliminar: eliminarEtapa }} />
-        <Seccion title="Descripciones" rows={descripciones} addPlaceholder="Nueva descripción…"
-          ops={{ crear: crearDescripcion, renombrar: renombrarDescripcion, toggle: toggleDescripcion, eliminar: eliminarDescripcion }} />
-        <DepartamentosSection departamentos={departamentos} etapas={etapas} />
       </div>
     </div>
   )

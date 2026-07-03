@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { guardarRegistro, type LineInput } from '@/app/(horas)/registrar/actions'
 import { formatHoras } from '@/lib/horas/format'
-import type { AreaRow, EtapaRow, DescripcionRow, DepartamentoRow } from '@/lib/horas/types'
+import type { AreaRow, EtapaRow, DepartamentoRow } from '@/lib/horas/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -29,8 +29,8 @@ function MobileField({ label, children }: { label: string; children: ReactNode }
   )
 }
 
-export default function RegistroForm({ projects, finishedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial }: {
-  projects: string[]; finishedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: DescripcionRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
+export default function RegistroForm({ projects, finishedProjects, exceededProjects, areas, etapas, clientEtapas, departamentos, internalAreaId, canBackdate = false, initial }: {
+  projects: string[]; finishedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
   canBackdate?: boolean // admin: puede registrar fuera del rango de 7 días (PDF §4)
   initial?: { id: string; lines: LineInput[] }
 }) {
@@ -95,6 +95,13 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
         }
       }
 
+      // Descripción: en "Departamento" debe ser del departamento; si cambió el proyecto o
+      // el departamento y la actual ya no aplica, se limpia. Fuera de Departamento es libre.
+      if ((patch.project !== undefined || patch.department !== undefined) && isDepartamento(next.project)) {
+        const deptDescs = departamentos.find((dd) => dd.name === next.department)?.descripciones ?? []
+        if (next.description && !deptDescs.includes(next.description)) next.description = ''
+      }
+
       return next
     }))
   }
@@ -121,9 +128,8 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
     const lineClientEtapas = l.etapa_id && !clientEtapas.some((e) => e.id === l.etapa_id)
       ? [...clientEtapas, ...etapas.filter((e) => e.id === l.etapa_id)]
       : clientEtapas
-    const lineDescripciones = l.description && !descripciones.some((d) => d.name === l.description)
-      ? [...descripciones, { id: `__cur_${i}`, name: l.description }]
-      : descripciones
+    // Descripción: en "Departamento" son las del departamento elegido; en el resto, texto libre.
+    const deptDescripciones = isDep ? (departamentos.find((d) => d.name === l.department)?.descripciones ?? []) : []
 
     const fecha = (
       <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : daysAgo(7)}
@@ -157,13 +163,20 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
       <Input aria-label="Horas" type="number" step="0.5" min="0" value={l.hours || ''}
         onChange={(e) => update(i, { hours: Number(e.target.value) })} />
     )
-    const desc = lineDescripciones.length === 0 ? (
-      <select aria-label="Descripción" value="" disabled className={field}><option value="">— Sin descripciones (contacta al admin) —</option></select>
+    // En "Departamento": desplegable con las descripciones del departamento. En el resto:
+    // input de texto libre (obligatorio; el motor exige no vacía).
+    const desc = isDep ? (
+      deptDescripciones.length === 0 ? (
+        <select aria-label="Descripción" value="" disabled className={field}><option value="">— Sin descripciones (contacta al admin) —</option></select>
+      ) : (
+        <select aria-label="Descripción" value={l.description} onChange={(e) => update(i, { description: e.target.value })} className={field}>
+          <option value="">— Descripción —</option>
+          {deptDescripciones.map((name) => <option key={name} value={name}>{name}</option>)}
+        </select>
+      )
     ) : (
-      <select aria-label="Descripción" value={l.description} onChange={(e) => update(i, { description: e.target.value })} className={field}>
-        <option value="">— Descripción —</option>
-        {lineDescripciones.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-      </select>
+      <input aria-label="Descripción" type="text" value={l.description}
+        onChange={(e) => update(i, { description: e.target.value })} placeholder="Descripción…" className={field} />
     )
     const emptyPlaceholder = <span className="flex h-9 items-center px-2.5 text-sm text-muted-foreground/40">—</span>
     return { isDep, fecha, proyecto, depto, etapa, horas, desc, emptyPlaceholder }
