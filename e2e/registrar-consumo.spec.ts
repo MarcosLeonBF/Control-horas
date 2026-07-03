@@ -12,10 +12,10 @@ test('registrar un consumo descuenta el saldo y aparece en el historial', async 
   await page.getByRole('button', { name: /guardar/i }).click()
 
   // saldo restante 500 - 120 = 380
-  await expect(page.locator('.tabular-money').filter({ hasText: '380,00' }).first()).toBeVisible()
+  await expect(page.locator('.tabular-money').filter({ hasText: '380 €' }).first()).toBeVisible()
   // historial muestra el consumo
   await expect(page.getByText('Compra recurso E2E')).toBeVisible()
-  await expect(page.getByText('120,00').first()).toBeVisible()
+  await expect(page.getByText('120 €').first()).toBeVisible()
 })
 
 test('validación: importe vacío no envía', async ({ page }) => {

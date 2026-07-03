@@ -7,7 +7,7 @@ test('el detalle muestra el saldo y el historial', async ({ page }) => {
   await page.goto(`/presupuestos/${fixture.projectAssignedId}`)
   await expect(page.getByRole('heading', { name: /Cliente E2E Asignado/ })).toBeVisible()
   await expect(page.getByText('Restante')).toBeVisible()
-  await expect(page.locator('.tabular-money').first()).toContainText('500,00')
+  await expect(page.locator('.tabular-money').first()).toContainText('500 €')
   // el historial muestra la carga inicial (ampliacion)
   await expect(page.getByText('Carga inicial E2E')).toBeVisible()
 })

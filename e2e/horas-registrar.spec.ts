@@ -14,7 +14,7 @@ test('registrar dos líneas guarda el día con su total', async ({ page }) => {
   await page.getByLabel('Horas').nth(1).fill('1.5')
   await page.getByLabel('Descripción').nth(1).fill('Trabajo E2E 2')
 
-  await expect(page.getByText(/total del día/i)).toContainText('3.5h')
+  await expect(page.getByText(/total del día/i)).toContainText('3,5h')
   await page.getByRole('button', { name: /guardar registro/i }).click()
   await expect(page).toHaveURL(/\/mis-registros/)
 })
