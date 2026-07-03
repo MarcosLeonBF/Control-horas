@@ -5,7 +5,7 @@
 > - Diseño: [`specs/2026-06-23-hucha-presupuestos-design.md`](specs/2026-06-23-hucha-presupuestos-design.md)
 > - Plan de implementación 1: [`plans/2026-06-23-plan1-fundacion-datos-ledger.md`](plans/2026-06-23-plan1-fundacion-datos-ledger.md)
 
-**Última actualización:** 2026-07-03 (Horas · descripción libre en proyectos normales + lista GENERAL de descripciones para "Departamento" — aplicado a prod)
+**Última actualización:** 2026-07-03 (Horas · área al registrar por POSICIÓN + user_areas = visibilidad del manager — aplicado a prod)
 
 ---
 
@@ -212,8 +212,16 @@ El usuario pidió que las descripciones del proyecto "Departamento" sean **una l
 - **Registro:** el desplegable de "Departamento" muestra la **lista general** de descripciones activas (igual para todos los departamentos).
 - **Estado prod:** migración **0027 aplicada** (última). Test SQL `horas_rpc_descripcion_general` en verde; el obsoleto `horas_rpc_descripcion_departamento` se eliminó; `guardar`/`campos` siembran una descripción **general** (sin enlace a departamento). Ya hay 3 descripciones activas cargadas → el desplegable de "Departamento" tiene opciones.
 
+#### Ajuste (2026-07-03): el área al registrar sale de la POSICIÓN, no de user_areas
+Aclaración de modelo del usuario: **la posición define las áreas a las que se pertenece**; **user_areas** pasa a ser solo "las áreas que un **manager** puede ver" (su visibilidad en Equipo/Reportes, ya existente desde 0018). Cambios:
+- **Motor (`guardar_registro`, migración `0028`):** el área de cada línea de proyecto cliente debe estar en las **áreas de la posición** del dueño (`position_areas`), para **todos los roles**. Ya no se valida contra `user_areas`. Etapa/departamento/descripción sin cambios.
+- **Registro (`getMyPositionAreas`):** las áreas seleccionables salen de la posición del usuario (antes `getMyAreas`/user_areas).
+- **Form de usuario:** la sección ÁREAS ("áreas que puede ver") se muestra solo para **manager y admin**; el **operativo** no la edita (las hereda de su posición). Guard en servidor: al crear/editar un operativo se ignoran/limpian sus `user_areas`.
+- **Efecto:** resuelve el lock-out del admin (ya no necesita user_areas para registrar; registra por su posición).
+- **Estado prod:** migración **0028 aplicada** (última). Test SQL nuevo `horas_rpc_area_por_posicion` en verde; `guardar`/`campos` actualizados para elegir el operativo por `position_areas` y validar el área por posición.
+
 ### Próximo
-- §17.6 (manager ve solo su equipo/área), descarga de movimientos de banco de horas, y la activación del webhook de Slack (lado del usuario). ⏳ Por planificar.
+- §17.6 (manager ve solo su equipo/área) — el modelo de visibilidad (`user_areas` del manager) ya está listo para afinarlo, descarga de movimientos de banco de horas, y la activación del webhook de Slack (lado del usuario). ⏳ Por planificar.
 
 ---
 

@@ -22,19 +22,19 @@ declare
   ok            bool;
   n             int;
 begin
-  -- Operativo con área CRM, sin SEO (para el caso "área no asignada"), y cuya posición
-  -- tenga la etapa 'Setup'.
+  -- Operativo cuya POSICIÓN tenga el área CRM, no SEO (para el caso "área fuera de la
+  -- posición") y la etapa 'Setup'. El área al registrar sale de la posición (0028).
   select p.id into v_op
   from public.profiles p
-  join public.user_areas ua on ua.user_id = p.id
-  join public.areas a on a.id = ua.area_id and a.name = 'CRM'
+  join public.position_areas pa on pa.position_id = p.position_id
+  join public.areas a on a.id = pa.area_id and a.name = 'CRM'
   where p.role = 'operativo' and p.status = 'activo'
-    and not exists (select 1 from public.user_areas u2 join public.areas a2 on a2.id = u2.area_id
-                    where u2.user_id = p.id and a2.name = 'SEO')
+    and not exists (select 1 from public.position_areas pa2 join public.areas a2 on a2.id = pa2.area_id
+                    where pa2.position_id = p.position_id and a2.name = 'SEO')
     and exists (select 1 from public.position_etapas pe join public.etapas e on e.id = pe.etapa_id
                 where pe.position_id = p.position_id and e.name = 'Setup')
   limit 1;
-  if v_op is null then raise notice 'SKIP: no hay operativo con CRM/Setup configurado'; return; end if;
+  if v_op is null then raise notice 'SKIP: no hay operativo con posición CRM/Setup configurada'; return; end if;
   select id into v_area from public.areas where name='CRM';
   select id into v_seo  from public.areas where name='SEO';
   select id into v_intern from public.areas where is_internal = true;
