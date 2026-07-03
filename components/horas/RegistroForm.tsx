@@ -30,16 +30,17 @@ function MobileField({ label, children }: { label: string; children: ReactNode }
   )
 }
 
-export default function RegistroForm({ projects, finishedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial }: {
-  projects: string[]; finishedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: string[]; departamentos: DepartamentoRow[]; internalAreaId: string
+export default function RegistroForm({ projects, finishedProjects, pausedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial }: {
+  projects: string[]; finishedProjects: string[]; pausedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: string[]; departamentos: DepartamentoRow[]; internalAreaId: string
   canBackdate?: boolean // admin: puede registrar fuera del rango de 7 días (PDF §4)
   initial?: { id: string; lines: LineInput[] }
 }) {
   const router = useRouter()
   const finishedSet = new Set(finishedProjects)
+  const pausedSet = new Set(pausedProjects)
   const exceededSet = new Set(exceededProjects)
-  // Confirmación al elegir un proyecto finalizado y/o con el banco excedido.
-  const [projectWarning, setProjectWarning] = useState<{ index: number; project: string; finished: boolean; exceeded: boolean } | null>(null)
+  // Confirmación al elegir un proyecto finalizado, pausado y/o con el banco excedido.
+  const [projectWarning, setProjectWarning] = useState<{ index: number; project: string; finished: boolean; paused: boolean; exceeded: boolean } | null>(null)
   // Fecha por defecto: la heredan las líneas nuevas y las que aún la seguían.
   const [defaultDate, setDefaultDate] = useState(initial?.lines[0]?.entry_date ?? today())
   const defaultDep = departamentos[0]?.name ?? 'Clientes'
@@ -138,11 +139,12 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
     )
     const proyecto = (
       <ProjectCombobox ariaLabel="Proyecto" value={l.project} projects={projects}
-        finishedProjects={finishedSet} exceededProjects={exceededSet}
+        finishedProjects={finishedSet} pausedProjects={pausedSet} exceededProjects={exceededSet}
         onValueChange={(v) => {
           const finished = !!v && finishedSet.has(v)
+          const paused = !!v && pausedSet.has(v)
           const exceeded = !!v && exceededSet.has(v)
-          if (finished || exceeded) { setProjectWarning({ index: i, project: v, finished, exceeded }); return }
+          if (finished || paused || exceeded) { setProjectWarning({ index: i, project: v, finished, paused, exceeded }); return }
           update(i, { project: v })
         }} />
     )
@@ -281,17 +283,25 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
               <TriangleAlert className="size-5 text-(--status-bajo)" />
               {projectWarning?.finished && projectWarning?.exceeded
                 ? 'Proyecto finalizado y excedido'
+                : projectWarning?.paused && projectWarning?.exceeded
+                ? 'Proyecto pausado y excedido'
                 : projectWarning?.exceeded
                 ? 'Banco de horas excedido'
-                : 'Proyecto finalizado'}
+                : projectWarning?.finished
+                ? 'Proyecto finalizado'
+                : 'Proyecto pausado'}
             </DialogTitle>
             <DialogDescription>
               El proyecto <strong className="font-medium text-foreground">{projectWarning?.project}</strong>{' '}
               {projectWarning?.finished && projectWarning?.exceeded
                 ? 'está marcado como finalizado y el banco de horas de tu posición está excedido.'
+                : projectWarning?.paused && projectWarning?.exceeded
+                ? 'está pausado y el banco de horas de tu posición está excedido.'
                 : projectWarning?.exceeded
                 ? 'tiene el banco de horas de tu posición excedido.'
-                : 'está marcado como finalizado en el Excel.'}{' '}
+                : projectWarning?.finished
+                ? 'está marcado como finalizado en el Excel.'
+                : 'está pausado en el Excel.'}{' '}
               ¿Deseas registrar horas de todas formas?
             </DialogDescription>
           </DialogHeader>

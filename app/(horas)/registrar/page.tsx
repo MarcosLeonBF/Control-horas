@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getCatalogos, getMyAreas, getMyPositionEtapaIds, getMyPositionDepartamentoIds } from '@/lib/horas/queries'
+import { getCatalogos, getMyPositionAreas, getMyPositionEtapaIds, getMyPositionDepartamentoIds } from '@/lib/horas/queries'
 import { getCachedBancoHoras, getCachedProyectosEstado } from '@/lib/graph/client'
 import { getBancosHoras } from '@/lib/horas/bancos'
 import RegistroForm from '@/components/horas/RegistroForm'
@@ -11,18 +11,17 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const { data: { user } } = await supabase.auth.getUser()
   const { areas, etapas, descripciones, departamentos } = await getCatalogos()
   const { data: me } = await supabase.from('profiles').select('role, position_id').eq('id', user!.id).single()
-  const myAreas = await getMyAreas(user!.id)
+  const myPositionAreas = await getMyPositionAreas(user!.id)
   const internal = areas.find((a) => a.is_internal)
   if (!internal) throw new Error('No hay un área interna configurada (is_internal) para el proyecto "Departamento".')
-  // Campos del registro restringidos por el alcance del usuario. Decisión 2026-07-02:
-  // el admin YA NO está exento (antes veía todo). Ahora TODOS —incluido el admin— solo
-  // ven/eligen lo de su alcance (áreas asignadas + posición), y el motor lo valida al
-  // guardar (migración 0024_horas_registro_campos_por_posicion). Sin nada asignado →
-  // lista vacía (estricto). NOTA: si el admin no tiene áreas asignadas, no podrá
-  // registrar en proyectos cliente (solo "Departamento"); asignarle áreas en Usuarios.
+  // Campos del registro restringidos por la POSICIÓN del usuario (decisión 2026-07-03): el
+  // área, la etapa, el departamento (y la descripción por departamento) salen de la posición,
+  // para todos los roles incluido el admin; el motor lo valida al guardar. user_areas ya no
+  // se usa para registrar (es solo la visibilidad del manager). Sin nada asignado a la
+  // posición → lista vacía (estricto); asignar áreas/etapas a la posición en Catálogos.
 
-  // Áreas (proyecto cliente, sin la interna): las áreas asignadas al usuario.
-  const selectableAreas = myAreas.filter((a) => !a.is_internal)
+  // Áreas (proyecto cliente, sin la interna): las áreas de la POSICIÓN del usuario.
+  const selectableAreas = myPositionAreas.filter((a) => !a.is_internal)
 
   // Etapas (proyecto cliente): las de la posición del usuario, excluyendo las exclusivas
   // de un departamento (esas solo aplican al proyecto "Departamento").
@@ -42,11 +41,16 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   try { projects = (await getCachedBancoHoras()).map((b) => b.project) } catch { /* Excel caído: solo Departamento */ }
   projects = Array.from(new Set([...projects, 'Departamento']))
 
-  // Estado de proyectos (tabla clientes_proyectos): avisamos al elegir uno finalizado.
+  // Estado de proyectos (tabla clientes_proyectos): avisamos al elegir uno finalizado o pausado.
   let finishedProjects: string[] = []
+  let pausedProjects: string[] = []
   try {
-    finishedProjects = (await getCachedProyectosEstado())
+    const estados = await getCachedProyectosEstado()
+    finishedProjects = estados
       .filter((e) => e.estado.toLowerCase() === 'finalizado')
+      .map((e) => e.project)
+    pausedProjects = estados
+      .filter((e) => e.estado.toLowerCase().includes('paus'))
       .map((e) => e.project)
   } catch { /* tabla no disponible: sin estados, sin aviso */ }
 
@@ -92,7 +96,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl">{initial ? 'Editar registro' : 'Registrar horas'}</h1>
-      <RegistroForm projects={projects} finishedProjects={finishedProjects} exceededProjects={exceededProjects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} descripciones={descripciones} departamentos={allowedDepartamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
+      <RegistroForm projects={projects} finishedProjects={finishedProjects} pausedProjects={pausedProjects} exceededProjects={exceededProjects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} descripciones={descripciones} departamentos={allowedDepartamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
     </div>
   )
 }

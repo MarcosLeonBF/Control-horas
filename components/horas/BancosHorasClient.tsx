@@ -37,6 +37,7 @@ function estadoProyectoClass(estado: string): string {
   const e = estado.toLowerCase()
   if (e === 'finalizado') return 'bg-foreground/[0.07] text-muted-foreground'
   if (e === 'activo') return 'bg-(--status-disponible)/12 text-(--status-disponible)'
+  if (e.includes('paus')) return 'bg-(--status-pausado)/12 text-(--status-pausado)'
   return 'bg-(--muted-surface) text-muted-foreground'
 }
 

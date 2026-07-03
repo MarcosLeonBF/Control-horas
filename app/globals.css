@@ -99,6 +99,7 @@
     --status-consumido: #6B6560;
     --status-excedido: #A0073A;
     --status-sin: #9A938D;
+    --status-pausado: #2F5FA6;  /* azul acero: proyecto en pausa (Excel Clientes_Proyectos) */
 }
 
 .font-display { font-family: var(--font-display); }

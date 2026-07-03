@@ -8,6 +8,7 @@ interface ProjectComboboxProps {
   onValueChange: (value: string) => void
   projects: string[]
   finishedProjects?: Set<string>
+  pausedProjects?: Set<string>
   exceededProjects?: Set<string>
   placeholder?: string
   className?: string
@@ -15,11 +16,14 @@ interface ProjectComboboxProps {
 }
 
 // Insignias de estado del proyecto. Excedido (rojo) va primero para que resalte.
-function ProjectBadges({ project, finished, exceeded }: { project: string; finished?: Set<string>; exceeded?: Set<string> }) {
+function ProjectBadges({ project, finished, paused, exceeded }: { project: string; finished?: Set<string>; paused?: Set<string>; exceeded?: Set<string> }) {
   return (
     <>
       {exceeded?.has(project) && (
         <span className="shrink-0 rounded-full bg-(--status-excedido)/12 px-1.5 py-px text-[0.62rem] font-semibold text-(--status-excedido)">Excedido</span>
+      )}
+      {paused?.has(project) && (
+        <span className="shrink-0 rounded-full bg-(--status-pausado)/12 px-1.5 py-px text-[0.62rem] font-semibold text-(--status-pausado)">Pausado</span>
       )}
       {finished?.has(project) && (
         <span className="shrink-0 rounded-full bg-foreground/[0.07] px-1.5 py-px text-[0.62rem] font-medium text-muted-foreground">Finalizado</span>
@@ -32,7 +36,7 @@ function ProjectBadges({ project, finished, exceeded }: { project: string; finis
 // que no lo recorta el overflow de la tabla del formulario. Marca los proyectos
 // finalizados y con banco excedido con insignias.
 export default function ProjectCombobox({
-  value, onValueChange, projects, finishedProjects, exceededProjects, placeholder = '— Proyecto —', className, ariaLabel,
+  value, onValueChange, projects, finishedProjects, pausedProjects, exceededProjects, placeholder = '— Proyecto —', className, ariaLabel,
 }: ProjectComboboxProps) {
   return (
     <Combobox.Root items={projects} value={value || null} onValueChange={(v) => onValueChange(v ?? '')}>
@@ -48,7 +52,7 @@ export default function ProjectCombobox({
             <span className="flex min-w-0 items-center gap-1.5">
               {val === 'Departamento' && <Building2 className="size-4 shrink-0 text-(--brand)" />}
               <span className="truncate">{val}</span>
-              {val && <ProjectBadges project={val} finished={finishedProjects} exceeded={exceededProjects} />}
+              {val && <ProjectBadges project={val} finished={finishedProjects} paused={pausedProjects} exceeded={exceededProjects} />}
             </span>
           )}
         </Combobox.Value>
@@ -84,7 +88,7 @@ export default function ProjectCombobox({
                   </span>
                   {item === 'Departamento' && <Building2 className="size-4 shrink-0 text-(--brand)" />}
                   <span className="min-w-0 flex-1 truncate">{item}</span>
-                  <ProjectBadges project={item} finished={finishedProjects} exceeded={exceededProjects} />
+                  <ProjectBadges project={item} finished={finishedProjects} paused={pausedProjects} exceeded={exceededProjects} />
                 </Combobox.Item>
               )}
             </Combobox.List>
