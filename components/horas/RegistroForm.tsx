@@ -29,8 +29,8 @@ function MobileField({ label, children }: { label: string; children: ReactNode }
   )
 }
 
-export default function RegistroForm({ projects, finishedProjects, exceededProjects, areas, etapas, clientEtapas, departamentos, internalAreaId, canBackdate = false, initial }: {
-  projects: string[]; finishedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; departamentos: DepartamentoRow[]; internalAreaId: string
+export default function RegistroForm({ projects, finishedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial }: {
+  projects: string[]; finishedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: string[]; departamentos: DepartamentoRow[]; internalAreaId: string
   canBackdate?: boolean // admin: puede registrar fuera del rango de 7 días (PDF §4)
   initial?: { id: string; lines: LineInput[] }
 }) {
@@ -95,11 +95,11 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
         }
       }
 
-      // Descripción: en "Departamento" debe ser del departamento; si cambió el proyecto o
-      // el departamento y la actual ya no aplica, se limpia. Fuera de Departamento es libre.
-      if ((patch.project !== undefined || patch.department !== undefined) && isDepartamento(next.project)) {
-        const deptDescs = departamentos.find((dd) => dd.name === next.department)?.descripciones ?? []
-        if (next.description && !deptDescs.includes(next.description)) next.description = ''
+      // Descripción: en "Departamento" debe estar en la lista general; al entrar a
+      // "Departamento", si la actual (texto libre) no está en la lista, se limpia. Fuera
+      // de "Departamento" es texto libre.
+      if (patch.project !== undefined && isDepartamento(next.project)) {
+        if (next.description && !descripciones.includes(next.description)) next.description = ''
       }
 
       return next
@@ -128,8 +128,8 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
     const lineClientEtapas = l.etapa_id && !clientEtapas.some((e) => e.id === l.etapa_id)
       ? [...clientEtapas, ...etapas.filter((e) => e.id === l.etapa_id)]
       : clientEtapas
-    // Descripción: en "Departamento" son las del departamento elegido; en el resto, texto libre.
-    const deptDescripciones = isDep ? (departamentos.find((d) => d.name === l.department)?.descripciones ?? []) : []
+    // Descripción: en "Departamento" es la lista general (compartida); en el resto, texto libre.
+    const deptDescripciones = isDep ? descripciones : []
 
     const fecha = (
       <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : daysAgo(7)}

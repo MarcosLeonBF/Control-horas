@@ -9,21 +9,17 @@ export default async function CatalogosPage() {
   const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (me?.role !== 'admin') redirect('/registrar')
 
-  const [{ data: areas }, { data: etapas }, { data: descripciones }, { data: departamentos }, { data: positions }, { data: posAreas }, { data: posEtapas }, { data: posDepartamentos }, { data: depEtapas }, { data: depDescr }] = await Promise.all([
+  const [{ data: areas }, { data: etapas }, { data: descripciones }, { data: departamentos }, { data: positions }, { data: posAreas }, { data: posEtapas }, { data: posDepartamentos }, { data: depEtapas }] = await Promise.all([
     supabase.from('areas').select('id, name, active, is_internal').order('name'),
     supabase.from('etapas').select('id, name, active').order('name'),
-    supabase.from('descripciones').select('id, name').order('name'),
+    supabase.from('descripciones').select('id, name, active').order('name'),
     supabase.from('departamentos').select('id, name, active').order('name'),
     supabase.from('positions').select('id, name, active').order('name'),
     supabase.from('position_areas').select('position_id, area_id'),
     supabase.from('position_etapas').select('position_id, etapa_id'),
     supabase.from('position_departamentos').select('position_id, departamento_id'),
     supabase.from('departamento_etapas').select('departamento_id, etapa_id'),
-    supabase.from('departamento_descripciones').select('departamento_id, descripcion_id'),
   ])
-
-  // Mapa id→nombre para resolver las descripciones de cada departamento.
-  const descNombre = new Map((descripciones ?? []).map((d) => [d.id as string, d.name as string]))
 
   const posiciones: PosicionRow[] = (positions ?? []).map((p) => ({
     id: p.id as string,
@@ -39,10 +35,6 @@ export default async function CatalogosPage() {
     name: d.name as string,
     active: d.active as boolean,
     etapaIds: (depEtapas ?? []).filter((de) => de.departamento_id === d.id).map((de) => de.etapa_id as string),
-    descripciones: (depDescr ?? [])
-      .filter((dd) => dd.departamento_id === d.id)
-      .map((dd) => descNombre.get(dd.descripcion_id as string))
-      .filter((n): n is string => !!n),
   }))
 
   return (
@@ -58,6 +50,7 @@ export default async function CatalogosPage() {
         posiciones={posiciones}
         areas={(areas ?? []) as CatalogoRow[]}
         etapas={(etapas ?? []) as CatalogoRow[]}
+        descripciones={(descripciones ?? []) as CatalogoRow[]}
         departamentos={depsConEtapas}
       />
     </div>

@@ -45,11 +45,9 @@ begin
     raise exception 'precondición: faltan asignaciones (interna/área op/etapa/depto admin)';
   end if;
 
-  -- Sembrar una descripción para el departamento del admin (para el caso válido).
-  insert into public.descripciones(name) values (v_desc_name) on conflict (name) do nothing;
+  -- Sembrar una descripción GENERAL activa (lista general del proyecto Departamento).
+  insert into public.descripciones(name, active) values (v_desc_name, true) on conflict (name) do update set active = true;
   select id into v_desc_id from public.descripciones where name = v_desc_name;
-  insert into public.departamento_descripciones(departamento_id, descripcion_id)
-    values (v_dep_ok_id, v_desc_id) on conflict do nothing;
 
   delete from public.time_logs where user_id in (v_op, v_admin) and entry_date = current_date;
 
@@ -64,12 +62,12 @@ begin
     if not ok then raise exception 'admin: departamento fuera de su posición no fue rechazado'; end if;
   end if;
 
-  -- Descripción ajena al departamento → rechazada
+  -- Descripción fuera de la lista general → rechazada
   ok := true;
   begin perform public.guardar_registro(null, jsonb_build_array(
-    jsonb_build_object('entry_date',current_date,'project','Departamento','area_id',v_intern,'department',v_dep_ok,'etapa_id',v_etapa_ok,'hours',1,'description','__ajena_al_depto__')
+    jsonb_build_object('entry_date',current_date,'project','Departamento','area_id',v_intern,'department',v_dep_ok,'etapa_id',v_etapa_ok,'hours',1,'description','__fuera_de_lista__')
   )); ok := false; exception when others then null; end;
-  if not ok then raise exception 'admin: descripción ajena al departamento no fue rechazada'; end if;
+  if not ok then raise exception 'admin: descripción fuera de la lista general no fue rechazada'; end if;
 
   -- Área en proyecto cliente → rechazada si el admin no tiene áreas asignadas
   if not exists (select 1 from public.user_areas where user_id = v_admin) then
@@ -98,7 +96,6 @@ begin
   end if;
 
   -- limpieza de la siembra
-  delete from public.departamento_descripciones where departamento_id = v_dep_ok_id and descripcion_id = v_desc_id;
   delete from public.descripciones where id = v_desc_id;
   raise notice 'OK rpc campos por posición (0025)';
 end $$;

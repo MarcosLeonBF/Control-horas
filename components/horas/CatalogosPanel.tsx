@@ -9,8 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import {
   crearArea, renombrarArea, toggleArea, eliminarArea,
   crearEtapa, renombrarEtapa, toggleEtapa, eliminarEtapa,
-  crearDepartamento, renombrarDepartamento, toggleDepartamento, eliminarDepartamento,
-  setDepartamentoEtapasNombres, setDepartamentoDescripcionesNombres,
+  crearDescripcion, renombrarDescripcion, toggleDescripcion, eliminarDescripcion,
+  crearDepartamento, renombrarDepartamento, toggleDepartamento, eliminarDepartamento, setDepartamentoEtapasNombres,
   crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas, setPosicionEtapas, setPosicionDepartamentos,
 } from '@/app/(horas)/admin/catalogos/actions'
 import type { DepartamentoRow } from '@/lib/horas/types'
@@ -319,16 +319,12 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [etapaSel, setEtapaSel] = useState<string[]>([])
   const [newEtapa, setNewEtapa] = useState('')
-  const [descSel, setDescSel] = useState<string[]>([])
-  const [newDesc, setNewDesc] = useState('')
 
   function toggleExpand(d: DepartamentoRow) {
     if (expandedId === d.id) { setExpandedId(null); return }
     setExpandedId(d.id)
     setEtapaSel(d.etapaIds.map((id) => etapaName(id)).filter(Boolean))
     setNewEtapa('')
-    setDescSel(d.descripciones)
-    setNewDesc('')
   }
 
   async function add() {
@@ -343,17 +339,12 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
     const names = pending && !etapaSel.some((n) => n.toLowerCase() === pending.toLowerCase()) ? [...etapaSel, pending] : etapaSel
     if (await run(setDepartamentoEtapasNombres(id, names), 'Etapas actualizadas')) setNewEtapa('')
   }
-  async function saveDescripciones(id: string) {
-    const pending = newDesc.trim()
-    const names = pending && !descSel.some((n) => n.toLowerCase() === pending.toLowerCase()) ? [...descSel, pending] : descSel
-    if (await run(setDepartamentoDescripcionesNombres(id, names), 'Descripciones actualizadas')) setNewDesc('')
-  }
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="font-display text-lg font-semibold">Departamentos</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Solo aplican al proyecto interno &quot;Departamento&quot;. Abre cada uno para definir sus etapas y las descripciones que se podrán elegir al registrar en ese departamento.
+        Solo aplican al proyecto interno &quot;Departamento&quot;. Abre cada uno para definir sus etapas. Las descripciones del proyecto Departamento son generales y se gestionan en la sección &quot;Descripciones&quot;.
       </p>
 
       <div className="mt-4 flex gap-2">
@@ -383,10 +374,6 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
                       {d.etapaIds.length === 0
                         ? <span className="text-foreground/40">Sin etapas</span>
                         : <>{d.etapaIds.length} {d.etapaIds.length === 1 ? 'etapa' : 'etapas'}</>}
-                      <span className="px-1 text-foreground/25">·</span>
-                      {d.descripciones.length === 0
-                        ? <span className="text-foreground/40">Sin descripciones</span>
-                        : <>{d.descripciones.length} {d.descripciones.length === 1 ? 'descripción' : 'descripciones'}</>}
                     </span>
                     {!d.active && <Badge variant="outline" className="text-muted-foreground">inactivo</Badge>}
                   </button>
@@ -411,11 +398,6 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
                   title="Etapas" hint="Etapas de este departamento (se derivan al registrar en Departamento)."
                   chips={etapaSel} setChips={setEtapaSel} value={newEtapa} setValue={setNewEtapa}
                   onSave={() => saveEtapas(d.id)} busy={busy} emptyLabel="Ninguna etapa todavía." />
-                <ChipCard
-                  dot={<span className="h-0.5 w-2.5 shrink-0 rounded-full bg-foreground/40" />}
-                  title="Descripciones" hint="Opciones del desplegable de descripción al registrar en este departamento."
-                  chips={descSel} setChips={setDescSel} value={newDesc} setValue={setNewDesc}
-                  onSave={() => saveDescripciones(d.id)} busy={busy} emptyLabel="Ninguna descripción todavía." />
               </div>
             )}
           </li>
@@ -425,8 +407,8 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
   )
 }
 
-export default function CatalogosPanel({ areas, etapas, departamentos, posiciones }: {
-  areas: CatalogoRow[]; etapas: CatalogoRow[]; departamentos: DepartamentoRow[]; posiciones: PosicionRow[]
+export default function CatalogosPanel({ areas, etapas, descripciones, departamentos, posiciones }: {
+  areas: CatalogoRow[]; etapas: CatalogoRow[]; descripciones: CatalogoRow[]; departamentos: DepartamentoRow[]; posiciones: PosicionRow[]
 }) {
   // Etapas ligadas a un departamento: exclusivas del proyecto "Departamento", no
   // asignables a posiciones (las de posición son las etapas generales).
@@ -442,6 +424,8 @@ export default function CatalogosPanel({ areas, etapas, departamentos, posicione
           ops={{ crear: crearArea, renombrar: renombrarArea, toggle: toggleArea, eliminar: eliminarArea }} />
         <Seccion title="Etapas" rows={etapas} addPlaceholder="Nueva etapa…"
           ops={{ crear: crearEtapa, renombrar: renombrarEtapa, toggle: toggleEtapa, eliminar: eliminarEtapa }} />
+        <Seccion title="Descripciones" rows={descripciones} addPlaceholder="Nueva descripción…"
+          ops={{ crear: crearDescripcion, renombrar: renombrarDescripcion, toggle: toggleDescripcion, eliminar: eliminarDescripcion }} />
       </div>
     </div>
   )

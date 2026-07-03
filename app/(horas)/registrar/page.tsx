@@ -9,7 +9,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const { edit } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { areas, etapas, departamentos } = await getCatalogos()
+  const { areas, etapas, descripciones, departamentos } = await getCatalogos()
   const { data: me } = await supabase.from('profiles').select('role, position_id').eq('id', user!.id).single()
   const myAreas = await getMyAreas(user!.id)
   const internal = areas.find((a) => a.is_internal)
@@ -30,12 +30,11 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const departmentEtapaIds = new Set(departamentos.flatMap((d) => d.etapaIds))
   const clientEtapas = etapas.filter((e) => positionEtapaIds.includes(e.id) && !departmentEtapaIds.has(e.id))
 
-  // Descripción al registrar: en proyecto "Departamento" es un desplegable con las
-  // descripciones del departamento elegido (vienen dentro de cada DepartamentoRow); en
-  // cualquier otro proyecto es texto libre. Ya no depende de la posición.
+  // Descripción al registrar: en proyecto "Departamento" es un desplegable con la lista
+  // GENERAL de descripciones (compartida por todos los departamentos); en cualquier otro
+  // proyecto es texto libre. Ya no depende de la posición ni del departamento.
 
-  // Departamentos (proyecto interno "Departamento"): los de la posición del usuario,
-  // con sus descripciones para el desplegable de descripción.
+  // Departamentos (proyecto interno "Departamento"): los de la posición del usuario.
   const positionDepartamentoIds = await getMyPositionDepartamentoIds(user!.id)
   const allowedDepartamentos = departamentos.filter((d) => positionDepartamentoIds.includes(d.id))
 
@@ -93,7 +92,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl">{initial ? 'Editar registro' : 'Registrar horas'}</h1>
-      <RegistroForm projects={projects} finishedProjects={finishedProjects} exceededProjects={exceededProjects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} departamentos={allowedDepartamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
+      <RegistroForm projects={projects} finishedProjects={finishedProjects} exceededProjects={exceededProjects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} descripciones={descripciones} departamentos={allowedDepartamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} />
     </div>
   )
 }

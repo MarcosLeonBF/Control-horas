@@ -46,11 +46,9 @@ begin
     raise exception 'precondición: faltan semillas (CRM/SEO/interna/Setup) o departamento del admin';
   end if;
 
-  -- Sembrar una descripción para el departamento del admin (para las líneas Departamento).
-  insert into public.descripciones(name) values (v_desc_dep) on conflict (name) do nothing;
+  -- Sembrar una descripción GENERAL activa (lista general del proyecto Departamento).
+  insert into public.descripciones(name, active) values (v_desc_dep, true) on conflict (name) do update set active = true;
   select id into v_desc_dep_id from public.descripciones where name = v_desc_dep;
-  insert into public.departamento_descripciones(departamento_id, descripcion_id)
-    values (v_dep_id, v_desc_dep_id) on conflict do nothing;
 
   delete from public.time_logs where user_id=v_op
     and entry_date in (current_date, current_date-1, current_date-2, current_date-3);
@@ -152,7 +150,6 @@ begin
   delete from public.time_logs where id = v_log2;
 
   -- limpieza de la siembra
-  delete from public.departamento_descripciones where departamento_id = v_dep_id and descripcion_id = v_desc_dep_id;
   delete from public.descripciones where id = v_desc_dep_id;
   raise notice 'OK rpc guardar (multifecha, 0025)';
 end $$;

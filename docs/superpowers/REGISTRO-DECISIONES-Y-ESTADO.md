@@ -5,7 +5,7 @@
 > - Diseño: [`specs/2026-06-23-hucha-presupuestos-design.md`](specs/2026-06-23-hucha-presupuestos-design.md)
 > - Plan de implementación 1: [`plans/2026-06-23-plan1-fundacion-datos-ledger.md`](plans/2026-06-23-plan1-fundacion-datos-ledger.md)
 
-**Última actualización:** 2026-07-03 (Horas · descripciones por departamento + descripción libre en proyectos normales — aplicado a prod)
+**Última actualización:** 2026-07-03 (Horas · descripción libre en proyectos normales + lista GENERAL de descripciones para "Departamento" — aplicado a prod)
 
 ---
 
@@ -203,7 +203,14 @@ Cambio de modelo de la **Descripción** al registrar (brainstorming → spec `sp
 - **Modelo:** nueva tabla `departamento_descripciones` (calcada de `departamento_etapas`, migración **0025**). Las descripciones de cada departamento se **escriben como nombres** (crean/enlazan `descripciones`). Se **eliminó `position_descripciones`** (migración **0026**), ya sin uso.
 - **Motor (`guardar_registro`, 0025):** en "Departamento" la descripción debe pertenecer a `departamento_descripciones` del departamento de la línea; en cliente solo se exige no-vacía. Se retiró la validación por posición. Área/etapa/departamento sin cambios.
 - **Catálogos:** la sección **Departamentos es ahora un acordeón** (como Posiciones); cada departamento agrupa **Etapas** y **Descripciones** (chips "escribe y Enter"). Se quitó la tarjeta Descripciones de Posiciones y la **sección global de Descripciones** (las descripciones viven **solo dentro de cada departamento**).
-- **Estado prod:** migraciones 0025 y 0026 **aplicadas** (última `0026`). Test SQL nuevo `horas_rpc_descripcion_departamento` en verde; `guardar`/`campos` desacoplados de `position_descripciones` (hacen SKIP mientras no haya operativo con áreas). **Pendiente del usuario:** cargar las descripciones de cada departamento en Catálogos (la tabla arranca vacía) para que el desplegable de "Departamento" tenga opciones.
+- **Estado prod:** migraciones 0025 y 0026 **aplicadas**.
+
+#### Ajuste (2026-07-03, mismo día): descripciones GENERALES, no por departamento
+El usuario pidió que las descripciones del proyecto "Departamento" sean **una lista general** (compartida por todos los departamentos), **no** una por departamento. Se revirtió esa parte:
+- **Motor (`guardar_registro`, migración `0027`):** en "Departamento" la descripción debe estar en la **lista general** de descripciones **activas** (`descripciones.active = true`); ya no depende del departamento. Cliente sigue con texto libre. Se **eliminó `departamento_descripciones`**.
+- **Catálogos:** el acordeón de Departamentos queda **solo con Etapas**; las descripciones vuelven a una **sección general "Descripciones"** (CRUD sobre `descripciones`), etiquetada como la lista del proyecto Departamento.
+- **Registro:** el desplegable de "Departamento" muestra la **lista general** de descripciones activas (igual para todos los departamentos).
+- **Estado prod:** migración **0027 aplicada** (última). Test SQL `horas_rpc_descripcion_general` en verde; el obsoleto `horas_rpc_descripcion_departamento` se eliminó; `guardar`/`campos` siembran una descripción **general** (sin enlace a departamento). Ya hay 3 descripciones activas cargadas → el desplegable de "Departamento" tiene opciones.
 
 ### Próximo
 - §17.6 (manager ve solo su equipo/área), descarga de movimientos de banco de horas, y la activación del webhook de Slack (lado del usuario). ⏳ Por planificar.
