@@ -14,30 +14,29 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const myAreas = await getMyAreas(user!.id)
   const internal = areas.find((a) => a.is_internal)
   if (!internal) throw new Error('No hay un área interna configurada (is_internal) para el proyecto "Departamento".')
-  // Áreas seleccionables para proyectos de cliente (sin la interna):
-  // operativo y manager solo ven sus áreas asignadas (su alcance); el admin ve todas.
-  const realAreas = areas.filter((a) => !a.is_internal)
-  const selectableAreas = me?.role === 'admin' ? realAreas : myAreas.filter((a) => !a.is_internal)
+  // Campos del registro restringidos por el alcance del usuario. Decisión 2026-07-02:
+  // el admin YA NO está exento (antes veía todo). Ahora TODOS —incluido el admin— solo
+  // ven/eligen lo de su alcance (áreas asignadas + posición), y el motor lo valida al
+  // guardar (migración 0024_horas_registro_campos_por_posicion). Sin nada asignado →
+  // lista vacía (estricto). NOTA: si el admin no tiene áreas asignadas, no podrá
+  // registrar en proyectos cliente (solo "Departamento"); asignarle áreas en Usuarios.
 
-  // Etapas seleccionables en proyecto cliente: las de la posición del usuario.
-  // Admin ve todas (igual que con las áreas). Operativo/manager sin etapas de
-  // posición → lista vacía (no puede registrar en cliente; PDF: estricto).
-  // Las etapas ligadas a un departamento son exclusivas del proyecto "Departamento":
-  // nunca deben aparecer en proyecto cliente (ni siquiera para el admin).
+  // Áreas (proyecto cliente, sin la interna): las áreas asignadas al usuario.
+  const selectableAreas = myAreas.filter((a) => !a.is_internal)
+
+  // Etapas (proyecto cliente): las de la posición del usuario, excluyendo las exclusivas
+  // de un departamento (esas solo aplican al proyecto "Departamento").
   const positionEtapaIds = await getMyPositionEtapaIds(user!.id)
   const departmentEtapaIds = new Set(departamentos.flatMap((d) => d.etapaIds))
-  const clientBase = me?.role === 'admin' ? etapas : etapas.filter((e) => positionEtapaIds.includes(e.id))
-  const clientEtapas = clientBase.filter((e) => !departmentEtapaIds.has(e.id))
+  const clientEtapas = etapas.filter((e) => positionEtapaIds.includes(e.id) && !departmentEtapaIds.has(e.id))
 
-  // Descripciones seleccionables (todas las líneas): las de la posición del usuario.
-  // Admin ve todas; sin descripciones de posición → lista vacía (estricto).
+  // Descripciones (todas las líneas): las de la posición del usuario.
   const positionDescripcionIds = await getMyPositionDescripcionIds(user!.id)
-  const allowedDescripciones = me?.role === 'admin' ? descripciones : descripciones.filter((d) => positionDescripcionIds.includes(d.id))
+  const allowedDescripciones = descripciones.filter((d) => positionDescripcionIds.includes(d.id))
 
-  // Departamentos seleccionables (proyecto interno "Departamento"): los de la posición.
-  // Admin ve todos; sin departamentos de posición → lista vacía (estricto).
+  // Departamentos (proyecto interno "Departamento"): los de la posición del usuario.
   const positionDepartamentoIds = await getMyPositionDepartamentoIds(user!.id)
-  const allowedDepartamentos = me?.role === 'admin' ? departamentos : departamentos.filter((d) => positionDepartamentoIds.includes(d.id))
+  const allowedDepartamentos = departamentos.filter((d) => positionDepartamentoIds.includes(d.id))
 
   let projects: string[] = []
   try { projects = (await getCachedBancoHoras()).map((b) => b.project) } catch { /* Excel caído: solo Departamento */ }

@@ -5,7 +5,7 @@
 > - Diseño: [`specs/2026-06-23-hucha-presupuestos-design.md`](specs/2026-06-23-hucha-presupuestos-design.md)
 > - Plan de implementación 1: [`plans/2026-06-23-plan1-fundacion-datos-ledger.md`](plans/2026-06-23-plan1-fundacion-datos-ledger.md)
 
-**Última actualización:** 2026-06-29 (Horas · mejoras de registro: fecha por línea + selector Departamento condicional)
+**Última actualización:** 2026-07-02 (Horas · alcance por posición en los 4 campos también para el admin — preparado en local, prod intacta)
 
 ---
 
@@ -186,6 +186,15 @@ Dos ajustes sobre la pantalla de **Registrar horas**, pedidos por el usuario:
   - *Motor:* nuevo RPC `guardar_registro` (migración **0019**) que reemplaza a `guardar_registro_diario`: valida fecha/7 días por línea, **anti-duplicados por fecha+combinación** (la misma combinación en días distintos ya no es duplicado), agrupa por fecha y reconcilia (alta = un log por fecha; edición = reutiliza el registro editado para su día y crea logs nuevos para el resto). La **auditoría** escribe un asiento por día afectado.
 - **Selector "Departamento" condicional (UI).** El selector de Departamento (Clientes/Ventas/Marketing/Todos) ahora **permanece oculto** hasta elegir el proyecto **"Departamento"** (antes salía deshabilitado).
 - **Calidad:** test SQL del RPC ampliado (alta multifecha, 7 días por línea, dedup por fecha, edición con división) y E2E (dos fechas → dos entradas separadas).
+
+### Horas · Alcance por posición para TODOS los campos, incluido el admin (2026-07-02) — ⚠️ preparado en local, NO aplicado a prod
+Los cuatro campos del registro (**Área, Etapa, Departamento, Descripción**) se filtraban por el alcance del usuario **solo en la UI**, y el **admin quedaba exento** (veía/registraba cualquier valor). El usuario pidió que el admin **también** se limite a su alcance en los cuatro, y que se valide en el motor (no solo UI).
+- **UI (`registrar/page.tsx`):** se quitó el bypass del admin en los 4 campos. Ahora todos —incluido el admin— solo ven su alcance: áreas **asignadas** (`user_areas`), y etapas/departamentos/descripciones de **su posición**. Sin asignaciones → lista vacía ("contacta al admin").
+- **Motor (`guardar_registro`, migración `0024_horas_registro_campos_por_posicion`):** valida por línea, contra el **dueño** del registro y para **todos los roles**: descripción ∈ posición; en proyecto cliente área ∈ `user_areas` (antes solo operativo) y etapa ∈ posición; en proyecto "Departamento" el departamento ∈ posición. La validación de etapa que vivía en `actions.ts` (y eximía al admin) se **eliminó**: todo el alcance vive ahora en el motor.
+- **Bootstrap de áreas (seed en 0024):** los **admin fundadores** existentes reciben **todas** las áreas al aplicar la migración (para no quedar bloqueados por la restricción de área). Los usuarios que el admin cree **después** reciben sus áreas asignadas **por él** desde Usuarios (flujo normal, ya existente). Decisión del usuario: "por defecto a Marcos todas; a partir de ahí, todo lo asigna él".
+- **Estado:** la migración **NO está aplicada a producción** (se aplicó una versión previa solo-descripción y **se revirtió** para no tocar prod durante la demo). Queda como archivo + tests para aplicar en local o tras la demo. Prod sigue en la 0023.
+- **Datos de prod (2026-07-02, a pedido del usuario, para la demo):** se **vació** el registro de horas — `time_logs`/`time_log_lines`/`time_log_audit`/`horas_alertas` = 0 — y se le asignaron **todas las áreas a Marcos** (7: Automatizaciones, Contenido, CRM, Diseño, Estrategia, Paid Media, SEO). Así Marcos ya no queda bloqueado por la restricción de área, y no quedan registros de prueba con descripciones de texto libre.
+- **Calidad:** test SQL `horas_rpc_campos_por_posicion.sql` (admin rechazado por descripción/departamento/área fuera de alcance + caso válido; operativo rechazado por etapa fuera de posición). `horas_rpc_guardar.sql` ya usa descripciones del catálogo. **Pendiente de correr** al aplicar (no se ejecutó contra prod a propósito).
 
 ### Próximo
 - §17.6 (manager ve solo su equipo/área), descarga de movimientos de banco de horas, y la activación del webhook de Slack (lado del usuario). ⏳ Por planificar.
