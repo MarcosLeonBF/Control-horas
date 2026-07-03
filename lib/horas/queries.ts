@@ -34,6 +34,20 @@ export async function getMyAreas(userId: string): Promise<AreaRow[]> {
   return ((data ?? []) as unknown as { areas: AreaRow }[]).map((r) => r.areas)
 }
 
+// Áreas de la POSICIÓN del usuario. Al registrar, el área de cada línea de proyecto
+// cliente sale de aquí (la posición define las áreas a las que se pertenece), para todos
+// los roles. user_areas (getMyAreas) queda solo como la visibilidad del manager.
+export async function getMyPositionAreas(userId: string): Promise<AreaRow[]> {
+  const supabase = await createClient()
+  const { data: me } = await supabase.from('profiles').select('position_id').eq('id', userId).single()
+  if (!me?.position_id) return []
+  const { data } = await supabase
+    .from('position_areas')
+    .select('areas(id,name,is_internal)')
+    .eq('position_id', me.position_id)
+  return ((data ?? []) as unknown as { areas: AreaRow }[]).map((r) => r.areas)
+}
+
 // Ids de las etapas ligadas a la posición del usuario. Determinan las etapas
 // seleccionables al registrar horas en un proyecto cliente. Vacío si no tiene
 // posición o su posición no tiene etapas asignadas.
