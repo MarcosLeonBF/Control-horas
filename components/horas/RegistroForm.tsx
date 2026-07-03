@@ -32,7 +32,7 @@ function MobileField({ label, children }: { label: string; children: ReactNode }
 
 export default function RegistroForm({ projects, finishedProjects, pausedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial }: {
   projects: string[]; finishedProjects: string[]; pausedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: string[]; departamentos: DepartamentoRow[]; internalAreaId: string
-  canBackdate?: boolean // admin: puede registrar fuera del rango de 7 días (PDF §4)
+  canBackdate?: boolean // admin: puede registrar fuera del rango de 14 días (PDF §4)
   initial?: { id: string; lines: LineInput[] }
 }) {
   const router = useRouter()
@@ -134,7 +134,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
     const deptDescripciones = isDep ? descripciones : []
 
     const fecha = (
-      <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : daysAgo(7)}
+      <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : daysAgo(14)}
         onChange={(e) => update(i, { entry_date: e.target.value })} />
     )
     const proyecto = (
@@ -195,10 +195,10 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
       <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
         <label htmlFor="fecha" className="text-sm font-medium text-foreground">Fecha por defecto</label>
         <Input
-          id="fecha" type="date" value={defaultDate} max={today()} min={canBackdate ? undefined : daysAgo(7)}
+          id="fecha" type="date" value={defaultDate} max={today()} min={canBackdate ? undefined : daysAgo(14)}
           onChange={(e) => changeDefaultDate(e.target.value)} className="w-auto"
         />
-        {!canBackdate && <span className="text-xs text-muted-foreground">Hasta 7 días atrás</span>}
+        {!canBackdate && <span className="text-xs text-muted-foreground">Hasta 14 días atrás</span>}
       </div>
 
       {/* Escritorio: tabla */}

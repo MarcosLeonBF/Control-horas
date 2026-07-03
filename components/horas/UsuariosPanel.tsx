@@ -85,30 +85,34 @@ function Editor({ u, areas, posiciones, onDone }: { u: UsuarioRow; areas: AreaRo
         </Field>
       </div>
 
-      <div className="mt-4 rounded-lg border border-border bg-card p-4">
-        <div className="flex items-center gap-2">
-          <span className="size-2 shrink-0 rounded-full bg-(--brand)" />
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Áreas</h4>
-        </div>
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          {f.role === 'manager'
-            ? 'El manager gestiona estas áreas: verá los registros, bancos y reportes de los usuarios que las tengan asignadas.'
-            : 'Áreas asignadas al usuario.'}
-        </p>
-        {selectableAreas.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">No hay áreas en el catálogo.</p>
-        ) : (
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-            {selectableAreas.map((a) => (
-              <label key={a.id} className="flex cursor-pointer items-center gap-2 text-sm text-foreground/80 hover:text-foreground">
-                <input type="checkbox" className="size-4 accent-(--brand)" checked={f.areaIds.includes(a.id)}
-                  onChange={(e) => setF({ ...f, areaIds: e.target.checked ? [...f.areaIds, a.id] : f.areaIds.filter((x) => x !== a.id) })} />
-                {a.name}
-              </label>
-            ))}
+      {/* Áreas = visibilidad del manager/admin. El operativo las hereda de su posición
+          (no se editan aquí); el área con la que se registra sale siempre de la posición. */}
+      {(f.role === 'manager' || f.role === 'admin') && (
+        <div className="mt-4 rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center gap-2">
+            <span className="size-2 shrink-0 rounded-full bg-(--brand)" />
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Áreas que puede ver</h4>
           </div>
-        )}
-      </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {f.role === 'manager'
+              ? 'El manager verá los registros, bancos y reportes de los usuarios de estas áreas. El área con la que él registra sale de su posición.'
+              : 'Áreas de visibilidad. El admin ve todo por defecto; el área con la que registra sale de su posición.'}
+          </p>
+          {selectableAreas.length === 0 ? (
+            <p className="mt-3 text-sm text-muted-foreground">No hay áreas en el catálogo.</p>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+              {selectableAreas.map((a) => (
+                <label key={a.id} className="flex cursor-pointer items-center gap-2 text-sm text-foreground/80 hover:text-foreground">
+                  <input type="checkbox" className="size-4 accent-(--brand)" checked={f.areaIds.includes(a.id)}
+                    onChange={(e) => setF({ ...f, areaIds: e.target.checked ? [...f.areaIds, a.id] : f.areaIds.filter((x) => x !== a.id) })} />
+                  {a.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-5 flex gap-2">
         <Button onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</Button>

@@ -33,8 +33,10 @@ export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | 
   }).eq('id', id)
   if (profileError) return { ok: false, error: `Usuario creado pero falló su perfil: ${profileError.message}` }
 
-  if (input.areaIds.length) {
-    const { error: areasError } = await admin.from('user_areas').insert(input.areaIds.map((area_id) => ({ user_id: id, area_id })))
+  // user_areas = visibilidad del manager/admin. El operativo no tiene (registra por su posición).
+  const areaIds = input.role === 'operativo' ? [] : input.areaIds
+  if (areaIds.length) {
+    const { error: areasError } = await admin.from('user_areas').insert(areaIds.map((area_id) => ({ user_id: id, area_id })))
     if (areasError) return { ok: false, error: `Usuario creado pero fallaron sus áreas: ${areasError.message}` }
   }
   return { ok: true }
@@ -64,10 +66,12 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
   }).eq('id', id)
   if (error) return { ok: false, error: error.message }
 
-  // Reemplaza las áreas asignadas.
+  // Reemplaza las áreas de visibilidad (manager/admin). El operativo no tiene user_areas
+  // (registra por su posición): si el rol es operativo, se limpian.
   await admin.from('user_areas').delete().eq('user_id', id)
-  if (input.areaIds.length) {
-    const { error: ae } = await admin.from('user_areas').insert(input.areaIds.map((area_id) => ({ user_id: id, area_id })))
+  const areaIds = input.role === 'operativo' ? [] : input.areaIds
+  if (areaIds.length) {
+    const { error: ae } = await admin.from('user_areas').insert(areaIds.map((area_id) => ({ user_id: id, area_id })))
     if (ae) return { ok: false, error: `Datos guardados pero fallaron las áreas: ${ae.message}` }
   }
   return { ok: true }

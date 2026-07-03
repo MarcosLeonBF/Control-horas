@@ -32,15 +32,19 @@ export default function UsuarioForm({ areas, posiciones }: { areas: AreaRow[]; p
       <NativeSelect aria-label="Rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as NuevoUsuario['role'] })} className={selectClass} fullWidth>
         <option value="operativo">operativo</option><option value="manager">manager</option><option value="admin">admin</option>
       </NativeSelect>
-      <fieldset className="space-y-1"><legend className="text-sm text-muted-foreground">Áreas</legend>
-        {areas.filter((a) => !a.is_internal).map((a) => (
-          <label key={a.id} className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={f.areaIds.includes(a.id)}
-              onChange={(e) => setF({ ...f, areaIds: e.target.checked ? [...f.areaIds, a.id] : f.areaIds.filter((x) => x !== a.id) })} />
-            {a.name}
-          </label>
-        ))}
-      </fieldset>
+      {/* Áreas = visibilidad del manager (qué áreas ve su equipo/reportes). El operativo
+          las hereda de su posición (no se editan aquí). */}
+      {(f.role === 'manager' || f.role === 'admin') && (
+        <fieldset className="space-y-1"><legend className="text-sm text-muted-foreground">Áreas que puede ver</legend>
+          {areas.filter((a) => !a.is_internal).map((a) => (
+            <label key={a.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={f.areaIds.includes(a.id)}
+                onChange={(e) => setF({ ...f, areaIds: e.target.checked ? [...f.areaIds, a.id] : f.areaIds.filter((x) => x !== a.id) })} />
+              {a.name}
+            </label>
+          ))}
+        </fieldset>
+      )}
       <Button type="submit" disabled={saving} size="lg">{saving ? 'Creando…' : 'Crear usuario'}</Button>
     </form>
   )
