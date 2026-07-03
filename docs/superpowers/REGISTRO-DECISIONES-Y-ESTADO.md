@@ -5,7 +5,7 @@
 > - Diseño: [`specs/2026-06-23-hucha-presupuestos-design.md`](specs/2026-06-23-hucha-presupuestos-design.md)
 > - Plan de implementación 1: [`plans/2026-06-23-plan1-fundacion-datos-ledger.md`](plans/2026-06-23-plan1-fundacion-datos-ledger.md)
 
-**Última actualización:** 2026-07-02 (Horas · alcance por posición en los 4 campos también para el admin — preparado en local, prod intacta)
+**Última actualización:** 2026-07-03 (Horas · descripciones por departamento + descripción libre en proyectos normales — aplicado a prod)
 
 ---
 
@@ -192,9 +192,18 @@ Los cuatro campos del registro (**Área, Etapa, Departamento, Descripción**) se
 - **UI (`registrar/page.tsx`):** se quitó el bypass del admin en los 4 campos. Ahora todos —incluido el admin— solo ven su alcance: áreas **asignadas** (`user_areas`), y etapas/departamentos/descripciones de **su posición**. Sin asignaciones → lista vacía ("contacta al admin").
 - **Motor (`guardar_registro`, migración `0024_horas_registro_campos_por_posicion`):** valida por línea, contra el **dueño** del registro y para **todos los roles**: descripción ∈ posición; en proyecto cliente área ∈ `user_areas` (antes solo operativo) y etapa ∈ posición; en proyecto "Departamento" el departamento ∈ posición. La validación de etapa que vivía en `actions.ts` (y eximía al admin) se **eliminó**: todo el alcance vive ahora en el motor.
 - **Bootstrap de áreas (seed en 0024):** los **admin fundadores** existentes reciben **todas** las áreas al aplicar la migración (para no quedar bloqueados por la restricción de área). Los usuarios que el admin cree **después** reciben sus áreas asignadas **por él** desde Usuarios (flujo normal, ya existente). Decisión del usuario: "por defecto a Marcos todas; a partir de ahí, todo lo asigna él".
-- **Estado:** la migración **NO está aplicada a producción** (se aplicó una versión previa solo-descripción y **se revirtió** para no tocar prod durante la demo). Queda como archivo + tests para aplicar en local o tras la demo. Prod sigue en la 0023.
+- **Estado:** ✅ **aplicada a prod** el 2026-07-03 (migración 0024, versión `20260703154320`), con sus dos tests SQL en verde. La validación de **descripción por posición** de esta migración fue **sustituida** poco después por 0025 (descripción por departamento / libre — ver entrada siguiente); las validaciones de área/etapa/departamento siguen vigentes.
 - **Datos de prod (2026-07-02, a pedido del usuario, para la demo):** se **vació** el registro de horas — `time_logs`/`time_log_lines`/`time_log_audit`/`horas_alertas` = 0 — y se le asignaron **todas las áreas a Marcos** (7: Automatizaciones, Contenido, CRM, Diseño, Estrategia, Paid Media, SEO). Así Marcos ya no queda bloqueado por la restricción de área, y no quedan registros de prueba con descripciones de texto libre.
-- **Calidad:** test SQL `horas_rpc_campos_por_posicion.sql` (admin rechazado por descripción/departamento/área fuera de alcance + caso válido; operativo rechazado por etapa fuera de posición). `horas_rpc_guardar.sql` ya usa descripciones del catálogo. **Pendiente de correr** al aplicar (no se ejecutó contra prod a propósito).
+- **Calidad:** test SQL `horas_rpc_campos_por_posicion.sql` (admin rechazado por descripción/departamento/área fuera de alcance + caso válido; operativo rechazado por etapa fuera de posición). `horas_rpc_guardar.sql` ya usa descripciones del catálogo.
+
+### Horas · Descripciones por departamento + descripción libre en proyectos normales (2026-07-03) — ✅ aplicado a prod
+Cambio de modelo de la **Descripción** al registrar (brainstorming → spec `specs/2026-07-03-descripciones-por-departamento-design.md` → plan `plans/2026-07-03-descripciones-por-departamento.md`):
+- **Proyecto normal/cliente:** la descripción es **texto libre** (obligatoria, no vacía). Ya no hay desplegable por posición.
+- **Proyecto "Departamento":** la descripción es un **desplegable dinámico** con las descripciones **del departamento elegido**; al cambiar el departamento, cambian las opciones.
+- **Modelo:** nueva tabla `departamento_descripciones` (calcada de `departamento_etapas`, migración **0025**). Las descripciones de cada departamento se **escriben como nombres** (crean/enlazan `descripciones`). Se **eliminó `position_descripciones`** (migración **0026**), ya sin uso.
+- **Motor (`guardar_registro`, 0025):** en "Departamento" la descripción debe pertenecer a `departamento_descripciones` del departamento de la línea; en cliente solo se exige no-vacía. Se retiró la validación por posición. Área/etapa/departamento sin cambios.
+- **Catálogos:** la sección **Departamentos es ahora un acordeón** (como Posiciones); cada departamento agrupa **Etapas** y **Descripciones** (chips "escribe y Enter"). Se quitó la tarjeta Descripciones de Posiciones y la **sección global de Descripciones** (las descripciones viven **solo dentro de cada departamento**).
+- **Estado prod:** migraciones 0025 y 0026 **aplicadas** (última `0026`). Test SQL nuevo `horas_rpc_descripcion_departamento` en verde; `guardar`/`campos` desacoplados de `position_descripciones` (hacen SKIP mientras no haya operativo con áreas). **Pendiente del usuario:** cargar las descripciones de cada departamento en Catálogos (la tabla arranca vacía) para que el desplegable de "Departamento" tenga opciones.
 
 ### Próximo
 - §17.6 (manager ve solo su equipo/área), descarga de movimientos de banco de horas, y la activación del webhook de Slack (lado del usuario). ⏳ Por planificar.
