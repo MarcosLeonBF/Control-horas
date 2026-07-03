@@ -1,6 +1,6 @@
 'use client'
 import { Combobox } from '@base-ui/react/combobox'
-import { Check, ChevronsUpDown, Search } from 'lucide-react'
+import { Check, ChevronsUpDown, Search, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ProjectComboboxProps {
@@ -46,6 +46,7 @@ export default function ProjectCombobox({
         <Combobox.Value placeholder={<span className="text-muted-foreground">{placeholder}</span>}>
           {(val: string | null) => (
             <span className="flex min-w-0 items-center gap-1.5">
+              {val === 'Departamento' && <Building2 className="size-4 shrink-0 text-(--brand)" />}
               <span className="truncate">{val}</span>
               {val && <ProjectBadges project={val} finished={finishedProjects} exceeded={exceededProjects} />}
             </span>
@@ -81,6 +82,7 @@ export default function ProjectCombobox({
                       <Check className="size-4" />
                     </Combobox.ItemIndicator>
                   </span>
+                  {item === 'Departamento' && <Building2 className="size-4 shrink-0 text-(--brand)" />}
                   <span className="min-w-0 flex-1 truncate">{item}</span>
                   <ProjectBadges project={item} finished={finishedProjects} exceeded={exceededProjects} />
                 </Combobox.Item>
