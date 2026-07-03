@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { TriangleAlert } from 'lucide-react'
 import ProjectCombobox from '@/components/horas/ProjectCombobox'
+import DepartamentoSelect from '@/components/horas/DepartamentoSelect'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
@@ -141,9 +142,8 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
     const depto = departamentos.length === 0 ? (
       <select aria-label="Departamento" value="" disabled className={field}><option value="">— Sin departamentos (contacta al admin) —</option></select>
     ) : (
-      <select aria-label="Departamento" value={l.department} onChange={(e) => update(i, { department: e.target.value })} className={field}>
-        {departamentos.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-      </select>
+      <DepartamentoSelect ariaLabel="Departamento" value={l.department} departamentos={departamentos}
+        onValueChange={(v) => update(i, { department: v })} />
     )
     const etapa = lineClientEtapas.length === 0 ? (
       <select aria-label="Etapa" value="" disabled className={field}><option value="">— Sin etapas asignadas (contacta al admin) —</option></select>
