@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   Clock, FileText, Users, Wallet, BarChart3, PiggyBank, LayoutDashboard,
-  RefreshCw, UserCog, History, Tags, LogOut, ChevronsLeft, ChevronsRight, Menu, X,
+  RefreshCw, UserCog, History, Tags, LogOut, ChevronsLeft, ChevronsRight, Menu, X, User,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -149,10 +149,10 @@ export default function AppShell({ displayName, role, children }: { displayName:
         {/* Footer usuario */}
         <div className="relative border-t border-white/10 p-3">
           <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
-            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-(--brand)/90 text-xs font-semibold text-white">{initials(displayName)}</span>
+            <Link href="/perfil" title="Mi perfil" className="grid size-9 shrink-0 place-items-center rounded-full bg-(--brand)/90 text-xs font-semibold text-white transition-colors hover:bg-(--brand)">{initials(displayName)}</Link>
             {!collapsed && (
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-white">{displayName}</p>
+                <Link href="/perfil" className="block truncate text-sm font-medium text-white hover:underline">{displayName}</Link>
                 <p className="truncate text-xs capitalize text-white/45">{role}</p>
               </div>
             )}
@@ -161,9 +161,14 @@ export default function AppShell({ displayName, role, children }: { displayName:
             </button>
           </div>
           {collapsed && (
-            <button onClick={logout} title="Salir" aria-label="Salir" className="mt-3 flex w-full justify-center text-white/50 transition-colors hover:text-white">
-              <LogOut className="size-4" />
-            </button>
+            <div className="mt-2 flex w-full flex-col items-center gap-2">
+              <Link href="/perfil" title="Mi perfil" className="text-white/50 transition-colors hover:text-white">
+                <User className="size-4" />
+              </Link>
+              <button onClick={logout} title="Salir" aria-label="Salir" className="text-white/50 transition-colors hover:text-white">
+                <LogOut className="size-4" />
+              </button>
+            </div>
           )}
         </div>
 
