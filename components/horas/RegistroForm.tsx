@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { TriangleAlert } from 'lucide-react'
 import ProjectCombobox from '@/components/horas/ProjectCombobox'
 import DepartamentoSelect from '@/components/horas/DepartamentoSelect'
-import NativeSelect from '@/components/horas/NativeSelect'
+import NativeSelect from '@/components/ui/native-select'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
@@ -147,15 +147,15 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
         }} />
     )
     const depto = departamentos.length === 0 ? (
-      <NativeSelect aria-label="Departamento" value="" disabled><option value="">— Sin departamentos (contacta al admin) —</option></NativeSelect>
+      <NativeSelect aria-label="Departamento" value="" disabled fullWidth><option value="">— Sin departamentos (contacta al admin) —</option></NativeSelect>
     ) : (
       <DepartamentoSelect ariaLabel="Departamento" value={l.department} departamentos={departamentos}
         onValueChange={(v) => update(i, { department: v })} />
     )
     const etapa = lineClientEtapas.length === 0 ? (
-      <NativeSelect aria-label="Etapa" value="" disabled><option value="">— Sin etapas asignadas (contacta al admin) —</option></NativeSelect>
+      <NativeSelect aria-label="Etapa" value="" disabled fullWidth><option value="">— Sin etapas asignadas (contacta al admin) —</option></NativeSelect>
     ) : (
-      <NativeSelect aria-label="Etapa" value={l.etapa_id} onChange={(e) => update(i, { etapa_id: e.target.value })}>
+      <NativeSelect aria-label="Etapa" value={l.etapa_id} onChange={(e) => update(i, { etapa_id: e.target.value })} fullWidth>
         <option value="">— Etapa —</option>
         {lineClientEtapas.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
       </NativeSelect>
@@ -168,9 +168,9 @@ export default function RegistroForm({ projects, finishedProjects, exceededProje
     // input de texto libre (obligatorio; el motor exige no vacía).
     const desc = isDep ? (
       deptDescripciones.length === 0 ? (
-        <NativeSelect aria-label="Descripción" value="" disabled><option value="">— Sin descripciones (contacta al admin) —</option></NativeSelect>
+        <NativeSelect aria-label="Descripción" value="" disabled fullWidth><option value="">— Sin descripciones (contacta al admin) —</option></NativeSelect>
       ) : (
-        <NativeSelect aria-label="Descripción" value={l.description} onChange={(e) => update(i, { description: e.target.value })}>
+        <NativeSelect aria-label="Descripción" value={l.description} onChange={(e) => update(i, { description: e.target.value })} fullWidth>
           <option value="">— Descripción —</option>
           {deptDescripciones.map((name) => <option key={name} value={name}>{name}</option>)}
         </NativeSelect>

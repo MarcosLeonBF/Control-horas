@@ -6,6 +6,7 @@ import type { AreaRow } from '@/lib/horas/types'
 import type { PosicionOpt } from '@/components/horas/UsuariosPanel'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import NativeSelect from '@/components/ui/native-select'
 
 const selectClass = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
@@ -24,13 +25,13 @@ export default function UsuarioForm({ areas, posiciones }: { areas: AreaRow[]; p
       <Input aria-label="Nombre" placeholder="Nombre" value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} />
       <Input aria-label="Correo" type="email" placeholder="Correo" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
       <Input aria-label="Contraseña" type="password" placeholder="Contraseña inicial" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
-      <select aria-label="Posición" value={f.positionId} onChange={(e) => setF({ ...f, positionId: e.target.value })} className={selectClass}>
+      <NativeSelect aria-label="Posición" value={f.positionId} onChange={(e) => setF({ ...f, positionId: e.target.value })} className={selectClass} fullWidth>
         <option value="">— Posición (banco de horas) —</option>
         {posiciones.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-      </select>
-      <select aria-label="Rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as NuevoUsuario['role'] })} className={selectClass}>
+      </NativeSelect>
+      <NativeSelect aria-label="Rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as NuevoUsuario['role'] })} className={selectClass} fullWidth>
         <option value="operativo">operativo</option><option value="manager">manager</option><option value="admin">admin</option>
-      </select>
+      </NativeSelect>
       <fieldset className="space-y-1"><legend className="text-sm text-muted-foreground">Áreas</legend>
         {areas.filter((a) => !a.is_internal).map((a) => (
           <label key={a.id} className="flex items-center gap-2 text-sm">

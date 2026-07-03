@@ -10,6 +10,7 @@ import { getMovimientosExport } from '@/app/(hucha)/presupuestos/dashboard/actio
 import StatusBadge from '@/components/hucha/StatusBadge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import NativeSelect from '@/components/ui/native-select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
@@ -143,14 +144,14 @@ export default function DashboardClient({ rows }: { rows: DashboardRow[] }) {
             value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 pl-9"
           />
         </div>
-        <select aria-label="Estado" value={estado} onChange={(e) => setEstado(e.target.value as HuchaStatus | 'todos')} className={selectClass}>
+        <NativeSelect aria-label="Estado" value={estado} onChange={(e) => setEstado(e.target.value as HuchaStatus | 'todos')} className={selectClass}>
           <option value="todos">Todos los estados</option>
           {ESTADOS.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-        </select>
-        <select aria-label="Manager" value={manager} onChange={(e) => setManager(e.target.value)} className={selectClass}>
+        </NativeSelect>
+        <NativeSelect aria-label="Manager" value={manager} onChange={(e) => setManager(e.target.value)} className={selectClass}>
           <option value="todos">Todos los managers</option>
           {managers.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+        </NativeSelect>
         <span className="ml-auto text-sm text-muted-foreground">
           {filtered.length} de {rows.length} proyectos
         </span>

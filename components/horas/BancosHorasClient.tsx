@@ -10,6 +10,7 @@ import { formatHoras } from '@/lib/horas/format'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import NativeSelect from '@/components/ui/native-select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
@@ -115,14 +116,14 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
             value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 pl-9"
           />
         </div>
-        <select aria-label="Posición" value={posicion} onChange={(e) => setPosicion(e.target.value)} className={selectClass}>
+        <NativeSelect aria-label="Posición" value={posicion} onChange={(e) => setPosicion(e.target.value)} className={selectClass}>
           <option value="todas">Todas las posiciones</option>
           {positions.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <select aria-label="Estado" value={estado} onChange={(e) => setEstado(e.target.value as HorasStatus | 'todos')} className={selectClass}>
+        </NativeSelect>
+        <NativeSelect aria-label="Estado" value={estado} onChange={(e) => setEstado(e.target.value as HorasStatus | 'todos')} className={selectClass}>
           <option value="todos">Todos los estados</option>
           {ESTADOS.map((s) => <option key={s} value={s}>{HORAS_STATUS_LABELS[s]}</option>)}
-        </select>
+        </NativeSelect>
         <span className="ml-auto text-sm text-muted-foreground">{filtered.length} de {rows.length} bancos</span>
       </div>
 

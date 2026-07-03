@@ -7,6 +7,7 @@ import type { AreaRow } from '@/lib/horas/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import NativeSelect from '@/components/ui/native-select'
 import { Badge } from '@/components/ui/badge'
 
 export interface PosicionOpt { id: string; name: string }
@@ -64,23 +65,23 @@ function Editor({ u, areas, posiciones, onDone }: { u: UsuarioRow; areas: AreaRo
           <Input aria-label="Editar nombre" value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} className="h-9" />
         </Field>
         <Field label="Posición (banco de horas)">
-          <select aria-label="Editar posición" value={f.positionId} onChange={(e) => setF({ ...f, positionId: e.target.value })} className={fieldSelect}>
+          <NativeSelect aria-label="Editar posición" value={f.positionId} onChange={(e) => setF({ ...f, positionId: e.target.value })} className={fieldSelect} fullWidth>
             <option value="">— Sin posición —</option>
             {posiciones.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          </NativeSelect>
         </Field>
         <Field label="Rol">
-          <select aria-label="Editar rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as EdicionUsuario['role'] })} className={fieldSelect}>
+          <NativeSelect aria-label="Editar rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as EdicionUsuario['role'] })} className={fieldSelect} fullWidth>
             <option value="operativo">Operativo</option>
             <option value="manager">Manager</option>
             <option value="admin">Admin</option>
-          </select>
+          </NativeSelect>
         </Field>
         <Field label="Estado">
-          <select aria-label="Editar estado" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as EdicionUsuario['status'] })} className={fieldSelect}>
+          <NativeSelect aria-label="Editar estado" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as EdicionUsuario['status'] })} className={fieldSelect} fullWidth>
             <option value="activo">Activo</option>
             <option value="inactivo">Inactivo</option>
-          </select>
+          </NativeSelect>
         </Field>
       </div>
 

@@ -6,6 +6,7 @@ import type { ReporteLine, ReporteFilterOptions, GroupBy } from '@/lib/horas/rep
 import { GROUP_LABELS, GROUP_ORDER, aggregate } from '@/lib/horas/reportes-types'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras } from '@/lib/horas/format'
+import NativeSelect from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 
 const selectClass =
@@ -132,22 +133,22 @@ export default function ReportesView({
         <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
           <Filter className="size-4" /> Filtrar
         </span>
-        <select aria-label="Filtrar por proyecto" value={fProject} onChange={(e) => setFProject(e.target.value)} className={selectClass}>
+        <NativeSelect aria-label="Filtrar por proyecto" value={fProject} onChange={(e) => setFProject(e.target.value)} className={selectClass}>
           <option value="">Todos los proyectos</option>
           {options.projects.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <select aria-label="Filtrar por usuario" value={fUser} onChange={(e) => setFUser(e.target.value)} className={selectClass}>
+        </NativeSelect>
+        <NativeSelect aria-label="Filtrar por usuario" value={fUser} onChange={(e) => setFUser(e.target.value)} className={selectClass}>
           <option value="">Todos los usuarios</option>
           {options.users.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
-        <select aria-label="Filtrar por área" value={fArea} onChange={(e) => setFArea(e.target.value)} className={selectClass}>
+        </NativeSelect>
+        <NativeSelect aria-label="Filtrar por área" value={fArea} onChange={(e) => setFArea(e.target.value)} className={selectClass}>
           <option value="">Todas las áreas</option>
           {options.areas.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
-        <select aria-label="Filtrar por posición" value={fPosition} onChange={(e) => setFPosition(e.target.value)} className={selectClass}>
+        </NativeSelect>
+        <NativeSelect aria-label="Filtrar por posición" value={fPosition} onChange={(e) => setFPosition(e.target.value)} className={selectClass}>
           <option value="">Todas las posiciones</option>
           {options.positions.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
+        </NativeSelect>
         {hasFilters && (
           <button
             onClick={() => { setFProject(''); setFUser(''); setFArea(''); setFPosition('') }}
