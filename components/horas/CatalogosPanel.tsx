@@ -245,7 +245,7 @@ function PosicionesSection({ posiciones, areas, etapas, departamentos, departmen
                     <span className="size-2 shrink-0 rounded-full bg-(--brand)" />
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground/70">Áreas</h4>
                   </div>
-                  <p className="mt-1 mb-3 text-xs text-muted-foreground">Un manager verá los bancos de las posiciones de sus áreas.</p>
+                  <p className="mt-1 mb-3 text-xs text-muted-foreground">Área(s) a la(s) que pertenece la posición: definen en qué áreas registra horas y qué bancos ve un manager.</p>
                   <div className="flex flex-col gap-2">
                     {selectableAreas.map((a) => (
                       <label key={a.id} className="flex cursor-pointer items-center gap-2.5 text-sm text-foreground/80 hover:text-foreground">

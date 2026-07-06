@@ -17,6 +17,23 @@ const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 const emptyLine = (areaId: string, date: string, dep: string): LineInput => ({ entry_date: date, project: '', area_id: areaId, department: dep, etapa_id: '', hours: 0, description: '' })
 
+// Validación previa al guardado, acotada a los campos uuid (area_id, etapa_id) que son
+// NOT NULL en la BD: si llegan vacíos ('') el motor hace ''::uuid y Postgres devuelve el
+// error críptico "invalid input syntax for type uuid". El caso típico: la posición del
+// usuario no tiene área/etapa asignada, así que quedan ''. Lo convertimos en un mensaje
+// claro. El resto de validaciones (descripción, horas) ya las reporta el motor con
+// mensajes legibles. Devuelve el primer problema o null si todo ok.
+export function primerErrorLinea(lines: LineInput[]): string | null {
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]
+    const n = i + 1
+    if (!l.project) return `Línea ${n}: elegí un proyecto.`
+    if (!l.area_id) return `Línea ${n}: tu posición no tiene un área asignada. Pedile al administrador que le asigne un área a tu posición en Catálogos → Posiciones.`
+    if (!l.etapa_id) return `Línea ${n}: falta la etapa. Elegí una o, si el desplegable está vacío, pedile al admin que asigne etapas a tu posición.`
+  }
+  return null
+}
+
 const field =
   'w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
 
@@ -116,6 +133,10 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
   }
 
   async function onSave() {
+    // Guard: no dejamos que un uuid vacío (área/etapa sin asignar) llegue al motor y
+    // devuelva el error críptico de Postgres; mostramos un mensaje claro.
+    const err = primerErrorLinea(lines)
+    if (err) { toast.error(err); return }
     setSaving(true)
     const res = await guardarRegistro(lines, initial?.id ?? null)
     setSaving(false)
