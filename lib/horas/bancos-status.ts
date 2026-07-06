@@ -10,6 +10,8 @@ export interface BancoHorasRow {
   remaining: number
   status: HorasStatus
   projectEstado?: string // estado del proyecto (Excel Clientes_Proyectos): Activo/Finalizado/…
+  manager?: string // "Manager del proyecto" (Excel): para filtrar en Bancos
+  fechaAuditoria?: string // "Fecha Auditoría" (Excel) en ISO YYYY-MM-DD: para filtrar en Bancos
 }
 
 export interface AmpliacionHoras {
@@ -62,4 +64,39 @@ export function computeHorasStatus(assigned: number, consumed: number): HorasSta
   if (remaining === 0) return 'consumido'
   if (assigned > 0 && remaining < 0.2 * assigned) return 'bajo'
   return 'disponible'
+}
+
+// Un proyecto con su banco TOTAL (suma de sus posiciones) y el desglose por posición.
+export interface BancoHorasProyecto {
+  project: string
+  projectEstado?: string // estado del proyecto (Excel): mismo para todas sus posiciones
+  manager?: string // "Manager del proyecto" (Excel): mismo para todas sus posiciones
+  fechaAuditoria?: string // "Fecha Auditoría" (Excel) ISO: mismo para todas sus posiciones
+  positions: BancoHorasRow[] // desglose por posición
+  assigned: number
+  consumed: number
+  remaining: number
+  status: HorasStatus // estado del banco a nivel proyecto (calculado sobre los totales)
+}
+
+// Agrupa las filas (proyecto+posición) por proyecto, sumando el banco total y
+// calculando el estado a nivel proyecto. Las posiciones quedan ordenadas por nombre.
+export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[] {
+  const map = new Map<string, BancoHorasProyecto>()
+  for (const r of rows) {
+    let g = map.get(r.project)
+    if (!g) {
+      g = { project: r.project, projectEstado: r.projectEstado, manager: r.manager, fechaAuditoria: r.fechaAuditoria, positions: [], assigned: 0, consumed: 0, remaining: 0, status: 'sin_asignacion' }
+      map.set(r.project, g)
+    }
+    g.positions.push(r)
+    g.assigned += r.assigned
+    g.consumed += r.consumed
+  }
+  for (const g of map.values()) {
+    g.remaining = g.assigned - g.consumed
+    g.status = computeHorasStatus(g.assigned, g.consumed)
+    g.positions.sort((a, b) => a.position.localeCompare(b.position))
+  }
+  return [...map.values()]
 }

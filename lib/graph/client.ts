@@ -112,11 +112,25 @@ export const getCachedBancoHoras = unstable_cache(
 )
 
 // ── Estado de proyectos (hoja "Clientes_Proyectos" del mismo Excel) ──────────
-// Columnas: Proyecto | Tipo de Contrato | Estado. Traemos Proyecto→Estado para
-// distinguir proyectos finalizados al registrar. Se lee el usedRange de la hoja
-// (funciona sea o no una Tabla con nombre). El nombre de la hoja se puede
-// sobreescribir con SHAREPOINT_ESTADOS_SHEET (por defecto "Clientes_Proyectos").
-export interface ProyectoEstado { project: string; estado: string }
+// Columnas usadas: Proyecto | Estado | Manager del proyecto | Fecha Auditoría.
+// Proyecto→Estado distingue finalizados/pausados al registrar y en Bancos; el
+// manager y la fecha de auditoría se usan para filtrar en Bancos. Se lee el
+// usedRange de la hoja (funciona sea o no una Tabla con nombre). El nombre de la
+// hoja se puede sobreescribir con SHAREPOINT_ESTADOS_SHEET.
+export interface ProyectoEstado { project: string; estado: string; manager: string; fechaAuditoria: string }
+
+// Celda de fecha del Excel → ISO "YYYY-MM-DD". Acepta serial numérico o texto
+// tipo "12/31/2023". Vacío si no hay fecha o no se puede interpretar.
+function excelDateToISO(cell: unknown): string {
+  if (cell == null || cell === '') return ''
+  if (typeof cell === 'number') {
+    const ms = Math.round((cell - 25569) * 86400000) // 25569 = días de 1899-12-30 a 1970-01-01
+    const d = new Date(ms)
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
+  }
+  const t = Date.parse(String(cell).trim())
+  return isNaN(t) ? '' : new Date(t).toISOString().slice(0, 10)
+}
 
 async function readClientesProyectosSheet(
   token: string,
@@ -136,16 +150,25 @@ async function readClientesProyectosSheet(
   if (values.length < 2) return []
 
   const header = values[0]
-  const norm = (s: unknown) => String(s ?? '').trim().toLowerCase()
+  // Normaliza el encabezado: minúsculas y sin acentos (para casar "Fecha Auditoría").
+  const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   const projIdx = header.findIndex((h) => norm(h) === 'proyecto')
   const estadoIdx = header.findIndex((h) => norm(h) === 'estado')
   if (projIdx === -1 || estadoIdx === -1) {
     throw new Error(`La hoja ${sheet} necesita columnas "Proyecto" y "Estado".`)
   }
+  // Opcionales: manager del proyecto y fecha de auditoría (filtros de Bancos).
+  const managerIdx = header.findIndex((h) => norm(h) === 'manager del proyecto')
+  const auditIdx = header.findIndex((h) => norm(h) === 'fecha auditoria')
 
   return values
     .slice(1)
-    .map((cells) => ({ project: String(cells[projIdx] ?? '').trim(), estado: String(cells[estadoIdx] ?? '').trim() }))
+    .map((cells) => ({
+      project: String(cells[projIdx] ?? '').trim(),
+      estado: String(cells[estadoIdx] ?? '').trim(),
+      manager: managerIdx === -1 ? '' : String(cells[managerIdx] ?? '').trim(),
+      fechaAuditoria: auditIdx === -1 ? '' : excelDateToISO(cells[auditIdx]),
+    }))
     .filter((r) => r.project !== '')
 }
 
