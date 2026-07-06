@@ -183,7 +183,7 @@ function PosicionesSection({ posiciones, areas, etapas, departamentos, departmen
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="font-display text-lg font-semibold">Posiciones</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        El banco de horas es por posición (columnas del Excel). Abre cada una para ligar sus áreas (un manager verá los bancos de las posiciones de sus áreas) y las etapas que sus usuarios podrán elegir al registrar.
+        El banco de horas es por posición (columnas del Excel). Abre cada una para ligar las áreas a las que pertenece (definen en qué áreas registra y qué bancos ve un manager) y las etapas que sus usuarios podrán elegir al registrar.
       </p>
 
       <div className="mt-4 flex gap-2">
