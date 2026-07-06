@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import type { User } from '@supabase/supabase-js'
 
 // Helper que refresca la sesión del usuario en cada request
 export async function updateSession(request: NextRequest) {
@@ -26,18 +27,37 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Refresca la sesión (no usar getUser() con caché)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Refresca la sesión (no usar getUser() con caché). Si el refresh token guardado en
+  // la cookie está vencido o ya no existe (p. ej. una sesión vieja en local),
+  // getUser() lanza AuthApiError (refresh_token_not_found). Lo tratamos como "sin
+  // sesión" en vez de romper la app con el error crudo, y limpiamos las cookies de
+  // auth para que el próximo request no vuelva a chocar con el token inválido.
+  let user: User | null = null
+  let staleSession = false
+  try {
+    user = (await supabase.auth.getUser()).data.user
+  } catch {
+    staleSession = true
+  }
+
+  // Borra las cookies de auth de Supabase (sb-<ref>-auth-token[.n]) del response que
+  // se devuelve, solo cuando la sesión era inválida.
+  const clearAuthCookies = (res: NextResponse) => {
+    if (staleSession) {
+      for (const c of request.cookies.getAll()) {
+        if (/^sb-.*-auth-token/.test(c.name)) res.cookies.delete(c.name)
+      }
+    }
+    return res
+  }
 
   const isAuthPage = request.nextUrl.pathname.startsWith('/login')
 
   if (!user && !isAuthPage) {
-    // Sin sesión y no está en login → redirigir al login
+    // Sin sesión (o token inválido) y no está en login → redirigir al login
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    return NextResponse.redirect(url)
+    return clearAuthCookies(NextResponse.redirect(url))
   }
 
   if (user && isAuthPage) {
@@ -47,5 +67,5 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  return supabaseResponse
+  return clearAuthCookies(supabaseResponse)
 }
