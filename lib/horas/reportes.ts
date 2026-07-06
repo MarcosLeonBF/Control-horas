@@ -10,7 +10,7 @@ interface RawLine {
   description: string | null
   areas: { name: string } | null
   etapas: { name: string } | null
-  time_logs: { entry_date: string; profiles: { full_name: string; positions: { name: string } | null } | null } | null
+  time_logs: { entry_date: string; user_id: string; profiles: { full_name: string; positions: { name: string } | null } | null } | null
 }
 
 // Líneas de registro (no anuladas) dentro de un rango de fechas, con nombres resueltos.
@@ -32,6 +32,7 @@ export async function getReporteLines(from: string, to: string): Promise<Reporte
     area: l.areas?.name ?? '—',
     etapa: l.etapas?.name ?? '—',
     department: l.department,
+    userId: l.time_logs?.user_id ?? '',
     user: l.time_logs?.profiles?.full_name ?? '—',
     position: l.time_logs?.profiles?.positions?.name ?? '—',
     hours: Number(l.hours),
@@ -57,7 +58,7 @@ export async function getReporteOptions(scope: ViewerScope): Promise<ReporteFilt
     areaNames = (data ?? []).map((a) => a.name as string)
   }
 
-  const { data: profiles } = await supabase.from('profiles').select('full_name').not('full_name', 'is', null).order('full_name')
+  const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').not('full_name', 'is', null).order('full_name')
 
   let projects: string[] = []
   try {
@@ -85,9 +86,22 @@ export async function getReporteOptions(scope: ViewerScope): Promise<ReporteFilt
     positionNames = (data ?? []).map((p) => p.name as string)
   }
 
+  // Usuarios para el filtro: id (identidad) + nombre. El nombre no es único (dos
+  // personas pueden llamarse igual): a los homónimos se les agrega el email para
+  // poder distinguirlos a la vista.
+  const profs = (profiles ?? []).filter((p) => p.full_name)
+  const nameCount = new Map<string, number>()
+  for (const p of profs) nameCount.set(p.full_name as string, (nameCount.get(p.full_name as string) ?? 0) + 1)
+  const users = profs.map((p) => {
+    const name = p.full_name as string
+    const email = (p.email as string | null) ?? ''
+    const dup = (nameCount.get(name) ?? 0) > 1
+    return { id: p.id as string, name, label: dup && email ? `${name} (${email})` : name }
+  })
+
   return {
     projects,
-    users: (profiles ?? []).map((p) => p.full_name as string).filter(Boolean),
+    users,
     areas: areaNames,
     departments: ['Clientes', 'Ventas', 'Marketing', 'Todos'], // TODO: Cargar de DB si es necesario, pero actualmente es estático en reportes
     positions: positionNames,

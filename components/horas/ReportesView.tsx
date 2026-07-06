@@ -62,12 +62,15 @@ export default function ReportesView({
   const [fArea, setFArea] = useState('')
   const [fPosition, setFPosition] = useState('')
 
+  // Nombre a mostrar por usuario (con email si hay homónimos), indexado por id.
+  const userLabel = useMemo(() => new Map(options.users.map((u) => [u.id, u.label])), [options.users])
+
   const filtered = useMemo(
     () =>
       lines.filter(
         (l) =>
           (!fProject || l.project === fProject) &&
-          (!fUser || l.user === fUser) &&
+          (!fUser || l.userId === fUser) &&
           (!fArea || l.area === fArea) &&
           (!fPosition || l.position === fPosition),
       ),
@@ -92,12 +95,12 @@ export default function ReportesView({
 
   // Resumen agrupado (consumo por la dimensión elegida).
   function buildResumen(): ExportRow[] {
-    return rows.map((r) => ({ [dimLabel]: r.label, Horas: r.hours }))
+    return rows.map((r) => ({ [dimLabel]: groupBy === 'user' ? (userLabel.get(r.key) ?? r.label) : r.label, Horas: r.hours }))
   }
   // Detalle: líneas de registro crudas (§17.5 "descarga de líneas de registro").
   function buildDetalle(): ExportRow[] {
     return filtered.map((l) => ({
-      Fecha: l.date, Usuario: l.user, Posición: l.position, Proyecto: l.project, Área: l.area,
+      Fecha: l.date, Usuario: userLabel.get(l.userId) ?? l.user, Posición: l.position, Proyecto: l.project, Área: l.area,
       Departamento: l.department, Etapa: l.etapa, Horas: l.hours, Descripción: l.description,
     }))
   }
@@ -105,8 +108,8 @@ export default function ReportesView({
   function buildRegistros(): ExportRow[] {
     const map = new Map<string, { Fecha: string; Usuario: string; Total: number }>()
     for (const l of filtered) {
-      const key = `${l.date}|${l.user}`
-      const cur = map.get(key) ?? { Fecha: l.date, Usuario: l.user, Total: 0 }
+      const key = `${l.date}|${l.userId}`
+      const cur = map.get(key) ?? { Fecha: l.date, Usuario: userLabel.get(l.userId) ?? l.user, Total: 0 }
       cur.Total += l.hours
       map.set(key, cur)
     }
@@ -139,7 +142,7 @@ export default function ReportesView({
         </NativeSelect>
         <NativeSelect aria-label="Filtrar por usuario" value={fUser} onChange={(e) => setFUser(e.target.value)} className={selectClass}>
           <option value="">Todos los usuarios</option>
-          {options.users.map((u) => <option key={u} value={u}>{u}</option>)}
+          {options.users.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
         </NativeSelect>
         <NativeSelect aria-label="Filtrar por área" value={fArea} onChange={(e) => setFArea(e.target.value)} className={selectClass}>
           <option value="">Todas las áreas</option>
@@ -217,13 +220,14 @@ export default function ReportesView({
             {rows.map((r, i) => {
               const pct = totals.total > 0 ? (r.hours / totals.total) * 100 : 0
               const barW = max > 0 ? (r.hours / max) * 100 : 0
+              const label = groupBy === 'user' ? (userLabel.get(r.key) ?? r.label) : r.label
               return (
                 <li
-                  key={r.label}
+                  key={r.key}
                   className="grid grid-cols-[2.5rem_1fr_minmax(8rem,1.4fr)_5rem_3.5rem] items-center gap-3 border-b border-border/60 px-5 py-3 text-sm transition-colors last:border-0 hover:bg-(--muted-surface)/60"
                 >
                   <span className="text-right text-xs tabular-money text-muted-foreground">{i + 1}</span>
-                  <span className="truncate font-medium text-foreground" title={r.label}>{r.label}</span>
+                  <span className="truncate font-medium text-foreground" title={label}>{label}</span>
                   <span className="h-2 overflow-hidden rounded-full bg-(--muted-surface)">
                     <span className="block h-full rounded-full bg-(--brand)" style={{ width: `${barW}%` }} />
                   </span>
