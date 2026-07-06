@@ -2,14 +2,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getViewerScope } from '@/lib/horas/scope'
 import { getEquipoComposicion, type MiembroEquipo } from '@/lib/horas/equipo'
-import { formatHoras } from '@/lib/horas/format'
 import { cn } from '@/lib/utils'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-
-const STATUS_VARIANT: Record<string, 'secondary' | 'outline' | 'destructive'> = {
-  guardado: 'secondary', editado: 'outline', anulado: 'destructive',
-}
+import EquipoRegistros, { type EquipoLog } from '@/components/horas/EquipoRegistros'
 
 function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '·'
@@ -46,11 +40,23 @@ export default async function EquipoPage() {
   const supabase = await createClient()
   const { data: logs } = await supabase
     .from('time_logs')
-    .select('id, entry_date, total_hours, status, profiles!time_logs_user_id_fkey(full_name)')
+    .select('id, entry_date, total_hours, status, profiles!time_logs_user_id_fkey(full_name), time_log_lines(project, hours, description, department, areas(name), etapas(name))')
     .order('entry_date', { ascending: false })
     .limit(200)
 
-  type Log = { id: string; entry_date: string; total_hours: number; status: string; profiles: { full_name: string } | null }
+  type RawLog = {
+    id: string; entry_date: string; total_hours: number; status: string
+    profiles: { full_name: string } | null
+    time_log_lines: { project: string; hours: number; description: string | null; department: string | null; areas: { name: string } | null; etapas: { name: string } | null }[] | null
+  }
+  const registros: EquipoLog[] = ((logs ?? []) as unknown as RawLog[]).map((l) => ({
+    id: l.id, entry_date: l.entry_date, total_hours: Number(l.total_hours), status: l.status,
+    user: l.profiles?.full_name ?? '—',
+    lines: (l.time_log_lines ?? []).map((ln) => ({
+      project: ln.project, hours: Number(ln.hours), description: ln.description ?? '',
+      department: ln.department ?? '', area: ln.areas?.name ?? '', etapa: ln.etapas?.name ?? '',
+    })),
+  }))
 
   return (
     <div className="space-y-10">
@@ -126,36 +132,9 @@ export default async function EquipoPage() {
 
       {/* Registros del equipo */}
       <section>
-        <h2 className="font-display mb-4 border-b border-border pb-2 text-lg font-semibold">Registros del equipo</h2>
-        <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-(--muted-surface) hover:bg-(--muted-surface)">
-                <TableHead>Fecha</TableHead>
-                <TableHead>Usuario</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(logs ?? []).length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="py-10 text-center text-muted-foreground">Aún no hay registros.</TableCell>
-                </TableRow>
-              )}
-              {((logs ?? []) as unknown as Log[]).map((l) => (
-                <TableRow key={l.id}>
-                  <TableCell className="py-3">{l.entry_date}</TableCell>
-                  <TableCell className="py-3 text-foreground/70">{l.profiles?.full_name ?? '—'}</TableCell>
-                  <TableCell className="py-3 text-right tabular-money">{formatHoras(Number(l.total_hours))}</TableCell>
-                  <TableCell className="py-3 text-right">
-                    <Badge variant={STATUS_VARIANT[l.status] ?? 'outline'} className="capitalize">{l.status}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <h2 className="font-display mb-1 border-b border-border pb-2 text-lg font-semibold">Registros del equipo</h2>
+        <p className="mb-4 mt-2 text-sm text-muted-foreground">Cada registro se despliega para ver sus líneas: proyecto, área/departamento, etapa, horas y el motivo.</p>
+        <EquipoRegistros logs={registros} />
       </section>
     </div>
   )

@@ -91,32 +91,34 @@ export default async function BancoDetallePage({ params }: { params: Promise<{ p
         {d.ampliaciones.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin ampliaciones. El asignado es el del Excel.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="py-2 font-medium">Fecha</th>
-                <th className="py-2 font-medium">Horas</th>
-                <th className="py-2 font-medium">Motivo</th>
-                <th className="py-2 font-medium">Por</th>
-                {isAdmin && <th className="py-2 font-medium text-right">Acción</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {d.ampliaciones.map((a) => (
-                <tr key={a.id} className={`border-t border-border ${a.active ? '' : 'text-muted-foreground line-through'}`}>
-                  <td className="py-2">{a.entry_date}</td>
-                  <td className="tabular-money py-2">+{formatHoras(Number(a.hours))}</td>
-                  <td className="py-2">{a.reason}</td>
-                  <td className="py-2">{a.actor_name}</td>
-                  {isAdmin && (
-                    <td className="py-2 text-right">
-                      {a.active ? <AnularAmpliacionButton id={a.id} project={project} /> : <span className="text-xs">anulada</span>}
-                    </td>
-                  )}
+          <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-(--muted-surface) text-left text-muted-foreground">
+                  <th className="px-4 py-2.5 font-medium">Fecha</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Horas</th>
+                  <th className="px-4 py-2.5 font-medium">Motivo</th>
+                  <th className="px-4 py-2.5 font-medium">Por</th>
+                  {isAdmin && <th className="px-4 py-2.5 font-medium text-right">Acción</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {d.ampliaciones.map((a) => (
+                  <tr key={a.id} className={`border-t border-border ${a.active ? '' : 'text-muted-foreground line-through'}`}>
+                    <td className="px-4 py-2.5 whitespace-nowrap">{a.entry_date}</td>
+                    <td className="tabular-money px-4 py-2.5 text-right whitespace-nowrap">+{formatHoras(Number(a.hours))}</td>
+                    <td className="px-4 py-2.5">{a.reason}</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap">{a.actor_name}</td>
+                    {isAdmin && (
+                      <td className="px-4 py-2.5 text-right">
+                        {a.active ? <AnularAmpliacionButton id={a.id} project={project} /> : <span className="text-xs">anulada</span>}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -128,35 +130,35 @@ export default async function BancoDetallePage({ params }: { params: Promise<{ p
         {d.movimientos.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin movimientos todavía.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+            <table className="w-full min-w-176 text-sm">
               <thead>
-                <tr className="text-left text-muted-foreground">
-                  <th className="py-2 font-medium">Fecha</th>
-                  <th className="py-2 font-medium">Acción</th>
-                  <th className="py-2 font-medium text-right">Horas</th>
-                  <th className="py-2 font-medium text-right">Antes</th>
-                  <th className="py-2 font-medium text-right">Después</th>
-                  <th className="py-2 font-medium">Por</th>
-                  <th className="py-2 font-medium">Detalle</th>
+                <tr className="bg-(--muted-surface) text-left text-muted-foreground">
+                  <th className="px-4 py-2.5 font-medium">Fecha</th>
+                  <th className="px-4 py-2.5 font-medium">Acción</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Horas</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Antes</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Después</th>
+                  <th className="px-4 py-2.5 font-medium">Por</th>
+                  <th className="px-4 py-2.5 font-medium">Detalle</th>
                 </tr>
               </thead>
               <tbody>
                 {d.movimientos.map((m, i) => (
                   <tr key={i} className="border-t border-border">
-                    <td className="py-2 whitespace-nowrap">{m.date}</td>
-                    <td className="py-2">
+                    <td className="px-4 py-2.5 whitespace-nowrap">{m.date}</td>
+                    <td className="px-4 py-2.5">
                       <span className={m.kind === 'ampliacion' ? 'text-(--brand)' : 'text-foreground/70'}>
                         {m.kind === 'ampliacion' ? 'Ampliación' : 'Consumo'}
                       </span>
                     </td>
-                    <td className={`tabular-money py-2 text-right ${m.kind === 'ampliacion' ? 'text-(--brand)' : ''}`}>
+                    <td className={`tabular-money px-4 py-2.5 text-right whitespace-nowrap ${m.kind === 'ampliacion' ? 'text-(--brand)' : ''}`}>
                       {m.kind === 'ampliacion' ? '+' : '−'}{formatHoras(m.hours)}
                     </td>
-                    <td className="tabular-money py-2 text-right text-foreground/55">{formatHoras(m.saldoAntes)}</td>
-                    <td className={`tabular-money py-2 text-right ${m.saldoDespues < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(m.saldoDespues)}</td>
-                    <td className="py-2">{m.actor}</td>
-                    <td className="py-2 text-foreground/70">{m.detail}</td>
+                    <td className="tabular-money px-4 py-2.5 text-right text-foreground/55 whitespace-nowrap">{formatHoras(m.saldoAntes)}</td>
+                    <td className={`tabular-money px-4 py-2.5 text-right whitespace-nowrap ${m.saldoDespues < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(m.saldoDespues)}</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap">{m.actor}</td>
+                    <td className="px-4 py-2.5 text-foreground/70">{m.detail}</td>
                   </tr>
                 ))}
               </tbody>
