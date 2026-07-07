@@ -56,6 +56,21 @@ export const HORAS_STATUS_LABELS: Record<HorasStatus, string> = {
   excedido: 'Excedido',
 }
 
+// Orden de severidad para ordenar bancos/posiciones: excedido primero, sin_asignacion
+// al fondo. Compartido por la lista de bancos y el detalle "Por posición".
+export const HORAS_SEVERITY: Record<HorasStatus, number> = {
+  excedido: 0, bajo: 1, disponible: 2, consumido: 3, sin_asignacion: 4,
+}
+
+// Color de la barra de progreso según el estado del banco.
+export const HORAS_BAR_COLOR: Record<HorasStatus, string> = {
+  excedido: 'bg-(--status-excedido)',
+  bajo: 'bg-(--status-bajo)',
+  disponible: 'bg-(--status-disponible)',
+  consumido: 'bg-(--status-consumido)',
+  sin_asignacion: 'bg-(--status-sin)',
+}
+
 // Mismos umbrales que compute_hucha_status (migración 0002), pero con horas.
 export function computeHorasStatus(assigned: number, consumed: number): HorasStatus {
   if (assigned === 0 && consumed === 0) return 'sin_asignacion'

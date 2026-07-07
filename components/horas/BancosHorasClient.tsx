@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Search, AlertTriangle, TrendingDown, Download, ChevronRight, X } from 'lucide-react'
 import type { BancoHorasRow, HorasStatus } from '@/lib/horas/bancos-status'
-import { HORAS_STATUS_LABELS, groupBancosByProject, estadoProyectoBadgeClass } from '@/lib/horas/bancos-status'
+import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProject, estadoProyectoBadgeClass } from '@/lib/horas/bancos-status'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
@@ -12,18 +12,6 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import NativeSelect from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
-
-const SEVERITY: Record<HorasStatus, number> = {
-  excedido: 0, bajo: 1, disponible: 2, consumido: 3, sin_asignacion: 4,
-}
-
-const BAR_COLOR: Record<HorasStatus, string> = {
-  excedido: 'bg-(--status-excedido)',
-  bajo: 'bg-(--status-bajo)',
-  disponible: 'bg-(--status-disponible)',
-  consumido: 'bg-(--status-consumido)',
-  sin_asignacion: 'bg-(--status-sin)',
-}
 
 const ESTADOS: HorasStatus[] = ['excedido', 'bajo', 'disponible', 'consumido', 'sin_asignacion']
 
@@ -78,13 +66,13 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
         if (auditTo && (!fa || fa > auditTo)) return false
         return true
       })
-      .sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status] || a.project.localeCompare(b.project) || a.position.localeCompare(b.position))
+      .sort((a, b) => HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status] || a.project.localeCompare(b.project) || a.position.localeCompare(b.position))
   }, [rows, search, estado, posicion, manager, auditFrom, auditTo])
 
   // Agrupado por proyecto: una fila por proyecto con el banco total; el desglose por
   // posición se ve al desplegar. El total refleja las posiciones visibles (con filtros).
   const groups = useMemo(
-    () => groupBancosByProject(filtered).sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status] || a.project.localeCompare(b.project)),
+    () => groupBancosByProject(filtered).sort((a, b) => HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status] || a.project.localeCompare(b.project)),
     [filtered],
   )
 
@@ -247,7 +235,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                         <span className="text-muted-foreground"> / {formatHoras(g.assigned)}</span>
                       </span>
                       <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-(--muted-surface)">
-                        <span className={cn('block h-full rounded-full', BAR_COLOR[g.status])} style={{ width: `${pct}%` }} />
+                        <span className={cn('block h-full rounded-full', HORAS_BAR_COLOR[g.status])} style={{ width: `${pct}%` }} />
                       </span>
                     </span>
 

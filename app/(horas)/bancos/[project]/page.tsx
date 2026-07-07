@@ -4,7 +4,7 @@ import { getBancoHorasDetalle, type BancosScope } from '@/lib/horas/bancos'
 import { getCachedProyectosEstado } from '@/lib/graph/client'
 import { getViewerScope } from '@/lib/horas/scope'
 import { formatHoras, formatFechaISO } from '@/lib/horas/format'
-import { estadoProyectoBadgeClass } from '@/lib/horas/bancos-status'
+import { estadoProyectoBadgeClass, HORAS_BAR_COLOR } from '@/lib/horas/bancos-status'
 import { cn } from '@/lib/utils'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import AmpliarHorasForm from '@/components/horas/AmpliarHorasForm'
@@ -97,7 +97,14 @@ export default async function BancoDetallePage({ params }: { params: Promise<{ p
               <tbody>
                 {d.posiciones.map((p) => (
                   <tr key={p.position} className="border-t border-border">
-                    <td className="px-4 py-2.5 font-medium">{p.position}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="font-medium">{p.position}</div>
+                      {p.assigned > 0 && (
+                        <div className="mt-1.5 h-1.5 w-40 max-w-full overflow-hidden rounded-full bg-(--muted-surface)">
+                          <div className={cn('h-full rounded-full', HORAS_BAR_COLOR[p.status])} style={{ width: `${Math.min((p.consumed / p.assigned) * 100, 100)}%` }} />
+                        </div>
+                      )}
+                    </td>
                     <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.assigned)}</td>
                     <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.consumed)}</td>
                     <td className={`tabular-money px-4 py-2.5 text-right ${p.remaining < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(p.remaining)}</td>
