@@ -80,7 +80,7 @@ async function readBancoHorasTable(
   const positions = header.slice(1).map((h) => String(h ?? '').trim()) // columnas 1..n = posiciones
   const rows = (await rowsRes.json() as { value: Array<{ values: unknown[][] }> }).value
 
-  return rows
+  const mapped = rows
     .map((row) => {
       const cells = row.values[0]
       const project = String(cells[0] ?? '').trim()
@@ -90,6 +90,21 @@ async function readBancoHorasTable(
       return { project, positions: list }
     })
     .filter((item) => item.project !== '')
+
+  // Consolidación defensiva: el Excel puede traer filas de proyecto y/o columnas de
+  // posición repetidas (bug de datos que infla posiciones y horas). Dejamos UNA
+  // entrada por proyecto con posiciones únicas (la primera aparición de cada posición
+  // gana). Así la lista y el detalle ven los mismos datos, sin duplicados.
+  const byProject = new Map<string, BancoHorasProyecto>()
+  for (const item of mapped) {
+    let entry = byProject.get(item.project)
+    if (!entry) { entry = { project: item.project, positions: [] }; byProject.set(item.project, entry) }
+    const seen = new Set(entry.positions.map((p) => p.position))
+    for (const p of item.positions) {
+      if (!seen.has(p.position)) { entry.positions.push(p); seen.add(p.position) }
+    }
+  }
+  return [...byProject.values()]
 }
 
 // Función principal que ejecuta los 3 pasos
