@@ -4,14 +4,13 @@ import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Search, AlertTriangle, TrendingDown, Download, ChevronRight, X } from 'lucide-react'
 import type { BancoHorasRow, HorasStatus } from '@/lib/horas/bancos-status'
-import { HORAS_STATUS_LABELS, groupBancosByProject } from '@/lib/horas/bancos-status'
+import { HORAS_STATUS_LABELS, groupBancosByProject, estadoProyectoBadgeClass } from '@/lib/horas/bancos-status'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
-import { formatHoras } from '@/lib/horas/format'
+import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import NativeSelect from '@/components/ui/native-select'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 const SEVERITY: Record<HorasStatus, number> = {
@@ -30,21 +29,6 @@ const ESTADOS: HorasStatus[] = ['excedido', 'bajo', 'disponible', 'consumido', '
 
 const selectClass =
   'h-10 min-w-40 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
-
-// ISO "YYYY-MM-DD" → "DD/MM/YYYY" (sin desfase de zona horaria).
-function formatFecha(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return y && m && d ? `${d}/${m}/${y}` : iso
-}
-
-// Estilo de la insignia según el estado del proyecto (Excel Clientes_Proyectos).
-function estadoProyectoClass(estado: string): string {
-  const e = estado.toLowerCase()
-  if (e === 'finalizado') return 'bg-foreground/[0.07] text-muted-foreground'
-  if (e === 'activo') return 'bg-(--status-disponible)/12 text-(--status-disponible)'
-  if (e.includes('paus')) return 'bg-(--status-pausado)/12 text-(--status-pausado)'
-  return 'bg-(--muted-surface) text-muted-foreground'
-}
 
 function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'excedido' }) {
   return (
@@ -72,14 +56,6 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   const [manager, setManager] = useState('todos')
   const [auditFrom, setAuditFrom] = useState('')
   const [auditTo, setAuditTo] = useState('')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const toggle = (project: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(project)) next.delete(project)
-      else next.add(project)
-      return next
-    })
 
   const positions = useMemo(() => [...new Set(rows.map((r) => r.position))].sort((a, b) => a.localeCompare(b)), [rows])
   const managers = useMemo(
@@ -126,7 +102,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   function buildRows(): ExportRow[] {
     return filtered.map((r) => ({
       Proyecto: r.project, 'Estado proyecto': r.projectEstado ?? '—',
-      Manager: r.manager || '—', 'Fecha auditoría': r.fechaAuditoria ? formatFecha(r.fechaAuditoria) : '—',
+      Manager: r.manager || '—', 'Fecha auditoría': r.fechaAuditoria ? formatFechaISO(r.fechaAuditoria) : '—',
       Posición: r.position,
       Asignado: r.assigned, Consumido: r.consumed, Restante: r.remaining, 'Estado banco': HORAS_STATUS_LABELS[r.status],
     }))
@@ -137,9 +113,9 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
     <div className="space-y-6">
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Asignado total" value={formatHoras(totals.assigned)} />
-        <Kpi label="Consumido total" value={formatHoras(totals.consumed)} />
-        <Kpi label="Restante total" value={formatHoras(totals.remaining)} tone={totals.remaining < 0 ? 'excedido' : undefined} />
+        <Kpi label="Asignado total" value={formatHorasTotal(totals.assigned)} />
+        <Kpi label="Consumido total" value={formatHorasTotal(totals.consumed)} />
+        <Kpi label="Restante total" value={formatHorasTotal(totals.remaining)} tone={totals.remaining < 0 ? 'excedido' : undefined} />
         <Card className="gap-2 p-5">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Atención</p>
           <div className="flex flex-wrap gap-4 text-sm">
@@ -223,12 +199,13 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
         </button>
       </div>
 
-      {/* Lista agrupada por proyecto: desplegar una fila para ver el desglose por posición */}
+      {/* Lista agrupada por proyecto: click en una fila abre el detalle del proyecto */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="hidden items-center gap-4 border-b border-border bg-(--muted-surface) px-5 py-2.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-muted-foreground md:flex">
           <span className="flex-1">Proyecto</span>
           <span className="w-44 text-right">Banco total</span>
           <span className="w-28 text-right">Estado</span>
+          <span className="w-4" aria-hidden />
         </div>
 
         {groups.length === 0 ? (
@@ -236,27 +213,31 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
         ) : (
           <ul className="divide-y divide-border">
             {groups.map((g) => {
-              const open = expanded.has(g.project)
               const pct = g.assigned > 0 ? Math.min((g.consumed / g.assigned) * 100, 100) : 0
               return (
                 <li key={g.project}>
-                  <button
-                    type="button"
-                    onClick={() => toggle(g.project)}
-                    aria-expanded={open}
-                    className="group flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none transition-colors hover:bg-(--muted-surface)/50 focus-visible:bg-(--muted-surface)/50 md:gap-4 md:px-5"
+                  <Link
+                    href={`/bancos/${encodeURIComponent(g.project)}`}
+                    className="group flex w-full items-center gap-3 px-4 py-3.5 outline-none transition-colors hover:bg-(--muted-surface)/50 focus-visible:bg-(--muted-surface)/50 md:gap-4 md:px-5"
                   >
-                    <span className="flex min-w-0 flex-1 items-center gap-2.5">
-                      <ChevronRight className={cn('size-4 shrink-0 text-muted-foreground/60 transition-transform duration-300 group-hover:text-(--brand)', open && 'rotate-90')} />
-                      <span className="truncate font-display text-[0.95rem] font-medium text-foreground">{g.project}</span>
-                      {g.projectEstado && (
-                        <span className={cn('shrink-0 rounded-full px-1.5 py-px text-[0.62rem] font-medium', estadoProyectoClass(g.projectEstado))}>
-                          {g.projectEstado}
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="flex items-center gap-2.5">
+                        <span className="truncate font-display text-[0.95rem] font-medium text-foreground transition-colors group-hover:text-(--brand)">{g.project}</span>
+                        {g.projectEstado && (
+                          <span className={cn('shrink-0 rounded-full px-1.5 py-px text-[0.62rem] font-medium', estadoProyectoBadgeClass(g.projectEstado))}>
+                            {g.projectEstado}
+                          </span>
+                        )}
+                        <span className="hidden shrink-0 text-xs text-muted-foreground/60 sm:inline">
+                          {g.positions.length} {g.positions.length === 1 ? 'posición' : 'posiciones'}
+                        </span>
+                      </span>
+                      {(g.manager || g.fechaAuditoria) && (
+                        <span className="flex flex-wrap gap-x-4 text-[0.7rem] text-muted-foreground/70">
+                          {g.manager && <span>Manager <span className="text-foreground/70">{g.manager}</span></span>}
+                          {g.fechaAuditoria && <span>Auditoría <span className="text-foreground/70">{formatFechaISO(g.fechaAuditoria)}</span></span>}
                         </span>
                       )}
-                      <span className="hidden shrink-0 text-xs text-muted-foreground/60 sm:inline">
-                        {g.positions.length} {g.positions.length === 1 ? 'posición' : 'posiciones'}
-                      </span>
                     </span>
 
                     {/* Banco total con barra (escritorio) */}
@@ -277,51 +258,8 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                     </span>
 
                     <span className="w-28 shrink-0 text-right"><HorasStatusBadge status={g.status} /></span>
-                  </button>
-
-                  {/* Desglose por posición (desplegable animado) */}
-                  <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
-                    <div className="overflow-hidden">
-                      <div className="border-t border-border/60 bg-(--muted-surface)/40 px-4 pb-4 pt-2 md:px-5 md:pl-11">
-                        {(g.manager || g.fechaAuditoria) && (
-                          <div className="mb-2.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
-                            {g.manager && <span>Manager <span className="font-medium text-foreground/80">{g.manager}</span></span>}
-                            {g.fechaAuditoria && <span>Auditoría <span className="font-medium text-foreground/80">{formatFecha(g.fechaAuditoria)}</span></span>}
-                          </div>
-                        )}
-                        <div className="overflow-x-auto">
-                          <table className="w-full min-w-md text-sm">
-                            <thead>
-                              <tr className="text-left text-[0.7rem] uppercase tracking-wide text-muted-foreground/80">
-                                <th className="py-2 pr-3 font-medium">Posición</th>
-                                <th className="py-2 pr-3 font-medium text-right">Asignado</th>
-                                <th className="py-2 pr-3 font-medium text-right">Consumido</th>
-                                <th className="py-2 pr-3 font-medium text-right">Restante</th>
-                                <th className="py-2 font-medium text-right">Estado</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {g.positions.map((p) => (
-                                <tr key={p.position} className="border-t border-border/50">
-                                  <td className="py-2 pr-3"><Badge variant="secondary">{p.position}</Badge></td>
-                                  <td className="tabular-money py-2 pr-3 text-right text-foreground/80">{formatHoras(p.assigned)}</td>
-                                  <td className="tabular-money py-2 pr-3 text-right text-foreground/80">{formatHoras(p.consumed)}</td>
-                                  <td className={cn('tabular-money py-2 pr-3 text-right font-medium', p.remaining < 0 && 'text-(--status-excedido)')}>{formatHoras(p.remaining)}</td>
-                                  <td className="py-2 text-right"><HorasStatusBadge status={p.status} /></td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        <Link
-                          href={`/bancos/${encodeURIComponent(g.project)}`}
-                          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-(--brand) transition-colors hover:text-(--brand-strong)"
-                        >
-                          Ver detalle completo <ChevronRight className="size-3.5" />
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
+                    <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-(--brand) md:block" />
+                  </Link>
                 </li>
               )
             })}

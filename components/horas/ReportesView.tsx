@@ -5,7 +5,7 @@ import { Download, Filter, X } from 'lucide-react'
 import type { ReporteLine, ReporteFilterOptions, GroupBy } from '@/lib/horas/reportes-types'
 import { GROUP_LABELS, GROUP_ORDER, aggregate } from '@/lib/horas/reportes-types'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
-import { formatHoras } from '@/lib/horas/format'
+import { formatHoras, formatHorasTotal } from '@/lib/horas/format'
 import NativeSelect from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 
@@ -125,9 +125,9 @@ export default function ReportesView({
     <div className="animate-fade-up space-y-7">
       {/* Resumen */}
       <div className="grid gap-5 rounded-2xl border border-border bg-card px-6 py-5 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Total de horas" value={formatHoras(totals.total)} accent="brand" />
-        <Stat label="Horas cliente" value={formatHoras(totals.cliente)} accent="wine" />
-        <Stat label="Horas internas" value={formatHoras(totals.internas)} accent="muted" />
+        <Stat label="Total de horas" value={formatHorasTotal(totals.total)} accent="brand" />
+        <Stat label="Horas cliente" value={formatHorasTotal(totals.cliente)} accent="wine" />
+        <Stat label="Horas internas" value={formatHorasTotal(totals.internas)} accent="muted" />
         <Stat label="Líneas" value={String(totals.lineas)} accent="muted" />
       </div>
 
@@ -243,7 +243,7 @@ export default function ReportesView({
             <span />
             <span className="font-display font-semibold">Total</span>
             <span />
-            <span className="text-right tabular-money font-semibold">{formatHoras(totals.total)}</span>
+            <span className="text-right tabular-money font-semibold">{formatHorasTotal(totals.total)}</span>
             <span className="text-right text-xs text-muted-foreground">100%</span>
           </div>
         )}

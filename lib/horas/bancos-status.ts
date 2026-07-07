@@ -79,6 +79,17 @@ export interface BancoHorasProyecto {
   status: HorasStatus // estado del banco a nivel proyecto (calculado sobre los totales)
 }
 
+// Clase de la insignia según el estado del proyecto (Excel Clientes_Proyectos):
+// finalizado (gris), activo (verde), pausado (azul), otros (muted). Compartida por la
+// lista de bancos y la vista de detalle.
+export function estadoProyectoBadgeClass(estado: string): string {
+  const e = estado.toLowerCase()
+  if (e === 'finalizado') return 'bg-foreground/[0.07] text-muted-foreground'
+  if (e === 'activo') return 'bg-(--status-disponible)/12 text-(--status-disponible)'
+  if (e.includes('paus')) return 'bg-(--status-pausado)/12 text-(--status-pausado)'
+  return 'bg-(--muted-surface) text-muted-foreground'
+}
+
 // Agrupa las filas (proyecto+posición) por proyecto, sumando el banco total y
 // calculando el estado a nivel proyecto. Las posiciones quedan ordenadas por nombre.
 export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[] {
