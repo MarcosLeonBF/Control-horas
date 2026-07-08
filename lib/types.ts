@@ -27,9 +27,15 @@ export interface BancoPosicion {
   position: string
   hours: number
 }
+// Asignación de un mes concreto (fila del Excel con columna Fecha).
+export interface BancoMes {
+  month: string // 'YYYY-MM'
+  positions: BancoPosicion[]
+}
 export interface BancoHorasProyecto {
   project: string
-  positions: BancoPosicion[]
+  positions: BancoPosicion[] // totales = Σ de todas las filas (incluye filas sin fecha)
+  months: BancoMes[] // orden ascendente; las filas sin fecha NO aparecen en ningún mes
 }
 
 export interface ProjectSummary extends BancoHorasItem {

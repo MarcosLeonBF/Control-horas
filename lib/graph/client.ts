@@ -8,6 +8,22 @@ function encodeShareUrl(url: string): string {
   return 'u!' + Buffer.from(url).toString('base64url')
 }
 
+// Normaliza nombres de cabecera: minúsculas y sin acentos (casa "Fecha", "Fecha Auditoría"…).
+const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+
+// Celda de fecha del Excel → ISO "YYYY-MM-DD". Acepta serial numérico o texto
+// tipo "12/31/2023". Vacío si no hay fecha o no se puede interpretar.
+function excelDateToISO(cell: unknown): string {
+  if (cell == null || cell === '') return ''
+  if (typeof cell === 'number') {
+    const ms = Math.round((cell - 25569) * 86400000) // 25569 = días de 1899-12-30 a 1970-01-01
+    const d = new Date(ms)
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
+  }
+  const t = Date.parse(String(cell).trim())
+  return isNaN(t) ? '' : new Date(t).toISOString().slice(0, 10)
+}
+
 // Paso 1: obtiene el token de acceso con client credentials
 async function getToken(): Promise<string> {
   const res = await fetch(
@@ -77,34 +93,59 @@ async function readBancoHorasTable(
   }
 
   const header = (await headerRes.json() as { values: unknown[][] }).values[0] ?? []
-  const positions = header.slice(1).map((h) => String(h ?? '').trim()) // columnas 1..n = posiciones
+  // Columna "Fecha" (opcional, case/acentos-insensitive): mes de la asignación.
+  // El resto de columnas 1..n son posiciones. Col 0 = proyecto.
+  const fechaIdx = header.findIndex((h) => norm(h) === 'fecha')
+  const posCols = header
+    .map((h, col) => ({ position: String(h ?? '').trim(), col }))
+    .filter((c) => c.col !== 0 && c.col !== fechaIdx && c.position !== '')
   const rows = (await rowsRes.json() as { value: Array<{ values: unknown[][] }> }).value
 
-  const mapped = rows
-    .map((row) => {
-      const cells = row.values[0]
-      const project = String(cells[0] ?? '').trim()
-      const list = positions
-        .map((position, i) => ({ position, hours: Number(cells[i + 1] ?? 0) }))
-        .filter((p) => p.position !== '' && !isNaN(p.hours))
-      return { project, positions: list }
-    })
-    .filter((item) => item.project !== '')
-
-  // Consolidación defensiva: el Excel puede traer filas de proyecto y/o columnas de
-  // posición repetidas (bug de datos que infla posiciones y horas). Dejamos UNA
-  // entrada por proyecto con posiciones únicas (la primera aparición de cada posición
-  // gana). Así la lista y el detalle ven los mismos datos, sin duplicados.
-  const byProject = new Map<string, BancoHorasProyecto>()
-  for (const item of mapped) {
-    let entry = byProject.get(item.project)
-    if (!entry) { entry = { project: item.project, positions: [] }; byProject.set(item.project, entry) }
-    const seen = new Set(entry.positions.map((p) => p.position))
-    for (const p of item.positions) {
-      if (!seen.has(p.position)) { entry.positions.push(p); seen.add(p.position) }
+  // project → month ('' = sin fecha) → position → hours.
+  // Dentro de un mismo (proyecto, mes), fila/columna repetida = bug de datos:
+  // la primera aparición gana (misma política defensiva que antes por proyecto).
+  const byProject = new Map<string, Map<string, Map<string, number>>>()
+  for (const row of rows) {
+    const cells = row.values[0]
+    const project = String(cells[0] ?? '').trim()
+    if (project === '') continue
+    const month = fechaIdx === -1 ? '' : excelDateToISO(cells[fechaIdx]).slice(0, 7)
+    if (fechaIdx !== -1 && month === '') {
+      // Error de datos (spec §6): cuenta en totales, no aparece en ningún mes.
+      console.warn(`[banco-horas] fila sin fecha válida en el Excel: "${project}"`)
+    }
+    let months = byProject.get(project)
+    if (!months) { months = new Map(); byProject.set(project, months) }
+    let bucket = months.get(month)
+    if (!bucket) { bucket = new Map(); months.set(month, bucket) }
+    for (const { position, col } of posCols) {
+      const hours = Number(cells[col] ?? 0)
+      if (isNaN(hours)) continue
+      if (!bucket.has(position)) bucket.set(position, hours)
     }
   }
-  return [...byProject.values()]
+
+  // Totales por posición = Σ de todos los meses (incluida la clave '' sin fecha).
+  const result: BancoHorasProyecto[] = []
+  for (const [project, months] of byProject) {
+    const totals = new Map<string, number>()
+    for (const bucket of months.values()) {
+      for (const [position, hours] of bucket) totals.set(position, (totals.get(position) ?? 0) + hours)
+    }
+    const monthList = [...months.entries()]
+      .filter(([month]) => month !== '')
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, bucket]) => ({
+        month,
+        positions: [...bucket.entries()].map(([position, hours]) => ({ position, hours })),
+      }))
+    result.push({
+      project,
+      positions: [...totals.entries()].map(([position, hours]) => ({ position, hours })),
+      months: monthList,
+    })
+  }
+  return result
 }
 
 // Función principal que ejecuta los 3 pasos
@@ -134,19 +175,6 @@ export const getCachedBancoHoras = unstable_cache(
 // hoja se puede sobreescribir con SHAREPOINT_ESTADOS_SHEET.
 export interface ProyectoEstado { project: string; estado: string; manager: string; fechaAuditoria: string }
 
-// Celda de fecha del Excel → ISO "YYYY-MM-DD". Acepta serial numérico o texto
-// tipo "12/31/2023". Vacío si no hay fecha o no se puede interpretar.
-function excelDateToISO(cell: unknown): string {
-  if (cell == null || cell === '') return ''
-  if (typeof cell === 'number') {
-    const ms = Math.round((cell - 25569) * 86400000) // 25569 = días de 1899-12-30 a 1970-01-01
-    const d = new Date(ms)
-    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
-  }
-  const t = Date.parse(String(cell).trim())
-  return isNaN(t) ? '' : new Date(t).toISOString().slice(0, 10)
-}
-
 async function readClientesProyectosSheet(
   token: string,
   driveId: string,
@@ -165,8 +193,6 @@ async function readClientesProyectosSheet(
   if (values.length < 2) return []
 
   const header = values[0]
-  // Normaliza el encabezado: minúsculas y sin acentos (para casar "Fecha Auditoría").
-  const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   const projIdx = header.findIndex((h) => norm(h) === 'proyecto')
   const estadoIdx = header.findIndex((h) => norm(h) === 'estado')
   if (projIdx === -1 || estadoIdx === -1) {
