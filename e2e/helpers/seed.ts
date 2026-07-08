@@ -21,7 +21,9 @@ export async function seedManagerFixture() {
   })
   if (cErr) throw cErr
   const managerId = created.user!.id
-  await admin.from('profiles').update({ role: 'manager', status: 'activo' }).eq('id', managerId)
+  // must_change_password=false (migración 0029 lo pone true por defecto): evita que el
+  // gate de cambio de contraseña bloquee al manager en las rutas de la app.
+  await admin.from('profiles').update({ role: 'manager', status: 'activo', must_change_password: false }).eq('id', managerId)
 
   // 2) Proyecto asignado (trigger crea el banco en 0) + asignación
   const { data: pA } = await admin.from('projects').insert({ name: 'Cliente E2E Asignado', client: 'ACME' }).select('id').single()

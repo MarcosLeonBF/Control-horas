@@ -17,7 +17,9 @@ export async function seedHorasFixture() {
   })
   if (error) throw error
   const userId = created.user!.id
-  await admin.from('profiles').update({ role: 'operativo', status: 'activo' }).eq('id', userId)
+  // must_change_password=false: la migración 0029 lo pone true por defecto y el layout
+  // (horas) muestra la pantalla de cambio de contraseña, que bloquearía toda la suite e2e.
+  await admin.from('profiles').update({ role: 'operativo', status: 'activo', must_change_password: false }).eq('id', userId)
   const { data: area } = await admin.from('areas').select('id').eq('name', 'CRM').single()
   await admin.from('user_areas').insert({ user_id: userId, area_id: area!.id })
 
@@ -28,7 +30,7 @@ export async function seedHorasFixture() {
   })
   if (adminError) throw adminError
   const adminUserId = createdAdmin.user!.id
-  await admin.from('profiles').update({ role: 'admin', status: 'activo' }).eq('id', adminUserId)
+  await admin.from('profiles').update({ role: 'admin', status: 'activo', must_change_password: false }).eq('id', adminUserId)
 
   return {
     operativoEmail: OPERATIVO.email,
