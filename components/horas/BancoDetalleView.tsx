@@ -19,7 +19,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
   const maxMes = meses.length > 0 && meses[meses.length - 1] > currentMonth() ? meses[meses.length - 1] : currentMonth()
   const esMensual = vista === 'mensual'
 
-  // Cifras de cabecera: total (como hoy) o las del mes elegido (Excel + ampliaciones del mes).
+  // Cifras de cabecera: total confirmado, o las del mes (Excel + ampliaciones; o el estimado provisional si el mes no tiene datos reales).
   const mm = d.monthly.find((m) => m.month === mes)
   const esProvisional = esMensual && !!mm && mm.provisional > 0 && mm.excelAssigned === 0
   const cab = esMensual
