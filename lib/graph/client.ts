@@ -173,7 +173,15 @@ export const getCachedBancoHoras = unstable_cache(
 // manager y la fecha de auditoría se usan para filtrar en Bancos. Se lee el
 // usedRange de la hoja (funciona sea o no una Tabla con nombre). El nombre de la
 // hoja se puede sobreescribir con SHAREPOINT_ESTADOS_SHEET.
-export interface ProyectoEstado { project: string; estado: string; manager: string; fechaAuditoria: string }
+export interface ProyectoEstado {
+  project: string
+  estado: string
+  manager: string
+  fechaAuditoria: string
+  tipoContrato: string   // "Tipo de Contrato" (para horas provisionales)
+  inicioContable: string // "Fecha Inicio Contable" ISO o ''
+  finContable: string    // "Fecha Fin Contable" ISO o ''
+}
 
 async function readClientesProyectosSheet(
   token: string,
@@ -201,6 +209,9 @@ async function readClientesProyectosSheet(
   // Opcionales: manager del proyecto y fecha de auditoría (filtros de Bancos).
   const managerIdx = header.findIndex((h) => norm(h) === 'manager del proyecto')
   const auditIdx = header.findIndex((h) => norm(h) === 'fecha auditoria')
+  const tipoIdx = header.findIndex((h) => norm(h) === 'tipo de contrato')
+  const inicioIdx = header.findIndex((h) => norm(h) === 'fecha inicio contable')
+  const finIdx = header.findIndex((h) => norm(h) === 'fecha fin contable')
 
   return values
     .slice(1)
@@ -209,6 +220,9 @@ async function readClientesProyectosSheet(
       estado: String(cells[estadoIdx] ?? '').trim(),
       manager: managerIdx === -1 ? '' : String(cells[managerIdx] ?? '').trim(),
       fechaAuditoria: auditIdx === -1 ? '' : excelDateToISO(cells[auditIdx]),
+      tipoContrato: tipoIdx === -1 ? '' : String(cells[tipoIdx] ?? '').trim(),
+      inicioContable: inicioIdx === -1 ? '' : excelDateToISO(cells[inicioIdx]),
+      finContable: finIdx === -1 ? '' : excelDateToISO(cells[finIdx]),
     }))
     .filter((r) => r.project !== '')
 }
@@ -226,4 +240,57 @@ export const getCachedProyectosEstado = unstable_cache(
   fetchProyectosEstadoFromGraph,
   ['proyectos-estado-data'],
   { revalidate: 300, tags: [BANCO_HORAS_TAG] }
+)
+
+// ── Horas provisionales (hoja "Horas_Provisionales" del mismo Excel) ──────────
+// Primera columna = tipo de contrato; columnas siguientes = posiciones (mismas que
+// BancoHoras). Cada celda = horas/mes provisionales de esa posición para ese contrato.
+export type HorasProvisionales = Map<string, Map<string, number>>
+
+async function readHorasProvisionalesSheet(
+  token: string,
+  driveId: string,
+  itemId: string,
+): Promise<HorasProvisionales> {
+  const sheet = 'Horas_Provisionales'
+  const url = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets/${encodeURIComponent(sheet)}/usedRange(valuesOnly=true)`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
+    throw new Error(`Error leyendo hoja ${sheet}: ${err?.error?.message ?? res.status}`)
+  }
+  const values = (await res.json() as { values: unknown[][] }).values ?? []
+  if (values.length < 2) return new Map()
+
+  const header = values[0]
+  const posCols = header
+    .map((h, col) => ({ position: String(h ?? '').trim(), col }))
+    .filter((c) => c.col !== 0 && c.position !== '')
+
+  const out: HorasProvisionales = new Map()
+  for (const cells of values.slice(1)) {
+    const tipo = String(cells[0] ?? '').trim()
+    if (tipo === '') continue
+    const porPos = new Map<string, number>()
+    for (const { position, col } of posCols) {
+      const hours = Number(cells[col] ?? 0)
+      if (!isNaN(hours)) porPos.set(position, hours)
+    }
+    out.set(tipo, porPos)
+  }
+  return out
+}
+
+export async function fetchHorasProvisionalesFromGraph(): Promise<HorasProvisionales> {
+  const fileUrl = process.env.SHAREPOINT_FILE_URL
+  if (!fileUrl) throw new Error('SHAREPOINT_FILE_URL no está configurada')
+  const token = await getToken()
+  const { driveId, itemId } = await resolveDriveItem(token, fileUrl)
+  return readHorasProvisionalesSheet(token, driveId, itemId)
+}
+
+export const getCachedHorasProvisionales = unstable_cache(
+  fetchHorasProvisionalesFromGraph,
+  ['horas-provisionales-data'],
+  { revalidate: 300, tags: [BANCO_HORAS_TAG] },
 )
