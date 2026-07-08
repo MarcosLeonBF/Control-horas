@@ -15,7 +15,11 @@ import NativeSelect from '@/components/ui/native-select'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
-const emptyLine = (areaId: string, date: string, dep: string): LineInput => ({ entry_date: date, project: '', area_id: areaId, department: dep, etapa_id: '', hours: 0, description: '' })
+// El departamento solo aplica al proyecto "Departamento". El resto de líneas lo
+// llevan fijo en 'Clientes' (valor canónico histórico; la RPC también lo normaliza).
+// No usar departamentos[0]: el catálogo es editable y su primer nombre cambia.
+const CLIENTES_DEP = 'Clientes'
+const emptyLine = (areaId: string, date: string): LineInput => ({ entry_date: date, project: '', area_id: areaId, department: CLIENTES_DEP, etapa_id: '', hours: 0, description: '' })
 
 // Validación previa al guardado, acotada a los campos uuid (area_id, etapa_id) que son
 // NOT NULL en la BD: si llegan vacíos ('') el motor hace ''::uuid y Postgres devuelve el
@@ -60,8 +64,9 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
   const [projectWarning, setProjectWarning] = useState<{ index: number; project: string; finished: boolean; paused: boolean; exceeded: boolean } | null>(null)
   // Fecha por defecto: la heredan las líneas nuevas y las que aún la seguían.
   const [defaultDate, setDefaultDate] = useState(initial?.lines[0]?.entry_date ?? today())
-  const defaultDep = departamentos[0]?.name ?? 'Clientes'
-  const [lines, setLines] = useState<LineInput[]>(initial?.lines ?? [emptyLine(areas[0]?.id ?? '', today(), defaultDep)])
+  // Departamento inicial al entrar al proyecto "Departamento" (única pantalla donde se elige).
+  const defaultDep = departamentos[0]?.name ?? CLIENTES_DEP
+  const [lines, setLines] = useState<LineInput[]>(initial?.lines ?? [emptyLine(areas[0]?.id ?? '', today())])
   const [saving, setSaving] = useState(false)
 
   const total = lines.reduce((s, l) => s + (Number(l.hours) || 0), 0)
@@ -93,7 +98,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
           }
           checkEtapaForDep = true
         } else {
-          next.department = defaultDep
+          next.department = CLIENTES_DEP
           if (next.area_id === internalAreaId) next.area_id = areas[0]?.id ?? ''
           // Al salir de "Departamento", limpiar la etapa si no es válida para proyecto
           // cliente (las etapas de departamento no aplican en proyectos generales).
@@ -278,7 +283,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
       </div>
 
       <div className="mt-4 flex items-start justify-between border-t border-border pt-4">
-        <Button type="button" variant="link" size="sm" className="px-0" onClick={() => setLines((p) => [...p, emptyLine(areas[0]?.id ?? '', defaultDate, defaultDep)])}>
+        <Button type="button" variant="link" size="sm" className="px-0" onClick={() => setLines((p) => [...p, emptyLine(areas[0]?.id ?? '', defaultDate)])}>
           + Añadir línea
         </Button>
         <div className="text-right">
