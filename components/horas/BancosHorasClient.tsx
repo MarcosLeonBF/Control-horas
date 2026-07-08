@@ -16,6 +16,16 @@ import { cn } from '@/lib/utils'
 
 const ESTADOS: HorasStatus[] = ['excedido', 'bajo', 'disponible', 'consumido', 'sin_asignacion']
 
+// Orden por estado del proyecto: activo (y garantía) primero, luego pausa, luego el
+// resto, y finalizado al fondo.
+function estadoOrden(estado?: string): number {
+  const e = (estado ?? '').toLowerCase()
+  if (e === 'activo' || e.includes('garant')) return 0
+  if (e.includes('paus')) return 1
+  if (e === 'finalizado') return 3
+  return 2
+}
+
 const selectClass =
   'h-10 min-w-40 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
@@ -45,6 +55,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   const [manager, setManager] = useState('todos')
   const [auditFrom, setAuditFrom] = useState('')
   const [auditTo, setAuditTo] = useState('')
+  const [ocultarFinalizados, setOcultarFinalizados] = useState(false)
   const [vista, setVista] = useState<'total' | 'mensual'>('total')
   // Selección de meses (multi): por defecto el mes en curso, o el último con datos.
   const [mesesSel, setMesesSel] = useState<string[]>(() => {
@@ -101,15 +112,23 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
         const fa = r.fechaAuditoria ?? ''
         if (auditFrom && (!fa || fa < auditFrom)) return false
         if (auditTo && (!fa || fa > auditTo)) return false
+        if (ocultarFinalizados && (r.projectEstado ?? '').toLowerCase() === 'finalizado') return false
         return true
       })
-      .sort((a, b) => HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status] || a.project.localeCompare(b.project) || a.position.localeCompare(b.position))
-  }, [viewRows, search, estado, posicion, manager, auditFrom, auditTo])
+      .sort((a, b) =>
+        estadoOrden(a.projectEstado) - estadoOrden(b.projectEstado)
+        || HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status]
+        || a.project.localeCompare(b.project) || a.position.localeCompare(b.position))
+  }, [viewRows, search, estado, posicion, manager, auditFrom, auditTo, ocultarFinalizados])
 
   // Agrupado por proyecto: una fila por proyecto con el banco total; el desglose por
-  // posición se ve al desplegar. El total refleja las posiciones visibles (con filtros).
+  // posición se ve al desplegar. Orden: por estado (activo → pausa → finalizado), y
+  // dentro por severidad y nombre.
   const groups = useMemo(
-    () => groupBancosByProject(filtered).sort((a, b) => HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status] || a.project.localeCompare(b.project)),
+    () => groupBancosByProject(filtered).sort((a, b) =>
+      estadoOrden(a.projectEstado) - estadoOrden(b.projectEstado)
+      || HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status]
+      || a.project.localeCompare(b.project)),
     [filtered],
   )
 
@@ -233,9 +252,18 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
               <Input aria-label="Auditoría hasta" type="date" value={auditTo} min={auditFrom || undefined} onChange={(e) => setAuditTo(e.target.value)} className="h-10 w-34" />
             </div>
           </FilterField>
-          {(search || estado !== 'todos' || posicion !== 'todas' || manager !== 'todos' || auditFrom || auditTo) && (
+          <label className="inline-flex h-10 cursor-pointer select-none items-center gap-2 self-end rounded-lg border border-border bg-card px-3 text-sm text-foreground transition-colors hover:bg-(--muted-surface)">
+            <input
+              type="checkbox"
+              checked={ocultarFinalizados}
+              onChange={(e) => setOcultarFinalizados(e.target.checked)}
+              className="size-4 accent-(--brand)"
+            />
+            Ocultar finalizados
+          </label>
+          {(search || estado !== 'todos' || posicion !== 'todas' || manager !== 'todos' || auditFrom || auditTo || ocultarFinalizados) && (
             <button
-              onClick={() => { setSearch(''); setEstado('todos'); setPosicion('todas'); setManager('todos'); setAuditFrom(''); setAuditTo('') }}
+              onClick={() => { setSearch(''); setEstado('todos'); setPosicion('todas'); setManager('todos'); setAuditFrom(''); setAuditTo(''); setOcultarFinalizados(false) }}
               className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:text-(--brand)"
             >
               <X className="size-3.5" /> Limpiar filtros

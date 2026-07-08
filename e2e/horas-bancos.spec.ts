@@ -67,6 +67,17 @@ test('el detalle del banco alterna Total y Mensual', async ({ page }) => {
   }).toPass({ timeout: 12000 })
 })
 
+test('ocultar finalizados quita del banco los proyectos finalizados', async ({ page }) => {
+  await page.goto('/bancos')
+  await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
+  const toggle = page.getByRole('checkbox', { name: 'Ocultar finalizados' })
+  await expect(toggle).toBeVisible()
+  // Si hay algún proyecto finalizado visible, al activar el filtro debe desaparecer.
+  if (!(await page.getByText('Finalizado', { exact: true }).first().isVisible().catch(() => false))) return
+  await toggle.check()
+  await expect(page.getByText('Finalizado', { exact: true })).toHaveCount(0)
+})
+
 test('un proyecto solo en Clientes_Proyectos (con consumo) aparece en el banco', async ({ page }) => {
   await page.goto('/bancos')
   await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
