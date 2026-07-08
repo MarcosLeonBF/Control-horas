@@ -21,7 +21,7 @@ test('el admin ve los bancos de horas con asignado vs registrado', async ({ page
   await expect(page.getByText('No hay bancos que coincidan con los filtros.')).toBeVisible()
 })
 
-test('el switch Mensual muestra el mes en curso y navega meses', async ({ page }) => {
+test('el switch Mensual muestra el selector de meses (calendario) con el mes en curso', async ({ page }) => {
   await page.goto('/bancos')
   await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
 
@@ -33,24 +33,21 @@ test('el switch Mensual muestra el mes en curso y navega meses', async ({ page }
   }
 
   await mensual.click()
-  // Selector con el mes en curso (formato "Julio 2026").
+  // El selector de meses (MonthPicker) muestra el mes en curso por defecto ("Julio 2026").
   const mesActual = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' })
     .format(new Date())
   const label = mesActual.charAt(0).toUpperCase() + mesActual.slice(1)
-  await expect(page.getByText(label)).toBeVisible()
+  const picker = page.getByRole('button', { name: new RegExp(label) })
+  await expect(picker).toBeVisible()
 
-  // Navegar al mes anterior y volver.
-  const prev = page.getByRole('button', { name: 'Mes anterior' })
-  if (await prev.isEnabled()) {
-    await prev.click()
-    await expect(page.getByText(label)).toHaveCount(0)
-    await page.getByRole('button', { name: 'Mes siguiente' }).click()
-    await expect(page.getByText(label)).toBeVisible()
-  }
+  // Abre el calendario de meses y confirma la grilla.
+  await picker.click()
+  await expect(page.getByRole('button', { name: 'Jul', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
 
-  // Volver a Total: el selector de mes desaparece.
+  // Volver a Total: el selector desaparece.
   await page.getByRole('button', { name: 'Total' }).click()
-  await expect(page.getByRole('button', { name: 'Mes anterior' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: new RegExp(label) })).toHaveCount(0)
 })
 
 test('el detalle del banco alterna Total y Mensual', async ({ page }) => {
@@ -62,9 +59,12 @@ test('el detalle del banco alterna Total y Mensual', async ({ page }) => {
 
   const mensual = page.getByRole('button', { name: 'Mensual' })
   if (!(await mensual.isVisible().catch(() => false))) return // Excel sin columna Fecha
-  await mensual.click()
-  await expect(page.getByRole('button', { name: 'Mes anterior' })).toBeVisible()
-  await expect(page.getByText('Por posición')).toBeVisible()
+  // Clic con reintento: la página del detalle es pesada y el primer clic puede perderse
+  // si el componente cliente aún no hidrató. En Mensual muestra "Banco mensual por posición".
+  await expect(async () => {
+    await mensual.click()
+    await expect(page.getByRole('heading', { name: 'Banco mensual por posición' })).toBeVisible({ timeout: 1500 })
+  }).toPass({ timeout: 12000 })
 })
 
 test('un proyecto solo en Clientes_Proyectos (con consumo) aparece en el banco', async ({ page }) => {

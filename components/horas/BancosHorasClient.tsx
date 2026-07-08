@@ -2,12 +2,13 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Search, AlertTriangle, TrendingDown, Download, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Search, AlertTriangle, TrendingDown, Download, ChevronRight, X } from 'lucide-react'
 import type { BancoHorasRow, HorasStatus } from '@/lib/horas/bancos-status'
 import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProject, estadoProyectoBadgeClass, computeHorasStatus } from '@/lib/horas/bancos-status'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
-import { formatHoras, formatHorasTotal, formatFechaISO, formatMes, currentMonth, addMonths } from '@/lib/horas/format'
+import { formatHoras, formatHorasTotal, formatFechaISO, currentMonth } from '@/lib/horas/format'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
+import MonthPicker from '@/components/ui/month-picker'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import NativeSelect from '@/components/ui/native-select'
@@ -45,7 +46,15 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   const [auditFrom, setAuditFrom] = useState('')
   const [auditTo, setAuditTo] = useState('')
   const [vista, setVista] = useState<'total' | 'mensual'>('total')
-  const [mes, setMes] = useState(() => currentMonth())
+  // Selección de meses (multi): por defecto el mes en curso, o el último con datos.
+  const [mesesSel, setMesesSel] = useState<string[]>(() => {
+    const s = new Set<string>()
+    for (const r of rows) for (const m of r.monthly) s.add(m.month)
+    const disp = [...s].sort()
+    const cm = currentMonth()
+    return disp.includes(cm) ? [cm] : disp.length ? [disp[disp.length - 1]] : [cm]
+  })
+  const selSet = useMemo(() => new Set(mesesSel), [mesesSel])
 
   const positions = useMemo(() => [...new Set(rows.map((r) => r.position))].sort((a, b) => a.localeCompare(b)), [rows])
   const managers = useMemo(
@@ -62,20 +71,23 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
     return [...s].sort()
   }, [rows])
   const hayMensual = meses.length > 0
-  const minMes = meses[0] ?? currentMonth()
-  const maxMes = meses.length > 0 && meses[meses.length - 1] > currentMonth() ? meses[meses.length - 1] : currentMonth()
 
   // En Mensual, cada fila muestra las cifras del mes elegido (0/0 si no tiene datos:
   // decisión de producto — el proyecto se ve en cero, no desaparece).
+  // En Mensual, cada fila suma los meses elegidos (assigned/consumed de esos meses);
+  // provisional = true si alguno de los meses elegidos es provisional.
   const viewRows = useMemo(() => {
     if (vista === 'total') return rows.map((r) => ({ ...r, provisional: false }))
     return rows.map((r) => {
-      const m = r.monthly.find((x) => x.month === mes)
-      const assigned = m?.assigned ?? 0
-      const consumed = m?.consumed ?? 0
-      return { ...r, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), provisional: !!m?.provisional }
+      let assigned = 0, consumed = 0, provisional = false
+      for (const m of r.monthly) {
+        if (!selSet.has(m.month)) continue
+        assigned += m.assigned; consumed += m.consumed
+        if (m.provisional) provisional = true
+      }
+      return { ...r, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), provisional }
     })
-  }, [rows, vista, mes])
+  }, [rows, vista, selSet])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -125,7 +137,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
       Consumido: r.consumed, Restante: r.remaining, 'Estado banco': HORAS_STATUS_LABELS[r.status],
     }))
   }
-  const fileBase = `bancos-horas${vista === 'mensual' ? `-${mes}` : ''}${estado === 'todos' ? '' : `-${estado}`}`
+  const fileBase = `bancos-horas${vista === 'mensual' ? `-${mesesSel.length === 1 ? mesesSel[0] : `${mesesSel.length}meses`}` : ''}${estado === 'todos' ? '' : `-${estado}`}`
 
   return (
     <div className="space-y-6">
@@ -149,7 +161,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
 
       {hayProvisional && (
         <p className="-mt-3 text-xs text-(--brand)">
-          En Mensual, el asignado del mes incluye horas <strong className="font-medium">provisionales</strong> (estimadas por tipo de contrato); en la descarga van marcadas en la columna «Provisional».
+          El asignado de los meses elegidos incluye horas <strong className="font-medium">provisionales</strong> (estimadas por tipo de contrato); en la descarga van marcadas en la columna «Provisional».
         </p>
       )}
 
@@ -172,23 +184,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
               ))}
             </div>
             {vista === 'mensual' && (
-              <div className="inline-flex items-center gap-1">
-                <button
-                  type="button" aria-label="Mes anterior" disabled={mes <= minMes}
-                  onClick={() => setMes((m) => addMonths(m, -1))}
-                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-(--brand) disabled:pointer-events-none disabled:opacity-30"
-                >
-                  <ChevronLeft className="size-4" />
-                </button>
-                <span className="min-w-30 text-center text-sm font-medium text-foreground">{formatMes(mes)}</span>
-                <button
-                  type="button" aria-label="Mes siguiente" disabled={mes >= maxMes}
-                  onClick={() => setMes((m) => addMonths(m, 1))}
-                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-(--brand) disabled:pointer-events-none disabled:opacity-30"
-                >
-                  <ChevronRight className="size-4" />
-                </button>
-              </div>
+              <MonthPicker value={mesesSel} onChange={setMesesSel} available={meses} />
             )}
           </div>
         )}
@@ -320,7 +316,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                     </span>
 
                     {(() => {
-                      const mesProvisional = vista === 'mensual' && !!g.monthly.find((m) => m.month === mes)?.provisional
+                      const mesProvisional = vista === 'mensual' && g.monthly.some((m) => selSet.has(m.month) && m.provisional)
                       return (
                         <span className="flex w-32 shrink-0 items-center justify-end gap-1.5">
                           {mesProvisional && (

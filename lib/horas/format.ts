@@ -39,6 +39,16 @@ export function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
 }
 
+// 'YYYY-MM' → "Jul 2026" (mes abreviado + año, inicial mayúscula, sin punto).
+const MES_CORTO = new Intl.DateTimeFormat('es-ES', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+
+export function mesCorto(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  if (!y || !m) return month
+  const s = MES_CORTO.format(new Date(Date.UTC(y, m - 1, 1))).replace('.', '')
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 // Suma delta meses a un 'YYYY-MM' (delta puede ser negativo).
 export function addMonths(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number)

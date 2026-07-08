@@ -1,50 +1,79 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { BancoHorasDetalle } from '@/lib/horas/bancos-status'
-import { computeHorasStatus, HORAS_BAR_COLOR } from '@/lib/horas/bancos-status'
-import { formatHoras, formatMes, currentMonth, addMonths } from '@/lib/horas/format'
+import { HORAS_BAR_COLOR } from '@/lib/horas/bancos-status'
+import { formatHoras, currentMonth, mesCorto } from '@/lib/horas/format'
 import { cn } from '@/lib/utils'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
+import MonthPicker from '@/components/ui/month-picker'
 import AnularAmpliacionButton from '@/components/horas/AnularAmpliacionButton'
 
 export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle; isAdmin: boolean }) {
   const [vista, setVista] = useState<'total' | 'mensual'>('total')
-  const [mes, setMes] = useState(() => currentMonth())
 
   const meses = useMemo(() => d.monthly.map((m) => m.month), [d.monthly])
+  const [mesesSel, setMesesSel] = useState<string[]>(() => {
+    const cm = currentMonth()
+    const disp = d.monthly.map((m) => m.month)
+    return disp.includes(cm) ? [cm] : disp.length ? [disp[disp.length - 1]] : [cm]
+  })
+  const selSet = useMemo(() => new Set(mesesSel), [mesesSel])
+  const mesesOrden = useMemo(() => [...mesesSel].sort(), [mesesSel])
   const hayMensual = meses.length > 0
-  const minMes = meses[0] ?? currentMonth()
-  const maxMes = meses.length > 0 && meses[meses.length - 1] > currentMonth() ? meses[meses.length - 1] : currentMonth()
   const esMensual = vista === 'mensual'
 
-  // Cifras de cabecera: total confirmado, o las del mes (Excel + ampliaciones; o el estimado provisional si el mes no tiene datos reales).
-  const mm = d.monthly.find((m) => m.month === mes)
-  const esProvisional = esMensual && !!mm && mm.provisional > 0 && mm.excelAssigned === 0
-  const cab = esMensual
-    ? { assigned: (mm?.excelAssigned ?? 0) + (mm?.ampliado ?? 0) + (mm?.provisional ?? 0), excelBase: mm?.excelAssigned ?? 0, ampliado: mm?.ampliado ?? 0, consumed: mm?.consumed ?? 0 }
-    : { assigned: d.assigned, excelBase: d.excelBase, ampliado: d.assigned - d.excelBase, consumed: d.consumed }
+  // Cabecera: total confirmado, o la suma de los meses elegidos (Excel + ampliaciones +
+  // provisional). esProvisional cuando lo elegido es solo estimado (sin Excel real).
+  const cab = useMemo(() => {
+    if (!esMensual) return { assigned: d.assigned, excelBase: d.excelBase, ampliado: d.assigned - d.excelBase, consumed: d.consumed, provisional: 0 }
+    let excelBase = 0, ampliado = 0, consumed = 0, provisional = 0
+    for (const m of d.monthly) {
+      if (!selSet.has(m.month)) continue
+      excelBase += m.excelAssigned; ampliado += m.ampliado; consumed += m.consumed; provisional += m.provisional
+    }
+    return { assigned: excelBase + ampliado + provisional, excelBase, ampliado, consumed, provisional }
+  }, [esMensual, d, selSet])
+  const esProvisional = esMensual && cab.provisional > 0 && cab.excelBase === 0
   const restante = cab.assigned - cab.consumed
 
-  // Posiciones: en Mensual cada fila muestra su mes (0/0 se ve en cero, estado neutro '—').
-  const posiciones = useMemo(() => {
-    if (!esMensual) return d.posiciones.map((p) => ({ ...p, provisionalMes: false }))
-    return d.posiciones.map((p) => {
-      const m = p.monthly.find((x) => x.month === mes)
-      const assigned = m?.assigned ?? 0
-      const consumed = m?.consumed ?? 0
-      return { ...p, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), provisionalMes: !!m?.provisional }
-    })
-  }, [d.posiciones, esMensual, mes])
+  const mesEsProvisional = (month: string) => (d.monthly.find((m) => m.month === month)?.provisional ?? 0) > 0
 
-  // Ampliaciones y movimientos: en Mensual, solo los del mes elegido.
-  const ampliaciones = esMensual ? d.ampliaciones.filter((a) => a.entry_date.slice(0, 7) === mes) : d.ampliaciones
-  const movimientos = esMensual ? d.movimientos.filter((m) => m.date.slice(0, 7) === mes) : d.movimientos
+  // Matriz posición × mes (vista Mensual): cada celda es consumido/asignado de ese mes.
+  const matriz = useMemo(
+    () =>
+      d.posiciones.map((p) => {
+        const porMes = mesesOrden.map((month) => {
+          const m = p.monthly.find((x) => x.month === month)
+          return { month, assigned: m?.assigned ?? 0, consumed: m?.consumed ?? 0 }
+        })
+        return {
+          position: p.position,
+          porMes,
+          totAssigned: porMes.reduce((s, c) => s + c.assigned, 0),
+          totConsumed: porMes.reduce((s, c) => s + c.consumed, 0),
+        }
+      }),
+    [d.posiciones, mesesOrden],
+  )
+
+  // Ampliaciones y movimientos: en Mensual, solo los de los meses elegidos.
+  const ampliaciones = esMensual ? d.ampliaciones.filter((a) => selSet.has(a.entry_date.slice(0, 7))) : d.ampliaciones
+  const movimientos = esMensual ? d.movimientos.filter((m) => selSet.has(m.date.slice(0, 7))) : d.movimientos
+
+  const celda = (assigned: number, consumed: number, bold = false) => {
+    const sinDato = assigned === 0 && consumed === 0
+    if (sinDato) return <span className="text-muted-foreground/40">—</span>
+    return (
+      <span className={cn('tabular-money', bold && 'font-medium', assigned - consumed < 0 && 'text-(--status-excedido)')}>
+        {formatHoras(consumed)} <span className="text-muted-foreground/60">/ {formatHoras(assigned)}</span>
+      </span>
+    )
+  }
 
   return (
     <div>
-      {/* Vista Total | Mensual (spec §5.1). Solo si el Excel ya trae meses. */}
+      {/* Vista Total | Mensual + selector de meses. Solo si el Excel ya trae meses. */}
       {hayMensual && (
         <div className="mb-8 flex flex-wrap items-center gap-3">
           <div role="group" aria-label="Vista del banco" className="inline-flex rounded-lg bg-(--muted-surface) p-0.5">
@@ -60,25 +89,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
               </button>
             ))}
           </div>
-          {esMensual && (
-            <div className="inline-flex items-center gap-1">
-              <button
-                type="button" aria-label="Mes anterior" disabled={mes <= minMes}
-                onClick={() => setMes((m) => addMonths(m, -1))}
-                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-(--brand) disabled:pointer-events-none disabled:opacity-30"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-              <span className="min-w-30 text-center text-sm font-medium text-foreground">{formatMes(mes)}</span>
-              <button
-                type="button" aria-label="Mes siguiente" disabled={mes >= maxMes}
-                onClick={() => setMes((m) => addMonths(m, 1))}
-                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-(--brand) disabled:pointer-events-none disabled:opacity-30"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-          )}
+          {esMensual && <MonthPicker value={mesesSel} onChange={setMesesSel} available={meses} />}
         </div>
       )}
 
@@ -106,10 +117,45 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
       </div>
 
       <section className="mb-10">
-        <h2 className="font-display mb-4 text-xl font-semibold">Por posición</h2>
-        {posiciones.length === 0 ? (
+        <h2 className="font-display mb-1 text-xl font-semibold">{esMensual ? 'Banco mensual por posición' : 'Por posición'}</h2>
+        {esMensual && <p className="mb-4 text-sm text-muted-foreground">Consumido / asignado por mes. El asignado puede ser provisional (estimado) en los meses aún no cargados.</p>}
+        {!esMensual && <div className="mb-4" />}
+
+        {d.posiciones.length === 0 ? (
           <p className="text-sm text-muted-foreground">Este proyecto no tiene posiciones con banco.</p>
+        ) : esMensual ? (
+          /* Matriz posición × mes */
+          <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+            <table className="w-full min-w-max text-sm">
+              <thead>
+                <tr className="bg-(--muted-surface) text-muted-foreground">
+                  <th className="sticky left-0 bg-(--muted-surface) px-4 py-2.5 text-left font-medium">Posición</th>
+                  {mesesOrden.map((month) => (
+                    <th key={month} className="px-3 py-2.5 text-center font-medium whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1">
+                        {mesCorto(month)}
+                        {mesEsProvisional(month) && <span className="rounded-full bg-(--brand)/10 px-1 py-px text-[0.55rem] font-medium text-(--brand)">prov</span>}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="px-3 py-2.5 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matriz.map((row) => (
+                  <tr key={row.position} className="border-t border-border">
+                    <td className="sticky left-0 bg-card px-4 py-2.5 font-medium whitespace-nowrap">{row.position}</td>
+                    {row.porMes.map((c) => (
+                      <td key={c.month} className="px-3 py-2.5 text-center whitespace-nowrap">{celda(c.assigned, c.consumed)}</td>
+                    ))}
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">{celda(row.totAssigned, row.totConsumed, true)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
+          /* Vista Total: tabla agregada por posición */
           <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
             <table className="w-full text-sm">
               <thead>
@@ -122,7 +168,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                 </tr>
               </thead>
               <tbody>
-                {posiciones.map((p) => (
+                {d.posiciones.map((p) => (
                   <tr key={p.position} className="border-t border-border">
                     <td className="px-4 py-2.5">
                       <div className="font-medium">{p.position}</div>
@@ -135,14 +181,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                     <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.assigned)}</td>
                     <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.consumed)}</td>
                     <td className={`tabular-money px-4 py-2.5 text-right ${p.remaining < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(p.remaining)}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <span className="inline-flex items-center gap-1.5">
-                        {p.provisionalMes && <span className="rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.6rem] font-medium text-(--brand)">Prov.</span>}
-                        {esMensual && p.assigned === 0 && p.consumed === 0 && !p.provisionalMes
-                          ? <span className="text-sm text-muted-foreground/50">—</span>
-                          : <HorasStatusBadge status={p.status} />}
-                      </span>
-                    </td>
+                    <td className="px-4 py-2.5 text-right"><HorasStatusBadge status={p.status} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -155,7 +194,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
         <h2 className="font-display mb-4 text-xl font-semibold">Ampliaciones</h2>
         {ampliaciones.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {esMensual ? `Sin ampliaciones en ${formatMes(mes)}.` : 'Sin ampliaciones. El asignado es el del Excel.'}
+            {esMensual ? 'Sin ampliaciones en los meses elegidos.' : 'Sin ampliaciones. El asignado es el del Excel.'}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
@@ -196,7 +235,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
         </p>
         {movimientos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {esMensual ? `Sin movimientos en ${formatMes(mes)}.` : 'Sin movimientos todavía.'}
+            {esMensual ? 'Sin movimientos en los meses elegidos.' : 'Sin movimientos todavía.'}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
