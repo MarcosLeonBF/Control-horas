@@ -6,13 +6,8 @@ import { Toaster } from '@/components/ui/sonner'
 export const metadata: Metadata = {
   title: 'Control de Gestión — Bastida & Farina',
   description: 'Sistema interno de control y gestión del equipo de Bastida & Farina',
-  // Favicon = logo de la marca. Negro para pestañas claras, blanco para oscuras.
-  icons: {
-    icon: [
-      { url: '/logo-negro.png', media: '(prefers-color-scheme: light)' },
-      { url: '/logo-blanco.png', media: '(prefers-color-scheme: dark)' },
-    ],
-  },
+  // Favicon: ícono cuadrado generado en app/icon.tsx (el logo es un wordmark ancho que
+  // se veía ilegible aplastado en la pestaña).
 }
 
 export default function RootLayout({
