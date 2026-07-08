@@ -140,10 +140,11 @@ nada que parezca de otra app.
 ## 7. Tests
 
 El repo cubre esta zona con **e2e de Playwright** (sin framework de unit
-tests; no se añade uno en este trabajo):
+tests; no se añade uno en este trabajo). La suite corre contra el dev server
+del usuario con datos vivos (Supabase seedeado + Excel real de Graph, sin
+mock), así que las aserciones son laxas y toleran que el Excel aún no tenga
+la columna `Fecha` (en ese caso el switch no se muestra y el spec lo anota):
 
-- Fixture del Graph extendida con la columna `Fecha` y varios meses por
-  proyecto (incluye una fila sin fecha para el caso de error).
 - Lista: el switch cambia cifras y badges; el selector navega meses; el mes
   sin datos muestra el proyecto en cero con estado neutro; los totales de
   cabecera se recalculan.
