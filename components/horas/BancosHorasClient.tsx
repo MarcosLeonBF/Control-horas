@@ -329,7 +329,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                     {/* Banco total con barra (escritorio) */}
                     <span className="hidden w-44 shrink-0 md:block">
                       <span className="tabular-money block text-right text-sm leading-none">
-                        <span className={cn('font-medium', g.remaining < 0 && 'text-(--status-excedido)')}>{formatHoras(g.remaining)}</span>
+                        <span className={cn('font-medium', g.remaining < 0 && 'text-(--status-excedido)')}>{formatHoras(g.consumed)}</span>
                         <span className="text-muted-foreground"> / {formatHoras(g.assigned)}</span>
                       </span>
                       <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-(--muted-surface)">
@@ -339,7 +339,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
 
                     {/* Banco total compacto (móvil) */}
                     <span className="tabular-money shrink-0 text-right text-sm md:hidden">
-                      <span className={cn('font-medium', g.remaining < 0 && 'text-(--status-excedido)')}>{formatHoras(g.remaining)}</span>
+                      <span className={cn('font-medium', g.remaining < 0 && 'text-(--status-excedido)')}>{formatHoras(g.consumed)}</span>
                       <span className="text-muted-foreground">/{formatHoras(g.assigned)}</span>
                     </span>
 
