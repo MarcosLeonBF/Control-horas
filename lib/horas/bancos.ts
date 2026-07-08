@@ -1,7 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedBancoHoras, getCachedProyectosEstado } from '@/lib/graph/client'
+import { getCachedBancoHoras, getCachedProyectosEstado, getCachedHorasProvisionales, type ProyectoEstado, type HorasProvisionales } from '@/lib/graph/client'
 import { computeHorasStatus, HORAS_SEVERITY, type BancoHorasRow, type BancoHorasDetalle, type AmpliacionHoras, type MovimientoBanco, type BancoMensual, type BancoDetalleMensual } from '@/lib/horas/bancos-status'
 import type { BancoHorasProyecto } from '@/lib/types'
+import { currentMonth } from '@/lib/horas/format'
+import { ultimoRegistroGlobal, mesesVentana, provisionalPorPosicion } from '@/lib/horas/provisionales'
 
 // Banco de horas POR POSICIÓN (PDF + lógica nueva):
 //   - Asignado: cada columna del Excel (CRM, SEO, Growth Strategists…) por proyecto.
@@ -51,11 +53,10 @@ const visible = (allowed: Set<string> | null, position: string) => allowed === n
 
 export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[]> {
   let excel: BancoHorasProyecto[] = []
-  try {
-    excel = await getCachedBancoHoras()
-  } catch {
-    excel = [] // Excel caído: devolvemos vacío en vez de romper la página.
-  }
+  try { excel = await getCachedBancoHoras() } catch { excel = [] }
+
+  let horasProv: HorasProvisionales = new Map()
+  try { horasProv = await getCachedHorasProvisionales() } catch { horasProv = new Map() }
 
   const db = createAdminClient()
   const { data: lines } = await db
@@ -65,48 +66,81 @@ export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[
 
   const { allowed, userPosition } = await loadPositionContext(scope)
 
-  // Metadatos del proyecto (hoja Clientes_Proyectos del Excel): estado, manager y
-  // fecha de auditoría. Se muestran/filtran en Bancos.
-  const metaByProject = new Map<string, { estado: string; manager: string; fechaAuditoria: string }>()
+  // Registro maestro de proyectos + metadatos (Clientes_Proyectos).
+  const metaByProject = new Map<string, ProyectoEstado>()
   try {
-    for (const e of await getCachedProyectosEstado()) {
-      metaByProject.set(e.project.trim(), { estado: e.estado, manager: e.manager, fechaAuditoria: e.fechaAuditoria })
-    }
-  } catch { /* sin metadatos: no se muestran */ }
+    for (const e of await getCachedProyectosEstado()) metaByProject.set(e.project.trim(), e)
+  } catch { /* sin metadatos: banco solo con lo real */ }
 
-  // Consumido por (proyecto, posición) según la posición del usuario que registró.
+  // Consumo por (proyecto, posición): total, por mes, y posiciones con consumo por proyecto.
   const consumed = new Map<string, number>()
-  const consumedMes = new Map<string, Map<string, number>>() // key(project, position) → mes → horas
+  const consumedMes = new Map<string, Map<string, number>>()
+  const posConsumoPorProyecto = new Map<string, Set<string>>()
   for (const l of (lines ?? []) as unknown as { project: string; hours: number; time_logs: { user_id: string; entry_date: string } }[]) {
-    if (l.project.trim() === 'Departamento') continue // horas internas: no consumen banco
+    const project = l.project.trim()
+    if (project === 'Departamento') continue // horas internas: no consumen banco
     const position = userPosition.get(l.time_logs.user_id)
-    if (!position) continue // usuario sin posición: no se atribuye a ningún banco
-    const k = key(l.project.trim(), position)
+    if (!position) continue // usuario sin posición: no se atribuye
+    const k = key(project, position)
     consumed.set(k, (consumed.get(k) ?? 0) + Number(l.hours))
     const month = l.time_logs.entry_date.slice(0, 7)
     let porMes = consumedMes.get(k)
     if (!porMes) { porMes = new Map(); consumedMes.set(k, porMes) }
     porMes.set(month, (porMes.get(month) ?? 0) + Number(l.hours))
+    let ps = posConsumoPorProyecto.get(project)
+    if (!ps) { ps = new Set(); posConsumoPorProyecto.set(project, ps) }
+    ps.add(position)
   }
 
+  const excelByProject = new Map<string, BancoHorasProyecto>()
+  for (const p of excel) excelByProject.set(p.project.trim(), p)
+
+  // Ventana provisional (global).
+  const ventana = mesesVentana(ultimoRegistroGlobal(excel), currentMonth())
+
+  // Conjunto de proyectos = registro maestro ∪ los que tengan Excel o consumo. Sin "Departamento".
+  const projectNames = new Set<string>([...metaByProject.keys(), ...excelByProject.keys(), ...posConsumoPorProyecto.keys()])
+  projectNames.delete('Departamento')
+
   const rows: BancoHorasRow[] = []
-  for (const proj of excel) {
-    const project = proj.project.trim()
-    if (project === 'Departamento') continue // proyecto interno: sin banco
-    for (const { position, hours } of proj.positions) {
+  for (const project of projectNames) {
+    const proj = excelByProject.get(project)
+    const meta = metaByProject.get(project)
+    const mesesReales = new Set((proj?.months ?? []).map((m) => m.month))
+    const tarifa = meta ? horasProv.get(meta.tipoContrato) : undefined
+    if (meta && meta.tipoContrato && horasProv.size > 0 && !tarifa) {
+      console.warn(`[horas-provisionales] sin tarifa para tipo de contrato "${meta.tipoContrato}" (proyecto "${project}")`)
+    }
+    const provByPos = meta
+      ? provisionalPorPosicion(
+          { tipoContrato: meta.tipoContrato, estado: meta.estado, inicioContable: meta.inicioContable, finContable: meta.finContable },
+          mesesReales, ventana, tarifa,
+        )
+      : new Map<string, BancoMensual[]>()
+
+    // Posiciones del proyecto = Excel ∪ consumo ∪ provisional.
+    const positions = new Set<string>([
+      ...(proj?.positions ?? []).map((p) => p.position),
+      ...(posConsumoPorProyecto.get(project) ?? []),
+      ...provByPos.keys(),
+    ])
+    const excelByPos = new Map((proj?.positions ?? []).map((p) => [p.position, Number(p.hours)]))
+
+    for (const position of positions) {
       if (!visible(allowed, position)) continue
-      const assigned = Number(hours)
+      const assigned = excelByPos.get(position) ?? 0
       const k = key(project, position)
       const cons = consumed.get(k) ?? 0
-      if (assigned === 0 && cons === 0) continue // banco vacío: no lo listamos
-      const meta = metaByProject.get(project)
+      const prov = provByPos.get(position) ?? []
+      if (assigned === 0 && cons === 0 && prov.length === 0) continue // nada que mostrar
 
-      // Desglose mensual: Excel del mes ∪ consumo del mes (spec §4.2).
+      // monthly: Excel real + provisional (disjuntos por mes) + consumo (merge).
       const byMonth = new Map<string, BancoMensual>()
-      for (const m of proj.months) {
+      for (const m of proj?.months ?? []) {
         const h = m.positions.find((p) => p.position === position)?.hours ?? 0
         if (h !== 0) byMonth.set(m.month, { month: m.month, assigned: h, consumed: 0 })
       }
+      for (const pm of prov) byMonth.set(pm.month, { ...pm })
       for (const [month, h] of consumedMes.get(k) ?? []) {
         const acc = byMonth.get(month) ?? { month, assigned: 0, consumed: 0 }
         acc.consumed += h
