@@ -5,8 +5,12 @@ test('el admin amplía y anula horas de un proyecto', async ({ page }) => {
   page.on('dialog', (d) => d.accept()) // aceptar el confirm() de anular
 
   await page.goto('/bancos')
-  // La lista de /bancos es una <ul>/<li> con <Link> (ya no una <table>).
-  await page.locator('a[href^="/bancos/"]').first().click()
+  await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
+  // La lista de /bancos es una <ul>/<li> con <Link> (ya no una <table>). Esperamos a que
+  // la primera fila esté lista (la lista puede ser larga y tardar en hidratar).
+  const primera = page.locator('a[href^="/bancos/"]').first()
+  await expect(primera).toBeVisible()
+  await primera.click()
   await expect(page.getByRole('heading', { name: 'Ampliar horas' })).toBeVisible()
 
   const motivo = `E2E ampliación ${Date.now()}`

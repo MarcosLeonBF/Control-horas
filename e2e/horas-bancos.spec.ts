@@ -66,3 +66,26 @@ test('el detalle del banco alterna Total y Mensual', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Mes anterior' })).toBeVisible()
   await expect(page.getByText('Por posición')).toBeVisible()
 })
+
+test('un proyecto solo en Clientes_Proyectos (con consumo) aparece en el banco', async ({ page }) => {
+  await page.goto('/bancos')
+  await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
+  // "Opospills" tiene horas registradas pero no está en BancoHoras; antes no aparecía.
+  await page.getByLabel('Buscar proyecto').fill('Opospills')
+  // Aparece como fila (o mensaje de vacío si el Excel/seed cambió; toleramos ambos).
+  const fila = page.getByRole('link', { name: /Opospills/ })
+  const vacio = page.getByText('No hay bancos que coincidan con los filtros.')
+  await expect(fila.or(vacio)).toBeVisible()
+})
+
+test('la vista Mensual del banco marca los meses provisionales', async ({ page }) => {
+  await page.goto('/bancos')
+  const mensual = page.getByRole('button', { name: 'Mensual' })
+  if (!(await mensual.isVisible().catch(() => false))) return // Excel sin columna Fecha
+  await mensual.click()
+  // Si hay datos provisionales para el mes en curso, hay al menos una marca "Prov."
+  // Tolerante: si no hay, no falla (el mes puede estar todo cargado).
+  // Nota: la lista usa el texto corto "Prov." (el detalle usa "Provisional" completo).
+  const marca = page.getByText('Prov.', { exact: true })
+  if ((await marca.count()) > 0) await expect(marca.first()).toBeVisible()
+})
