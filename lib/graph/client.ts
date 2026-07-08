@@ -281,16 +281,27 @@ async function readHorasProvisionalesSheet(
   return out
 }
 
-export async function fetchHorasProvisionalesFromGraph(): Promise<HorasProvisionales> {
+// unstable_cache serializa su valor a JSON: un Map se perdería (vuelve como objeto
+// plano sin .get). Cacheamos la forma serializable (entries) y reconstruimos el Map al
+// leer, para que los consumidores sigan usando .get().
+type HorasProvEntries = [string, [string, number][]][]
+
+async function fetchHorasProvEntriesFromGraph(): Promise<HorasProvEntries> {
   const fileUrl = process.env.SHAREPOINT_FILE_URL
   if (!fileUrl) throw new Error('SHAREPOINT_FILE_URL no está configurada')
   const token = await getToken()
   const { driveId, itemId } = await resolveDriveItem(token, fileUrl)
-  return readHorasProvisionalesSheet(token, driveId, itemId)
+  const map = await readHorasProvisionalesSheet(token, driveId, itemId)
+  return [...map].map(([tipo, ps]) => [tipo, [...ps]])
 }
 
-export const getCachedHorasProvisionales = unstable_cache(
-  fetchHorasProvisionalesFromGraph,
-  ['horas-provisionales-data'],
+const getCachedHorasProvEntries = unstable_cache(
+  fetchHorasProvEntriesFromGraph,
+  ['horas-provisionales-entries'], // key nueva: invalida cualquier caché viejo con el Map roto
   { revalidate: 300, tags: [BANCO_HORAS_TAG] },
 )
+
+export async function getCachedHorasProvisionales(): Promise<HorasProvisionales> {
+  const entries = await getCachedHorasProvEntries()
+  return new Map(entries.map(([tipo, ps]) => [tipo, new Map(ps)]))
+}
