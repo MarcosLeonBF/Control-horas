@@ -68,12 +68,12 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   // En Mensual, cada fila muestra las cifras del mes elegido (0/0 si no tiene datos:
   // decisión de producto — el proyecto se ve en cero, no desaparece).
   const viewRows = useMemo(() => {
-    if (vista === 'total') return rows
+    if (vista === 'total') return rows.map((r) => ({ ...r, provisional: false }))
     return rows.map((r) => {
       const m = r.monthly.find((x) => x.month === mes)
       const assigned = m?.assigned ?? 0
       const consumed = m?.consumed ?? 0
-      return { ...r, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed) }
+      return { ...r, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), provisional: !!m?.provisional }
     })
   }, [rows, vista, mes])
 
@@ -111,13 +111,18 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
     return t
   }, [filtered])
 
+  // En Mensual, el asignado del mes puede incluir horas provisionales (estimadas). Lo
+  // avisamos en los KPIs y lo marcamos en la descarga para no mezclarlas con lo confirmado.
+  const hayProvisional = useMemo(() => vista === 'mensual' && filtered.some((r) => r.provisional), [vista, filtered])
+
   // Descarga de la vista filtrada (§17.5: bancos de horas; excedidos/cerca = filtrar estado + descargar).
   function buildRows(): ExportRow[] {
     return filtered.map((r) => ({
       Proyecto: r.project, 'Estado proyecto': r.projectEstado ?? '—',
       Manager: r.manager || '—', 'Fecha auditoría': r.fechaAuditoria ? formatFechaISO(r.fechaAuditoria) : '—',
       Posición: r.position,
-      Asignado: r.assigned, Consumido: r.consumed, Restante: r.remaining, 'Estado banco': HORAS_STATUS_LABELS[r.status],
+      Asignado: r.assigned, Provisional: r.provisional ? 'Sí' : 'No',
+      Consumido: r.consumed, Restante: r.remaining, 'Estado banco': HORAS_STATUS_LABELS[r.status],
     }))
   }
   const fileBase = `bancos-horas${vista === 'mensual' ? `-${mes}` : ''}${estado === 'todos' ? '' : `-${estado}`}`
@@ -141,6 +146,12 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
           </div>
         </Card>
       </div>
+
+      {hayProvisional && (
+        <p className="-mt-3 text-xs text-(--brand)">
+          En Mensual, el asignado del mes incluye horas <strong className="font-medium">provisionales</strong> (estimadas por tipo de contrato); en la descarga van marcadas en la columna «Provisional».
+        </p>
+      )}
 
       {/* Filtros */}
       <div className="space-y-3.5">
