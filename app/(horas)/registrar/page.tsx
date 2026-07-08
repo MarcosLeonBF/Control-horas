@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCatalogos, getMyPositionAreas, getMyPositionEtapaIds, getMyPositionDepartamentoIds } from '@/lib/horas/queries'
-import { getCachedBancoHoras, getCachedProyectosEstado } from '@/lib/graph/client'
+import { getCachedProyectosEstado } from '@/lib/graph/client'
 import { getBancosHoras } from '@/lib/horas/bancos'
 import RegistroForm from '@/components/horas/RegistroForm'
 import type { LineInput } from '@/app/(horas)/registrar/actions'
@@ -37,22 +37,19 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const positionDepartamentoIds = await getMyPositionDepartamentoIds(user!.id)
   const allowedDepartamentos = departamentos.filter((d) => positionDepartamentoIds.includes(d.id))
 
-  let projects: string[] = []
-  try { projects = (await getCachedBancoHoras()).map((b) => b.project) } catch { /* Excel caído: solo Departamento */ }
-  projects = Array.from(new Set([...projects, 'Departamento']))
-
-  // Estado de proyectos (tabla clientes_proyectos): avisamos al elegir uno finalizado o pausado.
+  // La lista de proyectos y sus estados salen de Clientes_Proyectos: es el registro
+  // maestro con TODOS los proyectos, incluidos los recién ingresados. BancoHoras tiene
+  // delay (los proyectos nuevos tardan en aparecer ahí), así que no sirve como fuente de
+  // "qué proyectos existen". Excel caído → solo "Departamento", sin avisos.
+  let projects: string[] = ['Departamento']
   let finishedProjects: string[] = []
   let pausedProjects: string[] = []
   try {
     const estados = await getCachedProyectosEstado()
-    finishedProjects = estados
-      .filter((e) => e.estado.toLowerCase() === 'finalizado')
-      .map((e) => e.project)
-    pausedProjects = estados
-      .filter((e) => e.estado.toLowerCase().includes('paus'))
-      .map((e) => e.project)
-  } catch { /* tabla no disponible: sin estados, sin aviso */ }
+    projects = Array.from(new Set([...estados.map((e) => e.project), 'Departamento']))
+    finishedProjects = estados.filter((e) => e.estado.toLowerCase() === 'finalizado').map((e) => e.project)
+    pausedProjects = estados.filter((e) => e.estado.toLowerCase().includes('paus')).map((e) => e.project)
+  } catch { /* Excel no disponible: solo Departamento, sin avisos */ }
 
   // Orden en el selector: activos primero (alfabético), finalizados al fondo.
   const finishedSet = new Set(finishedProjects)

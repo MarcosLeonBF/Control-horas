@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getCachedBancoHoras } from '@/lib/graph/client'
+import { getCachedProyectosEstado } from '@/lib/graph/client'
 import type { ViewerScope } from '@/lib/horas/scope'
 import type { ReporteLine, ReporteFilterOptions } from '@/lib/horas/reportes-types'
 
@@ -62,11 +62,13 @@ export async function getReporteOptions(scope: ViewerScope): Promise<ReporteFilt
 
   let projects: string[] = []
   try {
-    projects = (await getCachedBancoHoras()).map((b) => b.project)
+    // Proyectos desde Clientes_Proyectos (registro maestro; incluye los recién ingresados,
+    // que en BancoHoras tardan por el delay de esa hoja).
+    projects = (await getCachedProyectosEstado()).map((e) => e.project)
   } catch {
     projects = []
   }
-  // Dedup: el Excel puede traer "Departamento" (o proyectos repetidos); evita keys duplicadas.
+  // Dedup + "Departamento": evita keys duplicadas.
   projects = Array.from(new Set([...projects, 'Departamento'])).sort((a, b) => a.localeCompare(b))
 
   // Posiciones acotadas al alcance del manager: solo las ligadas a sus áreas
