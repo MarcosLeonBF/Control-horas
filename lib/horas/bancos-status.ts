@@ -151,6 +151,7 @@ export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[
         const acc = byMonth.get(m.month) ?? { month: m.month, assigned: 0, consumed: 0 }
         acc.assigned += m.assigned
         acc.consumed += m.consumed
+        if (m.provisional) acc.provisional = true
         byMonth.set(m.month, acc)
       }
     }

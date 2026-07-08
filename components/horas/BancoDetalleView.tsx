@@ -21,19 +21,20 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
 
   // Cifras de cabecera: total (como hoy) o las del mes elegido (Excel + ampliaciones del mes).
   const mm = d.monthly.find((m) => m.month === mes)
+  const esProvisional = esMensual && !!mm && mm.provisional > 0 && mm.excelAssigned === 0
   const cab = esMensual
-    ? { assigned: (mm?.excelAssigned ?? 0) + (mm?.ampliado ?? 0), excelBase: mm?.excelAssigned ?? 0, ampliado: mm?.ampliado ?? 0, consumed: mm?.consumed ?? 0 }
+    ? { assigned: (mm?.excelAssigned ?? 0) + (mm?.ampliado ?? 0) + (mm?.provisional ?? 0), excelBase: mm?.excelAssigned ?? 0, ampliado: mm?.ampliado ?? 0, consumed: mm?.consumed ?? 0 }
     : { assigned: d.assigned, excelBase: d.excelBase, ampliado: d.assigned - d.excelBase, consumed: d.consumed }
   const restante = cab.assigned - cab.consumed
 
   // Posiciones: en Mensual cada fila muestra su mes (0/0 se ve en cero, estado neutro '—').
   const posiciones = useMemo(() => {
-    if (!esMensual) return d.posiciones
+    if (!esMensual) return d.posiciones.map((p) => ({ ...p, provisionalMes: false }))
     return d.posiciones.map((p) => {
       const m = p.monthly.find((x) => x.month === mes)
       const assigned = m?.assigned ?? 0
       const consumed = m?.consumed ?? 0
-      return { ...p, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed) }
+      return { ...p, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), provisionalMes: !!m?.provisional }
     })
   }, [d.posiciones, esMensual, mes])
 
@@ -83,10 +84,13 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
 
       <div className="mb-10 grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-xs text-foreground/50">Asignado</p>
+          <p className="flex items-center gap-1.5 text-xs text-foreground/50">
+            Asignado
+            {esProvisional && <span className="rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.6rem] font-medium text-(--brand)">Provisional</span>}
+          </p>
           <p className="tabular-money mt-1 text-2xl font-semibold">{formatHoras(cab.assigned)}</p>
           <p className="mt-1 text-xs text-foreground/45">
-            Excel {formatHoras(cab.excelBase)}{cab.ampliado > 0 && <> · ampliado +{formatHoras(cab.ampliado)}</>}
+            {esProvisional ? 'Estimado por tipo de contrato' : <>Excel {formatHoras(cab.excelBase)}{cab.ampliado > 0 && <> · ampliado +{formatHoras(cab.ampliado)}</>}</>}
           </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -132,9 +136,12 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                     <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.consumed)}</td>
                     <td className={`tabular-money px-4 py-2.5 text-right ${p.remaining < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(p.remaining)}</td>
                     <td className="px-4 py-2.5 text-right">
-                      {esMensual && p.assigned === 0 && p.consumed === 0
-                        ? <span className="text-sm text-muted-foreground/50">—</span>
-                        : <HorasStatusBadge status={p.status} />}
+                      <span className="inline-flex items-center gap-1.5">
+                        {p.provisionalMes && <span className="rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.6rem] font-medium text-(--brand)">Prov.</span>}
+                        {esMensual && p.assigned === 0 && p.consumed === 0 && !p.provisionalMes
+                          ? <span className="text-sm text-muted-foreground/50">—</span>
+                          : <HorasStatusBadge status={p.status} />}
+                      </span>
                     </td>
                   </tr>
                 ))}
