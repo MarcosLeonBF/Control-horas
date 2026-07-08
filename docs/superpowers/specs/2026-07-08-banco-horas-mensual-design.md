@@ -99,6 +99,12 @@ monthly: { month: string; assigned: number; consumed: number }[]
 
 ## 5. UI
 
+**Estándar de diseño (observación del product owner):** todo lo nuevo sigue
+la identidad visual existente de la app (shadcn/ui, estética corporativa
+limpia, tipografía y acentos actuales). El switch, el selector de mes y los
+estados neutros se construyen con los componentes y tokens ya establecidos —
+nada que parezca de otra app.
+
 ### 5.1 Lista de bancos (`BancosHorasClient`)
 
 - Control segmentado **Total | Mensual** junto a los filtros existentes
@@ -111,8 +117,10 @@ monthly: { month: string; assigned: number; consumed: number }[]
   recalculan para el mes.
 - Los filtros existentes (búsqueda, estado, posición, manager, auditoría)
   siguen operando; el filtro de estado usa el estado del modo activo.
-- Proyectos sin asignación **ni** consumo en el mes seleccionado se ocultan
-  (evita filas de ceros).
+- Proyectos sin asignación **ni** consumo en el mes seleccionado se muestran
+  **en cero** (0 asignadas / 0 consumidas), con estado neutro (sin badge de
+  semáforo: 0/0 no es "disponible" ni "excedido"). Decisión de producto:
+  se prefiere ver el proyecto en cero a que desaparezca de la lista.
 
 ### 5.2 Detalle
 
@@ -137,7 +145,8 @@ tests; no se añade uno en este trabajo):
 - Fixture del Graph extendida con la columna `Fecha` y varios meses por
   proyecto (incluye una fila sin fecha para el caso de error).
 - Lista: el switch cambia cifras y badges; el selector navega meses; el mes
-  sin datos oculta el proyecto; los totales de cabecera se recalculan.
+  sin datos muestra el proyecto en cero con estado neutro; los totales de
+  cabecera se recalculan.
 - Detalle: cifras del mes; ampliación imputada a su mes; movimientos
   filtrados.
 - Totales: los consumidores existentes (alertas, reportes) no cambian —
