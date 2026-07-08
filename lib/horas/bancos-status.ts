@@ -2,6 +2,13 @@
 // lo consume tanto la página (servidor) como el componente cliente.
 export type HorasStatus = 'sin_asignacion' | 'disponible' | 'bajo' | 'consumido' | 'excedido'
 
+// Cifras de un mes para una fila del banco (asignado Excel vs consumido del mes).
+export interface BancoMensual {
+  month: string // 'YYYY-MM'
+  assigned: number
+  consumed: number
+}
+
 export interface BancoHorasRow {
   project: string
   position: string // posición = columna del Excel (CRM, SEO, Growth Strategists…)
@@ -9,6 +16,7 @@ export interface BancoHorasRow {
   consumed: number // horas registradas por usuarios de esa posición en el proyecto
   remaining: number
   status: HorasStatus
+  monthly: BancoMensual[] // desglose mensual (ascendente); [] si no hay datos por mes
   projectEstado?: string // estado del proyecto (Excel Clientes_Proyectos): Activo/Finalizado/…
   manager?: string // "Manager del proyecto" (Excel): para filtrar en Bancos
   fechaAuditoria?: string // "Fecha Auditoría" (Excel) en ISO YYYY-MM-DD: para filtrar en Bancos
@@ -36,6 +44,15 @@ export interface MovimientoBanco {
   detail: string // descripción (consumo) / motivo (ampliación)
 }
 
+// Cifras mensuales del proyecto en el detalle: asignado Excel del mes + ampliaciones
+// del mes (a nivel proyecto, spec §4.3) frente al consumido del mes.
+export interface BancoDetalleMensual {
+  month: string // 'YYYY-MM'
+  excelAssigned: number
+  ampliado: number // Σ ampliaciones ACTIVAS con entry_date en ese mes
+  consumed: number
+}
+
 export interface BancoHorasDetalle {
   project: string
   posiciones: BancoHorasRow[] // desglose por posición (acotado al alcance del que mira)
@@ -46,6 +63,7 @@ export interface BancoHorasDetalle {
   consumed: number
   remaining: number
   status: HorasStatus
+  monthly: BancoDetalleMensual[] // cifras del proyecto por mes (ascendente)
 }
 
 export const HORAS_STATUS_LABELS: Record<HorasStatus, string> = {
@@ -92,6 +110,7 @@ export interface BancoHorasProyecto {
   consumed: number
   remaining: number
   status: HorasStatus // estado del banco a nivel proyecto (calculado sobre los totales)
+  monthly: BancoMensual[]
 }
 
 // Clase de la insignia según el estado del proyecto (Excel Clientes_Proyectos):
@@ -112,7 +131,7 @@ export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[
   for (const r of rows) {
     let g = map.get(r.project)
     if (!g) {
-      g = { project: r.project, projectEstado: r.projectEstado, manager: r.manager, fechaAuditoria: r.fechaAuditoria, positions: [], assigned: 0, consumed: 0, remaining: 0, status: 'sin_asignacion' }
+      g = { project: r.project, projectEstado: r.projectEstado, manager: r.manager, fechaAuditoria: r.fechaAuditoria, positions: [], assigned: 0, consumed: 0, remaining: 0, status: 'sin_asignacion', monthly: [] }
       map.set(r.project, g)
     }
     g.positions.push(r)
@@ -123,6 +142,17 @@ export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[
     g.remaining = g.assigned - g.consumed
     g.status = computeHorasStatus(g.assigned, g.consumed)
     g.positions.sort((a, b) => a.position.localeCompare(b.position))
+    // Mensual del proyecto = suma de lo mensual de sus posiciones.
+    const byMonth = new Map<string, BancoMensual>()
+    for (const p of g.positions) {
+      for (const m of p.monthly) {
+        const acc = byMonth.get(m.month) ?? { month: m.month, assigned: 0, consumed: 0 }
+        acc.assigned += m.assigned
+        acc.consumed += m.consumed
+        byMonth.set(m.month, acc)
+      }
+    }
+    g.monthly = [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
   }
   return [...map.values()]
 }
