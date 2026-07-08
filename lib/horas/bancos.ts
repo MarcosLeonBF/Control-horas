@@ -172,14 +172,30 @@ export async function getBancoHorasDetalle(
 
   let posicionesExcel: { position: string; hours: number }[] = []
   let mesesExcel: BancoHorasProyecto['months'] = []
+  let allExcel: BancoHorasProyecto[] = []
   try {
-    const excel = await getCachedBancoHoras()
-    const proj = excel.find((e) => e.project.trim() === name)
+    allExcel = await getCachedBancoHoras()
+    const proj = allExcel.find((e) => e.project.trim() === name)
     posicionesExcel = proj?.positions ?? []
     mesesExcel = proj?.months ?? []
   } catch {
     posicionesExcel = []
   }
+
+  let meta: ProyectoEstado | undefined
+  try { meta = (await getCachedProyectosEstado()).find((e) => e.project.trim() === name) } catch { /* sin meta */ }
+  let horasProv: HorasProvisionales = new Map()
+  try { horasProv = await getCachedHorasProvisionales() } catch { horasProv = new Map() }
+
+  const ventana = mesesVentana(ultimoRegistroGlobal(allExcel), currentMonth())
+  const mesesRealesProj = new Set(mesesExcel.map((m) => m.month))
+  const tarifa = meta ? horasProv.get(meta.tipoContrato) : undefined
+  const provByPos = meta
+    ? provisionalPorPosicion(
+        { tipoContrato: meta.tipoContrato, estado: meta.estado, inicioContable: meta.inicioContable, finContable: meta.finContable },
+        mesesRealesProj, ventana, tarifa,
+      )
+    : new Map<string, BancoMensual[]>()
 
   const db = createAdminClient()
   const [{ data: lines }, { data: amps }] = await Promise.all([
@@ -220,6 +236,7 @@ export async function getBancoHorasDetalle(
   const posNames = new Set<string>()
   for (const p of posicionesExcel) if (visible(allowed, p.position)) posNames.add(p.position)
   for (const p of consumedByPos.keys()) posNames.add(p)
+  for (const p of provByPos.keys()) if (visible(allowed, p)) posNames.add(p)
 
   const excelByPos = new Map(posicionesExcel.map((p) => [p.position, Number(p.hours)]))
   // Con asignación/actividad primero, "Sin asignación" al fondo (por severidad), luego nombre.
@@ -232,6 +249,7 @@ export async function getBancoHorasDetalle(
         const h = m.positions.find((p) => p.position === position)?.hours ?? 0
         if (h !== 0) byMonth.set(m.month, { month: m.month, assigned: h, consumed: 0 })
       }
+      for (const pm of provByPos.get(position) ?? []) byMonth.set(pm.month, { ...pm })
       for (const [month, h] of consumedByPosMes.get(position) ?? []) {
         const acc = byMonth.get(month) ?? { month, assigned: 0, consumed: 0 }
         acc.consumed += h
@@ -260,8 +278,9 @@ export async function getBancoHorasDetalle(
   for (const p of posiciones) {
     for (const m of p.monthly) {
       const e = monthEntry(m.month)
-      e.excelAssigned += m.assigned
       e.consumed += m.consumed
+      if (m.provisional) e.provisional += m.assigned
+      else e.excelAssigned += m.assigned
     }
   }
   for (const a of ampliaciones) {
