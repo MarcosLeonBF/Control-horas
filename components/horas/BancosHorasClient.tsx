@@ -2,11 +2,11 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Search, AlertTriangle, TrendingDown, Download, ChevronRight, X } from 'lucide-react'
+import { Search, AlertTriangle, TrendingDown, Download, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import type { BancoHorasRow, HorasStatus } from '@/lib/horas/bancos-status'
-import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProject, estadoProyectoBadgeClass } from '@/lib/horas/bancos-status'
+import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProject, estadoProyectoBadgeClass, computeHorasStatus } from '@/lib/horas/bancos-status'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
-import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
+import { formatHoras, formatHorasTotal, formatFechaISO, formatMes, currentMonth, addMonths } from '@/lib/horas/format'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -44,6 +44,8 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   const [manager, setManager] = useState('todos')
   const [auditFrom, setAuditFrom] = useState('')
   const [auditTo, setAuditTo] = useState('')
+  const [vista, setVista] = useState<'total' | 'mensual'>('total')
+  const [mes, setMes] = useState(() => currentMonth())
 
   const positions = useMemo(() => [...new Set(rows.map((r) => r.position))].sort((a, b) => a.localeCompare(b)), [rows])
   const managers = useMemo(
@@ -52,9 +54,32 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   )
   const hasSinManager = useMemo(() => rows.some((r) => !(r.manager ?? '').trim()), [rows])
 
+  // Meses con datos (Excel o consumo) en cualquier fila. Si el Excel aún no tiene
+  // la columna Fecha, no hay meses y el switch Mensual no se muestra.
+  const meses = useMemo(() => {
+    const s = new Set<string>()
+    for (const r of rows) for (const m of r.monthly) s.add(m.month)
+    return [...s].sort()
+  }, [rows])
+  const hayMensual = meses.length > 0
+  const minMes = meses[0] ?? currentMonth()
+  const maxMes = meses.length > 0 && meses[meses.length - 1] > currentMonth() ? meses[meses.length - 1] : currentMonth()
+
+  // En Mensual, cada fila muestra las cifras del mes elegido (0/0 si no tiene datos:
+  // decisión de producto — el proyecto se ve en cero, no desaparece).
+  const viewRows = useMemo(() => {
+    if (vista === 'total') return rows
+    return rows.map((r) => {
+      const m = r.monthly.find((x) => x.month === mes)
+      const assigned = m?.assigned ?? 0
+      const consumed = m?.consumed ?? 0
+      return { ...r, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed) }
+    })
+  }, [rows, vista, mes])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return rows
+    return viewRows
       .filter((r) => {
         if (q && !r.project.toLowerCase().includes(q) && !r.position.toLowerCase().includes(q)) return false
         if (estado !== 'todos' && r.status !== estado) return false
@@ -67,7 +92,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
         return true
       })
       .sort((a, b) => HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status] || a.project.localeCompare(b.project) || a.position.localeCompare(b.position))
-  }, [rows, search, estado, posicion, manager, auditFrom, auditTo])
+  }, [viewRows, search, estado, posicion, manager, auditFrom, auditTo])
 
   // Agrupado por proyecto: una fila por proyecto con el banco total; el desglose por
   // posición se ve al desplegar. El total refleja las posiciones visibles (con filtros).
@@ -95,7 +120,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
       Asignado: r.assigned, Consumido: r.consumed, Restante: r.remaining, 'Estado banco': HORAS_STATUS_LABELS[r.status],
     }))
   }
-  const fileBase = `bancos-horas${estado === 'todos' ? '' : `-${estado}`}`
+  const fileBase = `bancos-horas${vista === 'mensual' ? `-${mes}` : ''}${estado === 'todos' ? '' : `-${estado}`}`
 
   return (
     <div className="space-y-6">
@@ -119,6 +144,44 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
 
       {/* Filtros */}
       <div className="space-y-3.5">
+        {/* Vista Total | Mensual (spec §5.1). Solo si el Excel ya trae meses. */}
+        {hayMensual && (
+          <div className="flex flex-wrap items-center gap-3">
+            <div role="group" aria-label="Vista del banco" className="inline-flex rounded-lg bg-(--muted-surface) p-0.5">
+              {(['total', 'mensual'] as const).map((v) => (
+                <button
+                  key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
+                  className={cn(
+                    'rounded-md px-3.5 py-1.5 text-sm transition-colors',
+                    vista === v ? 'bg-card font-medium text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {v === 'total' ? 'Total' : 'Mensual'}
+                </button>
+              ))}
+            </div>
+            {vista === 'mensual' && (
+              <div className="inline-flex items-center gap-1">
+                <button
+                  type="button" aria-label="Mes anterior" disabled={mes <= minMes}
+                  onClick={() => setMes((m) => addMonths(m, -1))}
+                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-(--brand) disabled:pointer-events-none disabled:opacity-30"
+                >
+                  <ChevronLeft className="size-4" />
+                </button>
+                <span className="min-w-30 text-center text-sm font-medium text-foreground">{formatMes(mes)}</span>
+                <button
+                  type="button" aria-label="Mes siguiente" disabled={mes >= maxMes}
+                  onClick={() => setMes((m) => addMonths(m, 1))}
+                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-(--brand) disabled:pointer-events-none disabled:opacity-30"
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Buscar + resumen */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-56 flex-1">
@@ -245,7 +308,11 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                       <span className="text-muted-foreground">/{formatHoras(g.assigned)}</span>
                     </span>
 
-                    <span className="w-28 shrink-0 text-right"><HorasStatusBadge status={g.status} /></span>
+                    <span className="w-28 shrink-0 text-right">
+                      {vista === 'mensual' && g.assigned === 0 && g.consumed === 0
+                        ? <span aria-label="Sin datos este mes" className="text-sm text-muted-foreground/50">—</span>
+                        : <HorasStatusBadge status={g.status} />}
+                    </span>
                     <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-(--brand) md:block" />
                   </Link>
                 </li>

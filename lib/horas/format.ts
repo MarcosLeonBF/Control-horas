@@ -22,3 +22,25 @@ export function formatFechaISO(iso: string): string {
   const [y, m, d] = iso.split('-')
   return y && m && d ? `${d}/${m}/${y}` : iso
 }
+
+// 'YYYY-MM' → "Julio 2026" (es-ES, inicial mayúscula). Si no es un mes válido,
+// devuelve la entrada tal cual. timeZone UTC para no deslizarse de mes.
+const MES = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+
+export function formatMes(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  if (!y || !m) return month
+  const label = MES.format(new Date(Date.UTC(y, m - 1, 1)))
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+// Mes actual como 'YYYY-MM'.
+export function currentMonth(): string {
+  return new Date().toISOString().slice(0, 7)
+}
+
+// Suma delta meses a un 'YYYY-MM' (delta puede ser negativo).
+export function addMonths(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 7)
+}
