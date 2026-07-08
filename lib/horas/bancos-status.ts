@@ -7,6 +7,7 @@ export interface BancoMensual {
   month: string // 'YYYY-MM'
   assigned: number
   consumed: number
+  provisional?: boolean // true si `assigned` es un estimado provisional (no confirmado)
 }
 
 export interface BancoHorasRow {
@@ -51,6 +52,7 @@ export interface BancoDetalleMensual {
   excelAssigned: number
   ampliado: number // Σ ampliaciones ACTIVAS con entry_date en ese mes
   consumed: number
+  provisional: number // Σ horas provisionales del mes (0 si el mes es real)
 }
 
 export interface BancoHorasDetalle {
