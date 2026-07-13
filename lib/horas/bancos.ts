@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedBancoHoras, getCachedProyectosEstado, getCachedHorasProvisionales, type ProyectoEstado, type HorasProvisionales } from '@/lib/graph/client'
+import { getCachedBancoHoras, getCachedProyectosEstado, getCachedHorasProvisionales, getCachedHorasProvisionalesSetup, type ProyectoEstado, type HorasProvisionales } from '@/lib/graph/client'
 import { computeHorasStatus, HORAS_SEVERITY, type BancoHorasRow, type BancoHorasDetalle, type AmpliacionHoras, type MovimientoBanco, type BancoMensual, type BancoDetalleMensual } from '@/lib/horas/bancos-status'
 import type { BancoHorasProyecto } from '@/lib/types'
 import { currentMonth } from '@/lib/horas/format'
@@ -58,6 +58,9 @@ export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[
   let horasProv: HorasProvisionales = new Map()
   try { horasProv = await getCachedHorasProvisionales() } catch { horasProv = new Map() }
 
+  let horasProvSetup: HorasProvisionales = new Map()
+  try { horasProvSetup = await getCachedHorasProvisionalesSetup() } catch { horasProvSetup = new Map() }
+
   const db = createAdminClient()
   const { data: lines } = await db
     .from('time_log_lines')
@@ -108,13 +111,14 @@ export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[
     const meta = metaByProject.get(project)
     const mesesReales = new Set((proj?.months ?? []).map((m) => m.month))
     const tarifa = meta ? horasProv.get(meta.tipoContrato) : undefined
+    const tarifaSetup = meta ? horasProvSetup.get(meta.tipoContrato) : undefined
     if (meta && meta.tipoContrato && horasProv.size > 0 && !tarifa) {
       console.warn(`[horas-provisionales] sin tarifa para tipo de contrato "${meta.tipoContrato}" (proyecto "${project}")`)
     }
     const provByPos = meta
       ? provisionalPorPosicion(
           { tipoContrato: meta.tipoContrato, estado: meta.estado, inicioContable: meta.inicioContable, finContable: meta.finContable },
-          mesesReales, ventana, tarifa,
+          mesesReales, ventana, tarifa, tarifaSetup,
         )
       : new Map<string, BancoMensual[]>()
 
@@ -189,14 +193,17 @@ export async function getBancoHorasDetalle(
   try { meta = (await getCachedProyectosEstado()).find((e) => e.project.trim() === name) } catch { /* sin meta */ }
   let horasProv: HorasProvisionales = new Map()
   try { horasProv = await getCachedHorasProvisionales() } catch { horasProv = new Map() }
+  let horasProvSetup: HorasProvisionales = new Map()
+  try { horasProvSetup = await getCachedHorasProvisionalesSetup() } catch { horasProvSetup = new Map() }
 
   const ventana = mesesVentana(ultimoRegistroGlobal(allExcel), currentMonth())
   const mesesRealesProj = new Set(mesesExcel.map((m) => m.month))
   const tarifa = meta ? horasProv.get(meta.tipoContrato) : undefined
+  const tarifaSetup = meta ? horasProvSetup.get(meta.tipoContrato) : undefined
   const provByPos = meta
     ? provisionalPorPosicion(
         { tipoContrato: meta.tipoContrato, estado: meta.estado, inicioContable: meta.inicioContable, finContable: meta.finContable },
-        mesesRealesProj, ventana, tarifa,
+        mesesRealesProj, ventana, tarifa, tarifaSetup,
       )
     : new Map<string, BancoMensual[]>()
 
