@@ -247,12 +247,12 @@ export const getCachedProyectosEstado = unstable_cache(
 // BancoHoras). Cada celda = horas/mes provisionales de esa posición para ese contrato.
 export type HorasProvisionales = Map<string, Map<string, number>>
 
-async function readHorasProvisionalesSheet(
+async function readTarifaProvisionalSheet(
   token: string,
   driveId: string,
   itemId: string,
+  sheet: string,
 ): Promise<HorasProvisionales> {
-  const sheet = 'Horas_Provisionales'
   const url = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets/${encodeURIComponent(sheet)}/usedRange(valuesOnly=true)`
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
   if (!res.ok) {
@@ -291,7 +291,7 @@ async function fetchHorasProvEntriesFromGraph(): Promise<HorasProvEntries> {
   if (!fileUrl) throw new Error('SHAREPOINT_FILE_URL no está configurada')
   const token = await getToken()
   const { driveId, itemId } = await resolveDriveItem(token, fileUrl)
-  const map = await readHorasProvisionalesSheet(token, driveId, itemId)
+  const map = await readTarifaProvisionalSheet(token, driveId, itemId, 'Horas_Provisionales')
   return [...map].map(([tipo, ps]) => [tipo, [...ps]])
 }
 
@@ -303,5 +303,29 @@ const getCachedHorasProvEntries = unstable_cache(
 
 export async function getCachedHorasProvisionales(): Promise<HorasProvisionales> {
   const entries = await getCachedHorasProvEntries()
+  return new Map(entries.map(([tipo, ps]) => [tipo, new Map(ps)]))
+}
+
+// ── Horas provisionales de SETUP (hoja "Horas_Provisionales_Setup") ───────────
+// Misma estructura que Horas_Provisionales (tipo contrato × posición), con los valores
+// del mes de arranque. Se aplica solo al primer mes (Fecha Inicio Contable) de un
+// proyecto sin registros en BancoHoras; el resto usa la tarifa normal.
+async function fetchHorasProvSetupEntriesFromGraph(): Promise<HorasProvEntries> {
+  const fileUrl = process.env.SHAREPOINT_FILE_URL
+  if (!fileUrl) throw new Error('SHAREPOINT_FILE_URL no está configurada')
+  const token = await getToken()
+  const { driveId, itemId } = await resolveDriveItem(token, fileUrl)
+  const map = await readTarifaProvisionalSheet(token, driveId, itemId, 'Horas_Provisionales_Setup')
+  return [...map].map(([tipo, ps]) => [tipo, [...ps]])
+}
+
+const getCachedHorasProvSetupEntries = unstable_cache(
+  fetchHorasProvSetupEntriesFromGraph,
+  ['horas-provisionales-setup-entries'],
+  { revalidate: 300, tags: [BANCO_HORAS_TAG] },
+)
+
+export async function getCachedHorasProvisionalesSetup(): Promise<HorasProvisionales> {
+  const entries = await getCachedHorasProvSetupEntries()
   return new Map(entries.map(([tipo, ps]) => [tipo, new Map(ps)]))
 }
