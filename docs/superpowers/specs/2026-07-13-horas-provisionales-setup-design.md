@@ -49,18 +49,21 @@ Para un proyecto **P**:
 - **Disparador — P es nuevo:** P **no tiene ningún registro** en `BancoHoras`
   (`mesesReales` vacío). Si P tiene aunque sea un registro real, nada cambia: todos sus
   meses provisionales usan la tarifa normal, como hoy.
-- **Mes de setup — el primer mes provisional visible:** el **primer mes de la ventana**
-  (orden ascendente) que pasa los criterios de elegibilidad actuales
-  (`inicioContable ≤ M`, `finContable` vacía o `≥ M`, `estado ≠ Pausa`). Como P no tiene
-  meses reales, ninguno se salta por el criterio "mes ya real".
-  - Ese mes usa la tarifa de **`Horas_Provisionales_Setup`** del tipo de contrato de P.
+- **Mes de setup — el mes de arranque del proyecto:** el mes de la **`Fecha Inicio
+  Contable`** de P (`inicioContable`, a nivel `YYYY-MM`). Es una fecha **fija** del
+  proyecto, no una posición en la ventana.
+  - Si ese mes cae en la ventana provisional y P no tiene registros → usa la tarifa de
+    **`Horas_Provisionales_Setup`** del tipo de contrato de P.
   - El resto de meses elegibles de la ventana usan la tarifa **normal**
     (`Horas_Provisionales`), como hoy.
 
-Consecuencia aceptada (por elegir "primer mes visible" en vez de anclar a
-`Fecha Inicio Contable`): si avanza la ventana porque se carga un lote nuevo y P **sigue**
-sin registros, el "primer mes visible" puede recaer en un mes posterior, y el setup se
-mueve a ese mes. Es el comportamiento esperado dado el disparador (P sin registros).
+El setup queda **anclado** a ese mes: no se mueve. Ejemplo — hoy junio y julio sin
+registros, ventana `[junio, julio]`, proyecto nuevo con inicio en junio → **setup en
+junio, normal en julio**. Si más adelante se carga el lote y junio sale de la ventana
+(queda `[julio]`), el setup **no** salta a julio: julio es provisional normal (nunca fue
+el mes de inicio) y junio deja de mostrar estimado. Si `inicioContable` está **antes** de
+la ventana (el arranque ya pasó y nunca se cargó) → **sin setup**; sus meses provisionales
+son normales.
 
 ### 3.1 Marcado y semántica
 
@@ -75,7 +78,8 @@ mueve a ese mes. Es el comportamiento esperado dado el disparador (P sin registr
 |---|---|
 | Tipo de contrato sin fila en `Horas_Provisionales_Setup` | El primer mes cae a la tarifa **normal** (fallback defensivo: no se pierde la provisional). |
 | El setup indica 0 en una posición (aunque la normal tenga valor) | El mes de setup respeta la tabla de setup **tal cual, por posición** (0 → esa posición no genera celda ese mes). Dato del negocio. |
-| P sin registros y la ventana tiene un solo mes | Ese único mes es el de setup. |
+| P sin registros, inicio contable **fuera** de la ventana | Sin setup; sus meses provisionales son normales (su mes de arranque ya pasó). |
+| P sin registros, inicio contable dentro de la ventana | Ese mes = setup; los demás meses de la ventana = normal. |
 | P con registros reales | Sin setup; toda su provisional es normal (comportamiento actual). |
 | `Horas_Provisionales_Setup` no existe / vacía / Graph falla | Sin setup; el primer mes cae a tarifa normal. El resto del banco funciona igual. |
 
@@ -99,19 +103,18 @@ queda natural; no es obligatorio.
 
 `provisionalPorPosicion` recibe un parámetro nuevo `tarifaSetup: Map<string, number> |
 undefined` y detecta `esNuevo = mesesReales.size === 0`. Se itera la ventana (ya
-ascendente); en el **primer mes elegible**, si `esNuevo` y hay `tarifaSetup`, se usa esa
-tabla; el resto usa la normal. La forma de retorno (`Map<posición, BancoMensual[]>`) y el
-marcado `provisional: true` no cambian.
+ascendente); en el **mes de inicio contable** (`M === inicioMes`), si `esNuevo` y hay
+`tarifaSetup`, se usa esa tabla; el resto usa la normal. La forma de retorno
+(`Map<posición, BancoMensual[]>`) y el marcado `provisional: true` no cambian.
 
 ```ts
 const esNuevo = mesesReales.size === 0
-let primerElegible = true
 for (const M of ventana) {
   if (mesesReales.has(M)) continue    // (nunca para un proyecto nuevo)
   if (inicioMes > M) continue         // aún no arrancó
   if (finMes && finMes < M) continue  // ya finalizó
-  const tabla = (esNuevo && primerElegible && tarifaSetup) ? tarifaSetup : tarifa
-  primerElegible = false
+  // Setup solo en el mes de inicio contable de un proyecto sin registros.
+  const tabla = (esNuevo && M === inicioMes && tarifaSetup) ? tarifaSetup : tarifa
   for (const [position, hours] of tabla) {
     if (hours <= 0) continue
     const arr = out.get(position) ?? []
@@ -121,8 +124,9 @@ for (const M of ventana) {
 }
 ```
 
-`primerElegible` pasa a `false` en cuanto se procesa el primer mes elegible, con o sin
-setup, para que el setup no se aplique dos veces.
+`M === inicioMes` acota el setup a un único mes. Como el guard `inicioMes > M` garantiza
+`M ≥ inicioMes`, solo el propio mes de inicio cumple la igualdad; y si ese mes no está en
+la ventana (arranque anterior a la ventana), ninguna iteración lo alcanza → sin setup.
 
 ## 6. Ensamblado (`lib/horas/bancos.ts`)
 
@@ -147,18 +151,19 @@ mayor. No se toca ningún componente (`BancosHorasClient`, `BancoDetalleView`).
 - La lógica vive en la función pura `provisionalPorPosicion`, que se verifica de forma
   **determinista** (chequeo de nodo, sin framework de unit tests — consistente con el
   repo):
-  - Proyecto sin registros (`mesesReales` vacío) → primer mes elegible = tarifa setup;
-    segundo mes = tarifa normal.
+  - Proyecto sin registros, inicio contable dentro de la ventana → el mes de inicio =
+    tarifa setup; los demás meses de la ventana = tarifa normal.
+  - Proyecto sin registros, inicio contable **antes** de la ventana → sin setup (todos
+    normales).
   - Proyecto con registros → todos los meses provisionales = tarifa normal.
-  - Sin `tarifaSetup` para el tipo de contrato → primer mes cae a normal.
+  - Sin `tarifaSetup` para el tipo de contrato → el mes de inicio cae a normal.
 - El e2e existente (`e2e/horas-bancos.spec.ts`) sigue siendo tolerante a los datos vivos.
 - Gate del repo: `tsc` + `build` (lint roto repo-wide).
 
 ## 9. Fuera de alcance
 
-- La hoja `Primera Aparicion` (se descartó como fuente; se usa el primer mes visible de la
-  ventana).
-- Anclar el setup a `Fecha Inicio Contable`.
+- La hoja `Primera Aparicion` (se descartó como fuente; el ancla es `Fecha Inicio
+  Contable`).
 - Cambios en HUCHA.
 - Arrastre de saldo entre meses.
 - Distintivo visual propio para el mes de setup.
@@ -167,8 +172,8 @@ mayor. No se toca ningún componente (`BancosHorasClient`, `BancoDetalleView`).
 
 - Fuente: hoja `Horas_Provisionales_Setup` (misma estructura que `Horas_Provisionales`).
 - Disparador: proyecto **sin ningún registro** en `BancoHoras`.
-- Mes de setup: **primer mes provisional visible** de la ventana (no anclado a
-  `Fecha Inicio Contable`).
+- Mes de setup: **el mes de `Fecha Inicio Contable`** (fecha fija; el setup no se mueve
+  con la ventana). Inicio fuera de la ventana → sin setup.
 - Marcado: igual que provisional (sin badge nuevo); suma al total como transitorio.
 - Fallback sin fila de setup → tarifa normal ese mes.
 - El mes de setup respeta la tabla de setup por posición (0 incluido).
