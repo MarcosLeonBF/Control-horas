@@ -10,8 +10,16 @@ test('el admin amplía y anula horas de un proyecto', async ({ page }) => {
   // la primera fila esté lista (la lista puede ser larga y tardar en hidratar).
   const primera = page.locator('a[href^="/bancos/"]').first()
   await expect(primera).toBeVisible()
-  await primera.click()
+  // Navegación con reintento: la lista se re-ordena al hidratar y el clic puede perderse.
+  await expect(async () => {
+    await primera.click()
+    await page.waitForURL(/\/bancos\/.+/, { timeout: 2500 })
+  }).toPass({ timeout: 15000 })
   await expect(page.getByRole('heading', { name: 'Ampliar horas' })).toBeVisible()
+  // Esperar a que carguen los chunks + margen de hidratación: la página del detalle es
+  // pesada y, si el submit se dispara antes de hidratar, se pierde (un solo envío).
+  await page.waitForLoadState('networkidle').catch(() => {})
+  await page.waitForTimeout(1500)
 
   const motivo = `E2E ampliación ${Date.now()}`
   await page.getByLabel('Horas').fill('3')
@@ -22,7 +30,7 @@ test('el admin amplía y anula horas de un proyecto', async ({ page }) => {
   // detalle): acotamos a la sección "Ampliaciones" para no matchear ambas filas.
   const seccionAmpliaciones = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Ampliaciones', exact: true }) })
   const fila = seccionAmpliaciones.getByRole('row').filter({ hasText: motivo })
-  await expect(fila).toBeVisible()
+  await expect(fila).toBeVisible({ timeout: 10000 })
   await expect(fila.getByText('+3h')).toBeVisible()
 
   // anular → la fila queda como "anulada"

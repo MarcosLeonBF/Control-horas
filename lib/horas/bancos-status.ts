@@ -58,10 +58,11 @@ export interface BancoDetalleMensual {
 export interface BancoHorasDetalle {
   project: string
   posiciones: BancoHorasRow[] // desglose por posición (acotado al alcance del que mira)
-  excelBase: number // Σ horas del Excel de las posiciones visibles
+  excelBase: number // Σ horas del Excel real de las posiciones visibles
+  provisional: number // Σ horas provisionales (estimadas, transitorias) sumadas al total
   ampliaciones: AmpliacionHoras[]
   movimientos: MovimientoBanco[] // historial consumo + ampliación (más reciente primero)
-  assigned: number // excelBase + Σ ampliaciones activas
+  assigned: number // excelBase + provisional + Σ ampliaciones activas
   consumed: number
   remaining: number
   status: HorasStatus

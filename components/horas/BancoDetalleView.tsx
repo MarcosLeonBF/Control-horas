@@ -26,7 +26,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
   // Cabecera: total confirmado, o la suma de los meses elegidos (Excel + ampliaciones +
   // provisional). esProvisional cuando lo elegido es solo estimado (sin Excel real).
   const cab = useMemo(() => {
-    if (!esMensual) return { assigned: d.assigned, excelBase: d.excelBase, ampliado: d.assigned - d.excelBase, consumed: d.consumed, provisional: 0 }
+    if (!esMensual) return { assigned: d.assigned, excelBase: d.excelBase, ampliado: d.assigned - d.excelBase - d.provisional, consumed: d.consumed, provisional: d.provisional }
     let excelBase = 0, ampliado = 0, consumed = 0, provisional = 0
     for (const m of d.monthly) {
       if (!selSet.has(m.month)) continue
@@ -34,7 +34,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
     }
     return { assigned: excelBase + ampliado + provisional, excelBase, ampliado, consumed, provisional }
   }, [esMensual, d, selSet])
-  const esProvisional = esMensual && cab.provisional > 0 && cab.excelBase === 0
+  const incluyeProv = cab.provisional > 0
   const restante = cab.assigned - cab.consumed
 
   const mesEsProvisional = (month: string) => (d.monthly.find((m) => m.month === month)?.provisional ?? 0) > 0
@@ -97,11 +97,15 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <p className="flex items-center gap-1.5 text-xs text-foreground/50">
             Asignado
-            {esProvisional && <span className="rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.6rem] font-medium text-(--brand)">Provisional</span>}
+            {incluyeProv && <span className="rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.6rem] font-medium text-(--brand)">Provisional</span>}
           </p>
           <p className="tabular-money mt-1 text-2xl font-semibold">{formatHoras(cab.assigned)}</p>
           <p className="mt-1 text-xs text-foreground/45">
-            {esProvisional ? 'Estimado por tipo de contrato' : <>Excel {formatHoras(cab.excelBase)}{cab.ampliado > 0 && <> · ampliado +{formatHoras(cab.ampliado)}</>}</>}
+            {[
+              cab.excelBase > 0 && `Excel ${formatHoras(cab.excelBase)}`,
+              cab.provisional > 0 && `provisional +${formatHoras(cab.provisional)}`,
+              cab.ampliado > 0 && `ampliado +${formatHoras(cab.ampliado)}`,
+            ].filter(Boolean).join(' · ') || 'Sin asignación'}
           </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm">

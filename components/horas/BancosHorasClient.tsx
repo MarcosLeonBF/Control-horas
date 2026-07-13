@@ -88,7 +88,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   // En Mensual, cada fila suma los meses elegidos (assigned/consumed de esos meses);
   // provisional = true si alguno de los meses elegidos es provisional.
   const viewRows = useMemo(() => {
-    if (vista === 'total') return rows.map((r) => ({ ...r, provisional: false }))
+    if (vista === 'total') return rows.map((r) => ({ ...r, provisional: r.monthly.some((m) => m.provisional) }))
     return rows.map((r) => {
       let assigned = 0, consumed = 0, provisional = false
       for (const m of r.monthly) {
@@ -144,7 +144,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
 
   // En Mensual, el asignado del mes puede incluir horas provisionales (estimadas). Lo
   // avisamos en los KPIs y lo marcamos en la descarga para no mezclarlas con lo confirmado.
-  const hayProvisional = useMemo(() => vista === 'mensual' && filtered.some((r) => r.provisional), [vista, filtered])
+  const hayProvisional = useMemo(() => filtered.some((r) => r.provisional), [filtered])
 
   // Descarga de la vista filtrada (§17.5: bancos de horas; excedidos/cerca = filtrar estado + descargar).
   function buildRows(): ExportRow[] {
@@ -180,7 +180,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
 
       {hayProvisional && (
         <p className="-mt-3 text-xs text-(--brand)">
-          El asignado de los meses elegidos incluye horas <strong className="font-medium">provisionales</strong> (estimadas por tipo de contrato); en la descarga van marcadas en la columna «Provisional».
+          El asignado incluye horas <strong className="font-medium">provisionales</strong> (estimadas por tipo de contrato, transitorias hasta que se cargue el mes real); marcadas con «Prov.» y en la columna «Provisional» de la descarga.
         </p>
       )}
 
@@ -344,13 +344,15 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                     </span>
 
                     {(() => {
-                      const mesProvisional = vista === 'mensual' && g.monthly.some((m) => selSet.has(m.month) && m.provisional)
+                      const marcaProv = vista === 'mensual'
+                        ? g.monthly.some((m) => selSet.has(m.month) && m.provisional)
+                        : g.monthly.some((m) => m.provisional)
                       return (
                         <span className="flex w-32 shrink-0 items-center justify-end gap-1.5">
-                          {mesProvisional && (
+                          {marcaProv && (
                             <span className="rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.62rem] font-medium text-(--brand)">Prov.</span>
                           )}
-                          {vista === 'mensual' && g.assigned === 0 && g.consumed === 0 && !mesProvisional
+                          {vista === 'mensual' && g.assigned === 0 && g.consumed === 0 && !marcaProv
                             ? <span aria-label="Sin datos este mes" className="text-sm text-muted-foreground/50">—</span>
                             : <HorasStatusBadge status={g.status} />}
                         </span>

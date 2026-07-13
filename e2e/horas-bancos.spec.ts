@@ -52,10 +52,16 @@ test('el switch Mensual muestra el selector de meses (calendario) con el mes en 
 
 test('el detalle del banco alterna Total y Mensual', async ({ page }) => {
   await page.goto('/bancos')
+  await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
   const primera = page.locator('a[href^="/bancos/"]').first()
   if (!(await primera.isVisible().catch(() => false))) return // sin proyectos visibles
-  await primera.click()
-  await expect(page.getByText('Asignado')).toBeVisible()
+  // Navegación con reintento: la lista se re-ordena al hidratar y el clic puede perderse.
+  await expect(async () => {
+    await primera.click()
+    await page.waitForURL(/\/bancos\/.+/, { timeout: 2500 })
+  }).toPass({ timeout: 15000 })
+  // En Total el detalle muestra la sección "Por posición" (aserción específica del detalle).
+  await expect(page.getByRole('heading', { name: 'Por posición' })).toBeVisible()
 
   const mensual = page.getByRole('button', { name: 'Mensual' })
   if (!(await mensual.isVisible().catch(() => false))) return // Excel sin columna Fecha

@@ -128,11 +128,14 @@ export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[
 
     for (const position of positions) {
       if (!visible(allowed, position)) continue
-      const assigned = excelByPos.get(position) ?? 0
       const k = key(project, position)
       const cons = consumed.get(k) ?? 0
       const prov = provByPos.get(position) ?? []
-      if (assigned === 0 && cons === 0 && prov.length === 0) continue // nada que mostrar
+      const provTotal = prov.reduce((s, pm) => s + pm.assigned, 0)
+      // El asignado incluye las horas provisionales (transitorio): así un proyecto con
+      // estimado no se ve "excedido" solo porque su fila real aún no está cargada.
+      const assigned = (excelByPos.get(position) ?? 0) + provTotal
+      if (assigned === 0 && cons === 0) continue // nada que mostrar
 
       // monthly: Excel real + provisional (disjuntos por mes) + consumo (merge).
       const byMonth = new Map<string, BancoMensual>()
@@ -242,7 +245,9 @@ export async function getBancoHorasDetalle(
   // Con asignación/actividad primero, "Sin asignación" al fondo (por severidad), luego nombre.
   const posiciones: BancoHorasRow[] = [...posNames]
     .map((position) => {
-      const assigned = excelByPos.get(position) ?? 0
+      // El asignado incluye las provisionales (transitorio), como en la lista.
+      const provTotal = (provByPos.get(position) ?? []).reduce((s, pm) => s + pm.assigned, 0)
+      const assigned = (excelByPos.get(position) ?? 0) + provTotal
       const consumed = consumedByPos.get(position) ?? 0
       const byMonth = new Map<string, BancoMensual>()
       for (const m of mesesExcel) {
@@ -262,11 +267,14 @@ export async function getBancoHorasDetalle(
 
   const inScope = scope.role === 'admin' || posiciones.length > 0
 
-  const excelBase = posiciones.reduce((s, p) => s + p.assigned, 0)
+  // excelBase = solo real (Excel); provBase = provisional (transitorio); ambos suman al total.
+  const excelBase = posiciones.reduce((s, p) => s + (excelByPos.get(p.position) ?? 0), 0)
+  const asignadoPosiciones = posiciones.reduce((s, p) => s + p.assigned, 0) // real + provisional
+  const provBase = asignadoPosiciones - excelBase
   const consumed = posiciones.reduce((s, p) => s + p.consumed, 0)
   const ampliaciones = (amps ?? []) as AmpliacionHoras[]
   const ampActiveSum = ampliaciones.filter((a) => a.active).reduce((s, a) => s + Number(a.hours), 0)
-  const assigned = excelBase + ampActiveSum
+  const assigned = asignadoPosiciones + ampActiveSum
 
   // Cifras del proyecto por mes: Excel visible + ampliaciones del mes (spec §4.3).
   const detalleByMonth = new Map<string, BancoDetalleMensual>()
@@ -299,6 +307,7 @@ export async function getBancoHorasDetalle(
     project: name,
     posiciones,
     excelBase,
+    provisional: provBase,
     ampliaciones,
     movimientos: buildMovimientos(excelBase, consumosVisibles, ampliaciones),
     assigned,
