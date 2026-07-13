@@ -159,9 +159,12 @@ mayor. No se toca ningún componente (`BancosHorasClient`, `BancoDetalleView`).
 
 ## 8. Testing
 
-- La lógica vive en la función pura `provisionalPorPosicion`, que se verifica de forma
-  **determinista** (chequeo de nodo, sin framework de unit tests — consistente con el
-  repo):
+Consistente con el repo (sin framework de unit tests; lint roto repo-wide):
+
+- **Gate por tarea:** `npx tsc --noEmit`. **Cierre:** `npm run build`.
+- **Comprobación de comportamiento** de la función pura `provisionalPorPosicion`,
+  recorriendo estos escenarios en `/bancos` con el dev server (skill `verify`) o razonados
+  sobre datos vivos:
   - Proyecto sin registros, inicio contable dentro de la ventana → el mes de inicio =
     tarifa setup; los demás meses de la ventana = tarifa normal.
   - Proyecto sin registros, inicio contable **antes** de la ventana → sin setup (todos
@@ -169,7 +172,8 @@ mayor. No se toca ningún componente (`BancosHorasClient`, `BancoDetalleView`).
   - Proyecto con registros → todos los meses provisionales = tarifa normal.
   - Sin `tarifaSetup` para el tipo de contrato → el mes de inicio cae a normal.
 - El e2e existente (`e2e/horas-bancos.spec.ts`) sigue siendo tolerante a los datos vivos.
-- Gate del repo: `tsc` + `build` (lint roto repo-wide).
+  El mes de setup se ve como un mes provisional cualquiera, así que no requiere aserción
+  nueva.
 
 ## 9. Fuera de alcance
 
