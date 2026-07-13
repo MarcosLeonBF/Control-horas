@@ -51,10 +51,11 @@ function MobileField({ label, children }: { label: string; children: ReactNode }
   )
 }
 
-export default function RegistroForm({ projects, finishedProjects, pausedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial }: {
+export default function RegistroForm({ projects, finishedProjects, pausedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial, returnTo = '/mis-registros' }: {
   projects: string[]; finishedProjects: string[]; pausedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: string[]; departamentos: DepartamentoRow[]; internalAreaId: string
   canBackdate?: boolean // admin: puede registrar fuera del rango de 14 días (PDF §4)
   initial?: { id: string; lines: LineInput[] }
+  returnTo?: string // a dónde volver al guardar (default: mis registros; /equipo al editar ajeno)
 }) {
   const router = useRouter()
   const finishedSet = new Set(finishedProjects)
@@ -147,7 +148,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
     setSaving(false)
     if (!res.ok) { toast.error(res.error); return }
     toast.success(initial ? 'Registro actualizado' : 'Registro guardado')
-    router.push('/mis-registros')
+    router.push(returnTo)
   }
 
   // Controles de una línea, reutilizados por la tabla (escritorio) y las tarjetas (móvil).

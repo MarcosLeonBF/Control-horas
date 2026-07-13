@@ -23,6 +23,17 @@ export async function seedHorasFixture() {
   const { data: area } = await admin.from('areas').select('id').eq('name', 'CRM').single()
   await admin.from('user_areas').insert({ user_id: userId, area_id: area!.id })
 
+  // Un registro del operativo (hoy, 2h) para que el admin lo edite/anule en los tests.
+  const { data: etapa } = await admin.from('etapas').select('id').limit(1).single()
+  const today = new Date().toISOString().slice(0, 10)
+  const { data: log } = await admin.from('time_logs').insert({
+    user_id: userId, entry_date: today, total_hours: 2, status: 'guardado', created_by: userId, updated_by: userId,
+  }).select('id').single()
+  await admin.from('time_log_lines').insert({
+    log_id: log!.id, project: 'Proyecto E2E', area_id: area!.id, department: 'Clientes',
+    etapa_id: etapa!.id, hours: 2, description: 'Registro sembrado E2E', created_by: userId, updated_by: userId,
+  })
+
   // Create admin user
   const { data: createdAdmin, error: adminError } = await admin.auth.admin.createUser({
     email: ADMIN_USER.email, password: ADMIN_USER.password, email_confirm: true,
@@ -36,6 +47,8 @@ export async function seedHorasFixture() {
     operativoEmail: OPERATIVO.email,
     operativoPassword: OPERATIVO.password,
     userId,
+    operativoLogId: log!.id,
+    operativoName: OPERATIVO.full_name,
     adminEmail: ADMIN_USER.email,
     adminPassword: ADMIN_USER.password,
     adminUserId,

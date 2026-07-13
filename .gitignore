@@ -30,3 +30,6 @@ yarn-error.log*
 # Sistema operativo
 .DS_Store
 Thumbs.db
+
+# e2e: fixture efímera de horas (se regenera en cada corrida)
+e2e/.horas.json

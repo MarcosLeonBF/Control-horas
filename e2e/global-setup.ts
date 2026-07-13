@@ -24,6 +24,7 @@ export default async function globalSetup() {
 
   // ── HORAS: seed operativo + admin ────────────────────────────────────────
   const horasFixture = await seedHorasFixture()
+  fs.writeFileSync('e2e/.horas.json', JSON.stringify(horasFixture))
 
   // Login operativo → /registrar
   const operativoPage = await browser.newPage({ baseURL: 'http://localhost:3000' })
