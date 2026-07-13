@@ -83,6 +83,17 @@ son normales.
 | P con registros reales | Sin setup; toda su provisional es normal (comportamiento actual). |
 | `Horas_Provisionales_Setup` no existe / vacía / Graph falla | Sin setup; el primer mes cae a tarifa normal. El resto del banco funciona igual. |
 
+### 3.3 Recálculo — cede ante el dato real (igual que la provisional)
+
+Las horas de setup se derivan al leer, sin persistencia, exactamente como las
+provisionales. **En cuanto aparece la fila real del mes** en `BancoHoras`, se reemplazan
+por lo real, sin limpieza ni jobs: dos mecanismos lo garantizan a la vez —
+
+1. El criterio `mesesReales.has(M)` salta ese mes → no se emite provisional (setup ni
+   normal) para él; mandan los datos reales.
+2. En cuanto el proyecto tiene **cualquier** registro real deja de ser "nuevo"
+   (`esNuevo = false`) → no se vuelve a aplicar tarifa de setup a ningún mes.
+
 ## 4. Lectura del Excel (`lib/graph/client.ts`)
 
 Nuevo lector `getCachedHorasProvisionalesSetup()`, calcado de
