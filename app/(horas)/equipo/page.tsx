@@ -134,7 +134,7 @@ export default async function EquipoPage() {
       <section>
         <h2 className="font-display mb-1 border-b border-border pb-2 text-lg font-semibold">Registros del equipo</h2>
         <p className="mb-4 mt-2 text-sm text-muted-foreground">Cada registro se despliega para ver sus líneas: proyecto, área/departamento, etapa, horas y el motivo.</p>
-        <EquipoRegistros logs={registros} />
+        <EquipoRegistros logs={registros} isAdmin={viewer.role === 'admin'} />
       </section>
     </div>
   )
