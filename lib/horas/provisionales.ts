@@ -35,6 +35,7 @@ export function provisionalPorPosicion(
   mesesReales: Set<string>,
   ventana: string[],
   tarifa: Map<string, number> | undefined,
+  tarifaSetup?: Map<string, number>,
 ): Map<string, BancoMensual[]> {
   const out = new Map<string, BancoMensual[]>()
   if (!tarifa) return out                                    // sin tarifa
@@ -42,11 +43,15 @@ export function provisionalPorPosicion(
   if (meta.inicioContable === '') return out                 // sin inicio: no ubicable
   const inicioMes = meta.inicioContable.slice(0, 7)
   const finMes = meta.finContable ? meta.finContable.slice(0, 7) : ''
+  // Proyecto nuevo = sin ningún registro real en BancoHoras. Su mes de arranque
+  // (inicioMes), si cae en la ventana, usa la tarifa de setup; el resto, la normal.
+  const esNuevo = mesesReales.size === 0
   for (const M of ventana) {
     if (mesesReales.has(M)) continue   // ya hay fila real ese mes
     if (inicioMes > M) continue        // aún no arrancó
     if (finMes && finMes < M) continue // ya finalizó
-    for (const [position, hours] of tarifa) {
+    const tabla = (esNuevo && M === inicioMes && tarifaSetup) ? tarifaSetup : tarifa
+    for (const [position, hours] of tabla) {
       if (hours <= 0) continue
       const arr = out.get(position) ?? []
       arr.push({ month: M, assigned: hours, consumed: 0, provisional: true })
