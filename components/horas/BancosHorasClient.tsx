@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Search, AlertTriangle, TrendingDown, Download, ChevronRight, X } from 'lucide-react'
+import { Search, AlertTriangle, TrendingDown, Download, ChevronRight, X, Clock } from 'lucide-react'
 import type { BancoHorasRow, HorasStatus } from '@/lib/horas/bancos-status'
 import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProject, estadoProyectoBadgeClass, computeHorasStatus } from '@/lib/horas/bancos-status'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
@@ -325,7 +325,10 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                           </span>
                         )}
                         {marcaProv && (
-                          <span title="El asignado incluye horas provisionales (estimadas)" className="shrink-0 rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.62rem] font-medium text-(--brand)">Prov.</span>
+                          <span title="El asignado incluye horas provisionales (estimadas)" className="inline-flex shrink-0 items-center gap-1 rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.62rem] font-medium text-(--brand)">
+                            <Clock aria-hidden className="size-2.5 shrink-0" />
+                            Prov.
+                          </span>
                         )}
                         <span className="hidden shrink-0 text-xs text-muted-foreground/60 sm:inline">
                           {g.positions.length} {g.positions.length === 1 ? 'posición' : 'posiciones'}

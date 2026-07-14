@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { Clock } from 'lucide-react'
 import type { BancoHorasDetalle } from '@/lib/horas/bancos-status'
 import { HORAS_BAR_COLOR } from '@/lib/horas/bancos-status'
 import { formatHoras, currentMonth, mesCorto } from '@/lib/horas/format'
@@ -103,7 +104,12 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <p className="flex items-center gap-1.5 text-xs text-foreground/50">
             Asignado
-            {incluyeProv && <span className="rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.6rem] font-medium text-(--brand)">Provisional</span>}
+            {incluyeProv && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.6rem] font-medium text-(--brand)">
+                <Clock aria-hidden className="size-2.5 shrink-0" />
+                Provisional
+              </span>
+            )}
           </p>
           <p className="tabular-money mt-1 text-2xl font-semibold">{formatHoras(cab.assigned)}</p>
           <p className="mt-1 text-xs text-foreground/45">
