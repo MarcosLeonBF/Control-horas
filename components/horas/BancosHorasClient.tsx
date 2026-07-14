@@ -90,13 +90,16 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
   const viewRows = useMemo(() => {
     if (vista === 'total') return rows.map((r) => ({ ...r, provisional: r.monthly.some((m) => m.provisional) }))
     return rows.map((r) => {
-      let assigned = 0, consumed = 0, provisional = false
+      let assigned = 0, consumed = 0, provisional = false, inutilizables = 0, libres = 0
       for (const m of r.monthly) {
         if (!selSet.has(m.month)) continue
         assigned += m.assigned; consumed += m.consumed
+        inutilizables += m.inutilizables ?? 0; libres += m.libres ?? 0
         if (m.provisional) provisional = true
       }
-      return { ...r, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), provisional }
+      // En Mensual el restante/status del mes se mantienen crudos (el corte se ve en el
+      // detalle); inutilizables/carryNeto llevan lo de los meses elegidos para el export.
+      return { ...r, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), provisional, inutilizables, carryNeto: libres }
     })
   }, [rows, vista, selSet])
 
@@ -153,7 +156,9 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
       Manager: r.manager || '—', 'Fecha auditoría': r.fechaAuditoria ? formatFechaISO(r.fechaAuditoria) : '—',
       Posición: r.position,
       Asignado: r.assigned, Provisional: r.provisional ? 'Sí' : 'No',
-      Consumido: r.consumed, Restante: r.remaining, 'Estado banco': HORAS_STATUS_LABELS[r.status],
+      Consumido: r.consumed, Restante: r.remaining,
+      Inutilizables: r.inutilizables, 'Libres (carry)': r.carryNeto,
+      'Estado banco': HORAS_STATUS_LABELS[r.status],
     }))
   }
   const fileBase = `bancos-horas${vista === 'mensual' ? `-${mesesSel.length === 1 ? mesesSel[0] : `${mesesSel.length}meses`}` : ''}${estado === 'todos' ? '' : `-${estado}`}`
@@ -347,10 +352,16 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                       const marcaProv = vista === 'mensual'
                         ? g.monthly.some((m) => selSet.has(m.month) && m.provisional)
                         : g.monthly.some((m) => m.provisional)
+                      const marcaCF = vista === 'mensual'
+                        ? g.monthly.some((m) => selSet.has(m.month) && (m.libres ?? 0) > 0)
+                        : g.carryNeto > 0
                       return (
                         <span className="flex w-32 shrink-0 items-center justify-end gap-1.5">
                           {marcaProv && (
                             <span className="rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.62rem] font-medium text-(--brand)">Prov.</span>
+                          )}
+                          {marcaCF && (
+                            <span title="Incluye horas libres de carry forward" className="rounded-full bg-(--status-disponible)/12 px-1.5 py-px text-[0.62rem] font-medium text-(--status-disponible)">CF</span>
                           )}
                           {vista === 'mensual' && g.assigned === 0 && g.consumed === 0 && !marcaProv
                             ? <span aria-label="Sin datos este mes" className="text-sm text-muted-foreground/50">—</span>
