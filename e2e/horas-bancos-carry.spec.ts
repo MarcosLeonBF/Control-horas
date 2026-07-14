@@ -17,10 +17,6 @@ test('el detalle muestra Disponible real y el cierre de mes por posición', asyn
   if ((await cierre.count()) > 0) await expect(cierre.first()).toBeVisible()
 })
 
-test('la lista marca CF cuando hay carry forward', async ({ page }) => {
-  await page.goto('/bancos')
-  await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
-  // Tolerante: solo exige la marca si el dato produce carry (sobrantes en meses cerrados).
-  const marca = page.getByText('CF', { exact: true })
-  if ((await marca.count()) > 0) await expect(marca.first()).toBeVisible()
-})
+// La marca «CF» de la lista se quitó por decisión de UI (2026-07-14): saturaba la columna
+// de estado. El carry se ve en el detalle (KPI + cierre de mes) y en el export (columnas
+// Inutilizables / Libres (carry)).

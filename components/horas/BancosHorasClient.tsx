@@ -295,7 +295,7 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
         <div className="hidden items-center gap-4 border-b border-border bg-(--muted-surface) px-5 py-2.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-muted-foreground md:flex">
           <span className="flex-1">Proyecto</span>
           <span className="w-44 text-right">Banco total</span>
-          <span className="w-32 text-right">Estado</span>
+          <span className="w-28 text-right">Estado</span>
           <span className="w-4" aria-hidden />
         </div>
 
@@ -305,6 +305,11 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
           <ul className="divide-y divide-border">
             {groups.map((g) => {
               const pct = g.assigned > 0 ? Math.min((g.consumed / g.assigned) * 100, 100) : 0
+              // «Prov.» va junto al nombre (es un atributo del banco, no del estado):
+              // la columna de estado queda solo para el badge, sin chips que colisionen.
+              const marcaProv = vista === 'mensual'
+                ? g.monthly.some((m) => selSet.has(m.month) && m.provisional)
+                : g.monthly.some((m) => m.provisional)
               return (
                 <li key={g.project}>
                   <Link
@@ -318,6 +323,9 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                           <span className={cn('shrink-0 rounded-full px-1.5 py-px text-[0.62rem] font-medium', estadoProyectoBadgeClass(g.projectEstado))}>
                             {g.projectEstado}
                           </span>
+                        )}
+                        {marcaProv && (
+                          <span title="El asignado incluye horas provisionales (estimadas)" className="shrink-0 rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.62rem] font-medium text-(--brand)">Prov.</span>
                         )}
                         <span className="hidden shrink-0 text-xs text-muted-foreground/60 sm:inline">
                           {g.positions.length} {g.positions.length === 1 ? 'posición' : 'posiciones'}
@@ -348,27 +356,11 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                       <span className="text-muted-foreground">/{formatHoras(g.assigned)}</span>
                     </span>
 
-                    {(() => {
-                      const marcaProv = vista === 'mensual'
-                        ? g.monthly.some((m) => selSet.has(m.month) && m.provisional)
-                        : g.monthly.some((m) => m.provisional)
-                      const marcaCF = vista === 'mensual'
-                        ? g.monthly.some((m) => selSet.has(m.month) && (m.libres ?? 0) > 0)
-                        : g.carryNeto > 0
-                      return (
-                        <span className="flex w-32 shrink-0 items-center justify-end gap-1.5">
-                          {marcaProv && (
-                            <span className="rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.62rem] font-medium text-(--brand)">Prov.</span>
-                          )}
-                          {marcaCF && (
-                            <span title="Incluye horas libres de carry forward" className="rounded-full bg-(--status-disponible)/12 px-1.5 py-px text-[0.62rem] font-medium text-(--status-disponible)">CF</span>
-                          )}
-                          {vista === 'mensual' && g.assigned === 0 && g.consumed === 0 && !marcaProv
-                            ? <span aria-label="Sin datos este mes" className="text-sm text-muted-foreground/50">—</span>
-                            : <HorasStatusBadge status={g.status} />}
-                        </span>
-                      )
-                    })()}
+                    <span className="flex w-28 shrink-0 items-center justify-end">
+                      {vista === 'mensual' && g.assigned === 0 && g.consumed === 0 && !marcaProv
+                        ? <span aria-label="Sin datos este mes" className="text-sm text-muted-foreground/50">—</span>
+                        : <HorasStatusBadge status={g.status} />}
+                    </span>
                     <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-(--brand) md:block" />
                   </Link>
                 </li>
