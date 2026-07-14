@@ -97,9 +97,11 @@ migraciones, sin estado guardado.**
     `libres`/`inutilizables` en el monthly agregado.
 - **`computeHorasStatus` con cifras efectivas**: en filas y detalle el status pasa a
   calcularse como `computeHorasStatus(asignado − inutilizables, consumido)`. El umbral
-  "bajo" (20%) queda relativo al asignado efectivo. Las **alertas** 80/100/exceso
-  (`lib/horas/alertas.ts`, que consume `getBancosHoras`) reflejan el carry sin cambios
-  propios.
+  "bajo" (20%) queda relativo al asignado efectivo. El aviso de "excedido" al registrar
+  (`registrar/page.tsx`, que sí consume `getBancosHoras`) refleja el carry solo.
+  **Nota**: las alertas Slack 80/100/exceso (`lib/horas/alertas.ts`) calculan su propio
+  asignado (Excel total + ampliaciones, sin desglose mensual) → siguen con cifras crudas;
+  adaptarlas queda fuera de alcance.
 - **Cálculo en servidor** (`lib/horas/bancos.ts`): `getBancosHoras` y
   `getBancoHorasDetalle` llaman a `carrySplit` por posición y pueblan los campos; el
   cliente solo agrupa/suma (como hoy).
@@ -145,6 +147,8 @@ cero). La distinción normales vs carry queda siempre visible.
   por antigüedad del mes generador.
 - Configurar el % desde el Excel (hoy constante en código).
 - Cambios en el ledger de Movimientos.
+- Adaptar las alertas Slack 80/100/exceso al asignado efectivo (hoy usan Excel total +
+  ampliaciones, sin desglose mensual).
 
 ## Riesgos / bordes
 
