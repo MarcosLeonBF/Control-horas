@@ -57,6 +57,8 @@ export interface BancoDetalleMensual {
   ampliado: number // Σ ampliaciones ACTIVAS con entry_date en ese mes
   consumed: number
   provisional: number // Σ horas provisionales del mes (0 si el mes es real)
+  inutilizables: number // Σ inutilizables del mes (posiciones visibles; 0 si el mes no cerró)
+  libres: number // Σ libres (carry) del mes (posiciones visibles; 0 si el mes no cerró)
 }
 
 export interface BancoHorasDetalle {

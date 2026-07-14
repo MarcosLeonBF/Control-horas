@@ -312,13 +312,15 @@ export async function getBancoHorasDetalle(
   const detalleByMonth = new Map<string, BancoDetalleMensual>()
   const monthEntry = (month: string) => {
     let e = detalleByMonth.get(month)
-    if (!e) { e = { month, excelAssigned: 0, ampliado: 0, consumed: 0, provisional: 0 }; detalleByMonth.set(month, e) }
+    if (!e) { e = { month, excelAssigned: 0, ampliado: 0, consumed: 0, provisional: 0, inutilizables: 0, libres: 0 }; detalleByMonth.set(month, e) }
     return e
   }
   for (const p of posiciones) {
     for (const m of p.monthly) {
       const e = monthEntry(m.month)
       e.consumed += m.consumed
+      e.inutilizables += m.inutilizables ?? 0
+      e.libres += m.libres ?? 0
       if (m.provisional) e.provisional += m.assigned
       else e.excelAssigned += m.assigned
     }

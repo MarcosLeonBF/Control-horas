@@ -40,8 +40,9 @@ export function LeyendaCierre() {
 
 // La barra segmentada de un mes: composición sobre el asignado del mes (orden fijo:
 // consumido → inutilizables → libres; el tramo vacío del track es el restante del
-// mes en curso). El detalle completo va en el title.
-function BarraMes({ m, enCurso, className }: { m: BancoMensual; enCurso: boolean; className?: string }) {
+// mes en curso). El detalle completo va en el title. Exportada: la matriz de la
+// vista Mensual la usa como micro-barra por celda.
+export function BarraMes({ m, enCurso, className }: { m: BancoMensual; enCurso: boolean; className?: string }) {
   const partes: { pct: number; className?: string; style?: CSSProperties }[] = []
   if (m.assigned > 0) {
     const pct = (h: number) => (h / m.assigned) * 100

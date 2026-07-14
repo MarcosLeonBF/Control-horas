@@ -8,7 +8,8 @@ import { cn } from '@/lib/utils'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import MonthPicker from '@/components/ui/month-picker'
 import AnularAmpliacionButton from '@/components/horas/AnularAmpliacionButton'
-import { HATCH, LeyendaCierre, CierrePosicionPanel, BarraComposicion, tieneCierre } from '@/components/horas/CarryForwardCharts'
+import type { BancoMensual } from '@/lib/horas/bancos-status'
+import { HATCH, LeyendaCierre, CierrePosicionPanel, BarraComposicion, BarraMes, tieneCierre } from '@/components/horas/CarryForwardCharts'
 
 export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle; isAdmin: boolean }) {
   const [vista, setVista] = useState<'total' | 'mensual'>('total')
@@ -25,23 +26,24 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
   const esMensual = vista === 'mensual'
 
   // Cabecera: total confirmado, o la suma de los meses elegidos (Excel + ampliaciones +
-  // provisional). esProvisional cuando lo elegido es solo estimado (sin Excel real).
+  // provisional + carry de esos meses). En Total, libres = carryNeto (neteado de excesos);
+  // en Mensual, libres = Σ bruto de los meses elegidos.
   const cab = useMemo(() => {
-    if (!esMensual) return { assigned: d.assigned, excelBase: d.excelBase, ampliado: d.assigned - d.excelBase - d.provisional, consumed: d.consumed, provisional: d.provisional }
-    let excelBase = 0, ampliado = 0, consumed = 0, provisional = 0
+    if (!esMensual) return { assigned: d.assigned, excelBase: d.excelBase, ampliado: d.assigned - d.excelBase - d.provisional, consumed: d.consumed, provisional: d.provisional, inutilizables: d.inutilizables, libres: d.carryNeto }
+    let excelBase = 0, ampliado = 0, consumed = 0, provisional = 0, inutilizables = 0, libres = 0
     for (const m of d.monthly) {
       if (!selSet.has(m.month)) continue
       excelBase += m.excelAssigned; ampliado += m.ampliado; consumed += m.consumed; provisional += m.provisional
+      inutilizables += m.inutilizables; libres += m.libres
     }
-    return { assigned: excelBase + ampliado + provisional, excelBase, ampliado, consumed, provisional }
+    return { assigned: excelBase + ampliado + provisional, excelBase, ampliado, consumed, provisional, inutilizables, libres }
   }, [esMensual, d, selSet])
   const incluyeProv = cab.provisional > 0
-  // Disponible real (vista Total): descuenta los inutilizables del carry forward
-  // (spec 2026-07-14). En Mensual no aplica el corte. El desglose libres/inutilizables
-  // vive en sus propias cards informativas (ya están sumadas/descontadas del total).
-  const inutil = esMensual ? 0 : d.inutilizables
-  const restante = cab.assigned - cab.consumed - inutil
-  const hayCartasCarry = !esMensual && (d.carryNeto > 0 || d.inutilizables > 0)
+  // Disponible real (ambas vistas): descuenta los inutilizables del carry forward
+  // (spec 2026-07-14). El desglose libres/inutilizables vive en sus propias cards
+  // informativas (ya están sumadas/descontadas del total).
+  const restante = cab.assigned - cab.consumed - cab.inutilizables
+  const hayCartasCarry = cab.libres > 0 || cab.inutilizables > 0
 
   // Cierre de mes integrado en "Por posición": cada fila con meses se despliega y
   // muestra su cierre ahí mismo (leyenda junto al título; sin sección aparte).
@@ -57,19 +59,18 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
 
   const mesEsProvisional = (month: string) => (d.monthly.find((m) => m.month === month)?.provisional ?? 0) > 0
 
-  // Matriz posición × mes (vista Mensual): cada celda es consumido/asignado de ese mes.
+  // Matriz posición × mes (vista Mensual): cada celda lleva el BancoMensual completo
+  // (para la micro-barra de composición del cierre) además de las cifras.
+  const cmAct = currentMonth()
   const matriz = useMemo(
     () =>
       d.posiciones.map((p) => {
-        const porMes = mesesOrden.map((month) => {
-          const m = p.monthly.find((x) => x.month === month)
-          return { month, assigned: m?.assigned ?? 0, consumed: m?.consumed ?? 0 }
-        })
+        const porMes = mesesOrden.map((month) => ({ month, m: p.monthly.find((x) => x.month === month) }))
         return {
           position: p.position,
           porMes,
-          totAssigned: porMes.reduce((s, c) => s + c.assigned, 0),
-          totConsumed: porMes.reduce((s, c) => s + c.consumed, 0),
+          totAssigned: porMes.reduce((s, c) => s + (c.m?.assigned ?? 0), 0),
+          totConsumed: porMes.reduce((s, c) => s + (c.m?.consumed ?? 0), 0),
         }
       }),
     [d.posiciones, mesesOrden],
@@ -85,6 +86,23 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
     return (
       <span className={cn('tabular-money', bold && 'font-medium', assigned - consumed < 0 && 'text-(--status-excedido)')}>
         {formatHoras(consumed)} <span className="text-muted-foreground/60">/ {formatHoras(assigned)}</span>
+      </span>
+    )
+  }
+
+  // Celda de un mes en la matriz: mismo criterio que el cierre — mes cerrado sano
+  // muestra asignado/asignado (todo contabilizado) y la micro-barra reparte la
+  // distribución; excedido o en curso muestran consumido/asignado.
+  const celdaMes = (month: string, m?: BancoMensual) => {
+    if (!m || (m.assigned === 0 && m.consumed === 0)) return <span className="text-muted-foreground/40">—</span>
+    const enCurso = month >= cmAct
+    const excedido = m.consumed > m.assigned
+    return (
+      <span className="inline-flex flex-col items-center gap-1">
+        <span className={cn('tabular-money', excedido && 'text-(--status-excedido)')}>
+          {formatHoras(!enCurso && !excedido ? m.assigned : m.consumed)} <span className="text-muted-foreground/60">/ {formatHoras(m.assigned)}</span>
+        </span>
+        <BarraMes m={m} enCurso={enCurso} className="h-1.5 w-24 max-w-full" />
       </span>
     )
   }
@@ -136,7 +154,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
           <p className="tabular-money mt-1 text-2xl font-semibold">{formatHoras(cab.consumed)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-xs text-foreground/50">{esMensual ? 'Restante' : 'Disponible real'}</p>
+          <p className="text-xs text-foreground/50">Disponible real</p>
           <p className={`tabular-money mt-1 text-2xl font-semibold ${restante < 0 ? 'text-(--status-excedido)' : ''}`}>
             {formatHoras(restante)}
           </p>
@@ -151,7 +169,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                 <span aria-hidden className="size-2.5 shrink-0 rounded-[3px] bg-(--status-disponible)" />
                 Libres (carry)
               </p>
-              <p className="tabular-money mt-1 text-2xl font-semibold text-(--status-disponible)">+{formatHoras(d.carryNeto)}</p>
+              <p className="tabular-money mt-1 text-2xl font-semibold text-(--status-disponible)">+{formatHoras(cab.libres)}</p>
               <p className="mt-1 text-xs text-foreground/45">Ya sumadas al disponible real</p>
             </div>
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -159,7 +177,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                 <span aria-hidden className="size-2.5 shrink-0 rounded-[3px] bg-foreground/10" style={HATCH} />
                 Inutilizables
               </p>
-              <p className="tabular-money mt-1 text-2xl font-semibold text-foreground/70">{formatHoras(d.inutilizables)}</p>
+              <p className="tabular-money mt-1 text-2xl font-semibold text-foreground/70">{formatHoras(cab.inutilizables)}</p>
               <p className="mt-1 text-xs text-foreground/45">Ya descontadas del disponible real</p>
             </div>
           </>
@@ -169,10 +187,10 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
       <section className="mb-10">
         <div className="mb-1 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <h2 className="font-display text-xl font-semibold">{esMensual ? 'Banco mensual por posición' : 'Por posición'}</h2>
-          {!esMensual && hayCierre && <LeyendaCierre />}
+          {hayCierre && <LeyendaCierre />}
         </div>
         {esMensual ? (
-          <p className="mb-4 text-sm text-muted-foreground">Consumido / asignado por mes. El asignado puede ser provisional (estimado) en los meses aún no cargados.</p>
+          <p className="mb-4 text-sm text-muted-foreground">Un mes cerrado queda contabilizado por completo (consumido, inutilizables y libres, como muestra su barra); el mes en curso lleva consumido / asignado. El asignado puede ser provisional (estimado) en los meses aún no cargados.</p>
         ) : hayCierre ? (
           <p className="mb-4 text-sm text-muted-foreground">
             Desplegá una posición para ver su cierre mes a mes: consumido, inutilizables (75% del sobrante) y libres (25%, arrastran como carry forward). El mes en curso aún no sufre el corte.
@@ -206,7 +224,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                   <tr key={row.position} className="border-t border-border">
                     <td className="sticky left-0 bg-card px-4 py-2.5 font-medium whitespace-nowrap">{row.position}</td>
                     {row.porMes.map((c) => (
-                      <td key={c.month} className="px-3 py-2.5 text-center whitespace-nowrap">{celda(c.assigned, c.consumed)}</td>
+                      <td key={c.month} className="px-3 py-2.5 text-center whitespace-nowrap">{celdaMes(c.month, c.m)}</td>
                     ))}
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">{celda(row.totAssigned, row.totConsumed, true)}</td>
                   </tr>
