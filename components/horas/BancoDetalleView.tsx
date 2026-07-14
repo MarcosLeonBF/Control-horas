@@ -272,7 +272,10 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                           </div>
                         </td>
                         <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.assigned)}</td>
-                        <td className={cn('tabular-money px-4 py-2.5 text-right', p.consumed === 0 && 'text-muted-foreground/50')}>{formatHoras(p.consumed)}</td>
+                        {/* Consumido e Inutilizables son restas del asignado: rojo + signo −. */}
+                        <td className={cn('tabular-money px-4 py-2.5 text-right', p.consumed === 0 ? 'text-muted-foreground/50' : 'text-(--status-excedido)')}>
+                          {p.consumed > 0 ? `−${formatHoras(p.consumed)}` : formatHoras(p.consumed)}
+                        </td>
                         {/* En rojo y con signo −: se restan del disponible, igual que el consumo. */}
                         <td className="tabular-money px-4 py-2.5 text-right text-(--status-excedido)">
                           {p.inutilizables > 0 ? `−${formatHoras(p.inutilizables)}` : <span className="text-muted-foreground/40">—</span>}
