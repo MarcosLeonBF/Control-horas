@@ -8,12 +8,19 @@ export interface NuevoUsuario {
 }
 
 export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | { ok: false; error: string }> {
-  // Verificar que el actor es admin
+  // Actor válido: admin, o usuario activo con permiso delegado de alta (can_create_users).
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'No autenticado.' }
-  const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (me?.role !== 'admin') return { ok: false, error: 'Solo un administrador puede crear usuarios.' }
+  const { data: me } = await supabase.from('profiles').select('role, status, can_create_users').eq('id', user.id).single()
+  const esAdmin = me?.role === 'admin'
+  if (!esAdmin && !(me?.can_create_users === true && me?.status === 'activo')) {
+    return { ok: false, error: 'No tienes permiso para crear usuarios.' }
+  }
+  // El permiso delegado no alcanza para crear admins.
+  if (!esAdmin && input.role === 'admin') {
+    return { ok: false, error: 'Solo un administrador puede crear usuarios admin.' }
+  }
 
   if (!input.full_name.trim() || !input.email.trim() || input.password.length < 8) {
     return { ok: false, error: 'Nombre, correo y contraseña (mín. 8) son obligatorios.' }
@@ -45,6 +52,7 @@ export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | 
 export interface EdicionUsuario {
   full_name: string; positionId: string
   role: 'operativo' | 'manager' | 'admin'; status: 'activo' | 'inactivo'; areaIds: string[]
+  canCreateUsers: boolean
 }
 
 // Panel de usuarios (PDF §8/§19): editar datos + estado activo/inactivo. Solo admin.
@@ -63,6 +71,8 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
   const admin = createAdminClient()
   const { error } = await admin.from('profiles').update({
     full_name: input.full_name.trim(), position_id: input.positionId || null, role: input.role, status: input.status,
+    // Un admin ya puede crear usuarios por rol: el flag delegado se limpia para no dejarlo huérfano.
+    can_create_users: input.role === 'admin' ? false : input.canCreateUsers,
   }).eq('id', id)
   if (error) return { ok: false, error: error.message }
 

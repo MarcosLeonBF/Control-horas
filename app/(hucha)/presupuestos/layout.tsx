@@ -7,13 +7,13 @@ export default async function HuchaLayout({ children }: { children: React.ReactN
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('role, full_name').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('role, full_name, can_create_users').eq('id', user.id).single()
   if (!profile || (profile.role !== 'manager' && profile.role !== 'admin')) {
     redirect('/login')
   }
 
   return (
-    <AppShell displayName={profile.full_name || user.email!} role={profile.role}>
+    <AppShell displayName={profile.full_name || user.email!} role={profile.role} canCreateUsers={profile.can_create_users === true}>
       {children}
     </AppShell>
   )

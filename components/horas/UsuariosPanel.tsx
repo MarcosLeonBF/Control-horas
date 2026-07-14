@@ -14,6 +14,7 @@ export interface PosicionOpt { id: string; name: string }
 export interface UsuarioRow {
   id: string; full_name: string; email: string; positionId: string | null
   role: 'operativo' | 'manager' | 'admin'; status: 'activo' | 'inactivo'; areaIds: string[]
+  canCreateUsers: boolean
 }
 
 const fieldSelect = 'h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
@@ -35,6 +36,7 @@ function Editor({ u, areas, posiciones, onDone }: { u: UsuarioRow; areas: AreaRo
   const router = useRouter()
   const [f, setF] = useState<EdicionUsuario>({
     full_name: u.full_name, positionId: u.positionId ?? '', role: u.role, status: u.status, areaIds: u.areaIds,
+    canCreateUsers: u.canCreateUsers,
   })
   const [saving, setSaving] = useState(false)
   const selectableAreas = areas.filter((a) => !a.is_internal)
@@ -114,6 +116,15 @@ function Editor({ u, areas, posiciones, onDone }: { u: UsuarioRow; areas: AreaRo
         </div>
       )}
 
+      {/* Permiso delegado de alta: solo aplica a no-admins (el admin ya crea usuarios por rol). */}
+      {f.role !== 'admin' && (
+        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-foreground/80 hover:text-foreground">
+          <input type="checkbox" className="size-4 accent-(--brand)" checked={f.canCreateUsers}
+            onChange={(e) => setF({ ...f, canCreateUsers: e.target.checked })} />
+          Puede dar de alta usuarios (solo operativos y managers; no edita ni desactiva)
+        </label>
+      )}
+
       <div className="mt-5 flex gap-2">
         <Button onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</Button>
         <Button onClick={onDone} variant="outline">Cancelar</Button>
@@ -122,7 +133,7 @@ function Editor({ u, areas, posiciones, onDone }: { u: UsuarioRow; areas: AreaRo
   )
 }
 
-export default function UsuariosPanel({ usuarios, areas, posiciones }: { usuarios: UsuarioRow[]; areas: AreaRow[]; posiciones: PosicionOpt[] }) {
+export default function UsuariosPanel({ usuarios, areas, posiciones, readOnly = false }: { usuarios: UsuarioRow[]; areas: AreaRow[]; posiciones: PosicionOpt[]; readOnly?: boolean }) {
   const router = useRouter()
   const [editing, setEditing] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -148,7 +159,7 @@ export default function UsuariosPanel({ usuarios, areas, posiciones }: { usuario
             <TableHead>Rol</TableHead>
             <TableHead>Áreas</TableHead>
             <TableHead>Estado</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            {!readOnly && <TableHead className="text-right">Acciones</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -160,19 +171,26 @@ export default function UsuariosPanel({ usuarios, areas, posiciones }: { usuario
                   <div className="text-xs text-muted-foreground">{u.email}</div>
                 </TableCell>
                 <TableCell className="py-3 text-foreground/70">{posName(u.positionId)}</TableCell>
-                <TableCell className="py-3 text-foreground/70 capitalize">{u.role}</TableCell>
+                <TableCell className="py-3 text-foreground/70">
+                  <span className="capitalize">{u.role}</span>
+                  {u.canCreateUsers && u.role !== 'admin' && (
+                    <Badge className="ml-2 bg-sky-50 text-sky-700">Alta de usuarios</Badge>
+                  )}
+                </TableCell>
                 <TableCell className="py-3 text-foreground/70">{u.areaIds.map(areaName).filter(Boolean).join(', ') || '—'}</TableCell>
                 <TableCell className="py-3">
                   <Badge className={`capitalize ${u.status === 'activo' ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-500'}`}>{u.status}</Badge>
                 </TableCell>
-                <TableCell className="py-3 text-right">
-                  <Button variant="link" size="sm" className="px-1" onClick={() => setEditing(editing === u.id ? null : u.id)}>Editar</Button>
-                  <Button variant="ghost" size="sm" disabled={busy === u.id} onClick={() => toggle(u)}>
-                    {u.status === 'activo' ? 'Desactivar' : 'Activar'}
-                  </Button>
-                </TableCell>
+                {!readOnly && (
+                  <TableCell className="py-3 text-right">
+                    <Button variant="link" size="sm" className="px-1" onClick={() => setEditing(editing === u.id ? null : u.id)}>Editar</Button>
+                    <Button variant="ghost" size="sm" disabled={busy === u.id} onClick={() => toggle(u)}>
+                      {u.status === 'activo' ? 'Desactivar' : 'Activar'}
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
-              {editing === u.id && (
+              {!readOnly && editing === u.id && (
                 <TableRow>
                   <TableCell colSpan={6} className="py-3"><Editor u={u} areas={areas} posiciones={posiciones} onDone={() => setEditing(null)} /></TableCell>
                 </TableRow>

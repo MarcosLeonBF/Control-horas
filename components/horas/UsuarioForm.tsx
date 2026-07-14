@@ -10,7 +10,7 @@ import NativeSelect from '@/components/ui/native-select'
 
 const selectClass = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
-export default function UsuarioForm({ areas, posiciones }: { areas: AreaRow[]; posiciones: PosicionOpt[] }) {
+export default function UsuarioForm({ areas, posiciones, allowAdminRole = true }: { areas: AreaRow[]; posiciones: PosicionOpt[]; allowAdminRole?: boolean }) {
   const [f, setF] = useState<NuevoUsuario>({ full_name: '', email: '', password: '', positionId: '', role: 'operativo', areaIds: [] })
   const [saving, setSaving] = useState(false)
   async function onSubmit(e: React.FormEvent) {
@@ -30,7 +30,7 @@ export default function UsuarioForm({ areas, posiciones }: { areas: AreaRow[]; p
         {posiciones.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </NativeSelect>
       <NativeSelect aria-label="Rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as NuevoUsuario['role'] })} className={selectClass} fullWidth>
-        <option value="operativo">operativo</option><option value="manager">manager</option><option value="admin">admin</option>
+        <option value="operativo">operativo</option><option value="manager">manager</option>{allowAdminRole && <option value="admin">admin</option>}
       </NativeSelect>
       {/* Áreas = visibilidad del manager (qué áreas ve su equipo/reportes). El operativo
           las hereda de su posición (no se editan aquí). */}

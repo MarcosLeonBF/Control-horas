@@ -15,7 +15,7 @@ type Icon = ComponentType<{ className?: string }>
 interface Item { href: string; label: string; icon: Icon; show: boolean }
 interface Section { title: string; items: Item[] }
 
-function buildSections(role: string): Section[] {
+function buildSections(role: string, canCreateUsers: boolean): Section[] {
   const isMgr = role === 'manager' || role === 'admin'
   const isAdmin = role === 'admin'
   const raw: Section[] = [
@@ -40,7 +40,7 @@ function buildSections(role: string): Section[] {
     {
       title: 'Administración',
       items: [
-        { href: '/admin/usuarios', label: 'Usuarios', icon: UserCog, show: isAdmin },
+        { href: '/admin/usuarios', label: 'Usuarios', icon: UserCog, show: isAdmin || canCreateUsers },
         { href: '/admin/catalogos', label: 'Catálogos', icon: Tags, show: isAdmin },
         { href: '/admin/auditoria', label: 'Auditoría', icon: History, show: isAdmin },
       ],
@@ -55,7 +55,7 @@ function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '·'
 }
 
-export default function AppShell({ displayName, role, children }: { displayName: string; role: string; children: React.ReactNode }) {
+export default function AppShell({ displayName, role, canCreateUsers = false, children }: { displayName: string; role: string; canCreateUsers?: boolean; children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
@@ -63,7 +63,7 @@ export default function AppShell({ displayName, role, children }: { displayName:
 
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
-  const sections = buildSections(role)
+  const sections = buildSections(role, canCreateUsers)
   const hrefs = sections.flatMap((s) => s.items.map((i) => i.href))
   const activeHref = hrefs
     .filter((h) => pathname === h || pathname.startsWith(h + '/'))

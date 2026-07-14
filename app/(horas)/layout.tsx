@@ -7,7 +7,7 @@ export default async function HorasLayout({ children }: { children: React.ReactN
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const { data: profile } = await supabase.from('profiles').select('role, full_name, status, must_change_password').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('role, full_name, status, must_change_password, can_create_users').eq('id', user.id).single()
   if (!profile || profile.status !== 'activo') redirect('/login')
 
   // Si debe cambiar la contraseña, bloquear toda la app y mostrar el formulario.
@@ -16,7 +16,7 @@ export default async function HorasLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <AppShell displayName={profile.full_name || user.email!} role={profile.role}>
+    <AppShell displayName={profile.full_name || user.email!} role={profile.role} canCreateUsers={profile.can_create_users === true}>
       {children}
     </AppShell>
   )
