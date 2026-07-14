@@ -6,6 +6,7 @@ const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SU
 
 const OPERATIVO = { email: 'e2e-operativo@horas.test', password: 'E2e-Op-Pass-123', full_name: 'Operativo E2E' }
 const ADMIN_USER = { email: 'e2e-admin@horas.test', password: 'E2e-Admin-Pass-123', full_name: 'Admin E2E' }
+const RRHH = { email: 'e2e-rrhh@horas.test', password: 'E2e-Rrhh-Pass-123', full_name: 'RRHH E2E' }
 
 export async function seedHorasFixture() {
   await cleanupHorasFixture()
@@ -43,6 +44,17 @@ export async function seedHorasFixture() {
   const adminUserId = createdAdmin.user!.id
   await admin.from('profiles').update({ role: 'admin', status: 'activo', must_change_password: false }).eq('id', adminUserId)
 
+  // Usuario con permiso delegado de alta (operativo + can_create_users).
+  const { data: createdRrhh, error: rrhhError } = await admin.auth.admin.createUser({
+    email: RRHH.email, password: RRHH.password, email_confirm: true,
+    user_metadata: { full_name: RRHH.full_name },
+  })
+  if (rrhhError) throw rrhhError
+  const rrhhUserId = createdRrhh.user!.id
+  await admin.from('profiles').update({
+    role: 'operativo', status: 'activo', must_change_password: false, can_create_users: true,
+  }).eq('id', rrhhUserId)
+
   return {
     operativoEmail: OPERATIVO.email,
     operativoPassword: OPERATIVO.password,
@@ -52,6 +64,9 @@ export async function seedHorasFixture() {
     adminEmail: ADMIN_USER.email,
     adminPassword: ADMIN_USER.password,
     adminUserId,
+    rrhhEmail: RRHH.email,
+    rrhhPassword: RRHH.password,
+    rrhhUserId,
   }
 }
 
@@ -70,6 +85,12 @@ export async function cleanupHorasFixture() {
     // Delete admin E2E user
     if (u.email === ADMIN_USER.email) {
       await admin.from('horas_ampliaciones').delete().eq('created_by', u.id)
+      await admin.from('time_logs').delete().eq('user_id', u.id)
+      await admin.from('user_areas').delete().eq('user_id', u.id)
+      await admin.auth.admin.deleteUser(u.id)
+    }
+    // Delete RRHH E2E user (permiso delegado de alta)
+    if (u.email === RRHH.email) {
       await admin.from('time_logs').delete().eq('user_id', u.id)
       await admin.from('user_areas').delete().eq('user_id', u.id)
       await admin.auth.admin.deleteUser(u.id)

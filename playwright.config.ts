@@ -21,12 +21,17 @@ export default defineConfig({
       name: 'chromium-horas',
       use: { storageState: 'e2e/.auth/operativo.json' },
       testMatch: '**/horas-*.spec.ts',
-      testIgnore: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos*.spec.ts', '**/horas-reportes.spec.ts', '**/horas-alertas.spec.ts', '**/horas-usuarios-editar.spec.ts', '**/horas-auditoria.spec.ts', '**/horas-registros-editar.spec.ts', '**/horas-carry.spec.ts'],
+      testIgnore: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos*.spec.ts', '**/horas-reportes.spec.ts', '**/horas-alertas.spec.ts', '**/horas-usuarios-editar.spec.ts', '**/horas-usuarios-alta-delegada.spec.ts', '**/horas-auditoria.spec.ts', '**/horas-registros-editar.spec.ts', '**/horas-carry.spec.ts'],
     },
     {
       name: 'chromium-horas-admin',
       use: { storageState: 'e2e/.auth/admin-horas.json' },
       testMatch: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos*.spec.ts', '**/horas-reportes.spec.ts', '**/horas-usuarios-editar.spec.ts', '**/horas-auditoria.spec.ts', '**/horas-registros-editar.spec.ts', '**/hucha-sync-ui.spec.ts', '**/hucha-admin-*.spec.ts'],
+    },
+    {
+      name: 'chromium-horas-rrhh',
+      use: { storageState: 'e2e/.auth/rrhh.json' },
+      testMatch: '**/horas-usuarios-alta-delegada.spec.ts',
     },
   ],
   // Sin bloque `webServer`: el dev server lo gestiona el usuario.

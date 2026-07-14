@@ -46,5 +46,15 @@ export default async function globalSetup() {
   await adminPage.context().storageState({ path: 'e2e/.auth/admin-horas.json' })
   await adminPage.close()
 
+  // Login RRHH (permiso delegado de alta) → /registrar
+  const rrhhPage = await browser.newPage({ baseURL: 'http://localhost:3000' })
+  await rrhhPage.goto('/login')
+  await rrhhPage.getByLabel('Email').fill(horasFixture.rrhhEmail)
+  await rrhhPage.getByLabel('Contraseña').fill(horasFixture.rrhhPassword)
+  await rrhhPage.getByRole('button', { name: /ingresar/i }).click()
+  await rrhhPage.waitForURL('**/registrar')
+  await rrhhPage.context().storageState({ path: 'e2e/.auth/rrhh.json' })
+  await rrhhPage.close()
+
   await browser.close()
 }
