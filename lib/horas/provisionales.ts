@@ -30,6 +30,8 @@ export interface ProyectoProvisionalMeta {
 // Entradas mensuales provisionales por posición para un proyecto: para cada mes de la
 // ventana que NO sea real y cumpla los criterios, la tarifa por posición. Vacío si el
 // proyecto no es elegible o no hay tarifa (el caller loguea el caso sin tarifa).
+// Para un proyecto sin registros reales (mesesReales vacío), el mes de inicioContable usa
+// `tarifaSetup` (tarifa de arranque) cuando se provee; el resto de meses usa `tarifa`.
 export function provisionalPorPosicion(
   meta: ProyectoProvisionalMeta,
   mesesReales: Set<string>,
