@@ -85,9 +85,9 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
   const ampliaciones = esMensual ? d.ampliaciones.filter((a) => selSet.has(a.entry_date.slice(0, 7))) : d.ampliaciones
   const movimientos = esMensual ? d.movimientos.filter((m) => selSet.has(m.date.slice(0, 7))) : d.movimientos
 
-  // Celda de un mes en la matriz: mismo criterio que el cierre — mes cerrado sano
-  // muestra asignado/asignado (todo contabilizado) y la micro-barra reparte la
-  // distribución; excedido o en curso muestran consumido/asignado.
+  // Celda de un mes en la matriz: GASTADO (consumido + inutilizables) / asignado —
+  // la diferencia es siempre lo disponible ("restante y disponible son lo mismo",
+  // Marcos 2026-07-14). La micro-barra reparte la distribución; excedido en rojo.
   const celdaMes = (month: string, m?: BancoMensual) => {
     if (!m || (m.assigned === 0 && m.consumed === 0)) return <span className="text-muted-foreground/40">—</span>
     const enCurso = month >= cmAct
@@ -95,7 +95,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
     return (
       <span className="inline-flex flex-col items-center gap-1">
         <span className={cn('tabular-money', excedido && 'text-(--status-excedido)')}>
-          {formatHoras(!enCurso && !excedido ? m.assigned : m.consumed)} <span className="text-muted-foreground/60">/ {formatHoras(m.assigned)}</span>
+          {formatHoras(m.consumed + (m.inutilizables ?? 0))} <span className="text-muted-foreground/60">/ {formatHoras(m.assigned)}</span>
         </span>
         <BarraMes m={m} enCurso={enCurso} className="h-1.5 w-24 max-w-full" />
       </span>
@@ -185,7 +185,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
           {hayCierre && <LeyendaCierre />}
         </div>
         {esMensual ? (
-          <p className="mb-4 text-sm text-muted-foreground">Un mes cerrado queda contabilizado por completo (consumido, inutilizables y libres, como muestra su barra); el mes en curso lleva consumido / asignado. El asignado puede ser provisional (estimado) en los meses aún no cargados.</p>
+          <p className="mb-4 text-sm text-muted-foreground">Cada mes muestra gastado (consumido + inutilizables) / asignado: la diferencia es lo disponible — en meses cerrados, las horas libres del carry, como reparte su barra. El asignado puede ser provisional (estimado) en los meses aún no cargados.</p>
         ) : hayCierre ? (
           <p className="mb-4 text-sm text-muted-foreground">
             Desplegá una posición para ver su cierre mes a mes: consumido, inutilizables (75% del sobrante) y libres (25%, arrastran como carry forward). El mes en curso aún no sufre el corte.

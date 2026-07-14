@@ -1,7 +1,14 @@
 # Diseño — Carry forward del banco de horas (recalculable, por posición)
 
 **Fecha:** 2026-07-14
-**Estado:** aprobado, pendiente de plan de implementación
+**Estado:** implementado y en producción
+
+> **Revisión 2026-07-14 (feedback de Marcos, post-implementación):** el par `X/Y` de un
+> mes NO muestra "todo contabilizado" (`16/16`): muestra **gastado / asignado**, donde
+> gastado = consumido + inutilizables, de modo que la resta del par sea SIEMPRE lo
+> disponible ("lo restante y lo disponible son lo mismo"). Abril 8/16 cerrado se ve
+> `14/16` (8 consumidas + 6 inutilizadas) y quedan 2 libres. La barra sigue mostrando
+> la distribución completa. El cálculo no cambia; solo la presentación del par.
 **Origen:** pedido de negocio (Marcos) + hoja Excel de referencia del usuario (enero–julio)
 
 ## Problema

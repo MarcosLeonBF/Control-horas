@@ -125,11 +125,14 @@ export function BarraMes({ m, enCurso, className }: { m: BancoMensual; enCurso: 
   )
 }
 
-// Fila de un mes en el despliegue: etiqueta + barra + cifras. Mes cerrado sano: todo
-// quedó contabilizado → 8h/8h (la barra muestra cómo se repartió). Excedido o mes en
-// curso: consumido/asignado (el número a vigilar).
+// Fila de un mes en el despliegue: etiqueta + barra + cifras. El par muestra
+// GASTADO (consumido + inutilizables) / asignado: la diferencia es siempre lo
+// disponible (en meses cerrados, las libres del carry) — decisión Marcos 2026-07-14,
+// "lo restante y lo disponible son lo mismo". En el mes en curso inutilizables = 0,
+// así que queda consumido/asignado; el excedido va en rojo.
 function MesBar({ m, enCurso }: { m: BancoMensual; enCurso: boolean }) {
   const excedido = m.consumed > m.assigned
+  const gastado = m.consumed + (m.inutilizables ?? 0)
   return (
     <li className="flex items-center gap-3">
       <span className="flex w-24 shrink-0 items-center gap-1.5 text-xs whitespace-nowrap text-foreground/60">
@@ -138,9 +141,7 @@ function MesBar({ m, enCurso }: { m: BancoMensual; enCurso: boolean }) {
       </span>
       <BarraMes m={m} enCurso={enCurso} className="flex-1" />
       <span className="w-24 shrink-0 text-right text-xs tabular-money whitespace-nowrap">
-        <span className={cn('font-medium', excedido && 'text-(--status-excedido)')}>
-          {formatHoras(!enCurso && !excedido ? m.assigned : m.consumed)}
-        </span>
+        <span className={cn('font-medium', excedido && 'text-(--status-excedido)')}>{formatHoras(gastado)}</span>
         <span className="text-muted-foreground"> / {formatHoras(m.assigned)}</span>
       </span>
     </li>
