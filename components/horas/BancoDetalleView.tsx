@@ -69,7 +69,9 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
         return {
           position: p.position,
           porMes,
-          totAssigned: porMes.reduce((s, c) => s + (c.m?.assigned ?? 0), 0),
+          // Total EFECTIVO: el asignado de los meses elegidos menos sus inutilizables
+          // (lo que de verdad se puede usar; coordina con el Disponible real).
+          totAssigned: porMes.reduce((s, c) => s + (c.m?.assigned ?? 0) - (c.m?.inutilizables ?? 0), 0),
           totConsumed: porMes.reduce((s, c) => s + (c.m?.consumed ?? 0), 0),
         }
       }),
@@ -216,7 +218,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                       </span>
                     </th>
                   ))}
-                  <th className="px-3 py-2.5 text-right font-medium">Total</th>
+                  <th title="Consumido / asignado efectivo de los meses elegidos (el asignado descuenta los inutilizables del cierre)" className="px-3 py-2.5 text-right font-medium">Total efectivo</th>
                 </tr>
               </thead>
               <tbody>
