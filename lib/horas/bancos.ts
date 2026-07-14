@@ -4,6 +4,7 @@ import { computeHorasStatus, HORAS_SEVERITY, type BancoHorasRow, type BancoHoras
 import type { BancoHorasProyecto } from '@/lib/types'
 import { currentMonth } from '@/lib/horas/format'
 import { ultimoRegistroGlobal, mesesVentana, provisionalPorPosicion } from '@/lib/horas/provisionales'
+import { carrySplit } from '@/lib/horas/carry-forward'
 
 // Banco de horas POR POSICIÓN (PDF + lógica nueva):
 //   - Asignado: cada columna del Excel (CRM, SEO, Growth Strategists…) por proyecto.
@@ -155,10 +156,20 @@ export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[
       }
       const monthly = [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
 
+      // Carry forward (spec 2026-07-14): corte 75/25 de meses cerrados; el disponible
+      // real y el status descuentan los inutilizables. Anota el desglose en cada mes.
+      const carry = carrySplit(monthly, currentMonth())
+      for (const cm of carry.porMes) {
+        const m = byMonth.get(cm.month)
+        if (m && (cm.libres > 0 || cm.inutilizables > 0)) { m.libres = cm.libres; m.inutilizables = cm.inutilizables }
+      }
+
       rows.push({
         project, position, assigned, consumed: cons,
-        remaining: assigned - cons,
-        status: computeHorasStatus(assigned, cons),
+        remaining: assigned - cons - carry.totales.inutilizables,
+        inutilizables: carry.totales.inutilizables,
+        carryNeto: carry.totales.carryNeto,
+        status: computeHorasStatus(assigned - carry.totales.inutilizables, cons),
         monthly,
         projectEstado: meta?.estado,
         manager: meta?.manager,
@@ -268,7 +279,19 @@ export async function getBancoHorasDetalle(
         byMonth.set(month, acc)
       }
       const monthly = [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
-      return { project: name, position, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), monthly }
+      const carry = carrySplit(monthly, currentMonth())
+      for (const cm of carry.porMes) {
+        const m = byMonth.get(cm.month)
+        if (m && (cm.libres > 0 || cm.inutilizables > 0)) { m.libres = cm.libres; m.inutilizables = cm.inutilizables }
+      }
+      return {
+        project: name, position, assigned, consumed,
+        remaining: assigned - consumed - carry.totales.inutilizables,
+        inutilizables: carry.totales.inutilizables,
+        carryNeto: carry.totales.carryNeto,
+        status: computeHorasStatus(assigned - carry.totales.inutilizables, consumed),
+        monthly,
+      }
     })
     .sort((a, b) => HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status] || a.position.localeCompare(b.position))
 
@@ -279,6 +302,8 @@ export async function getBancoHorasDetalle(
   const asignadoPosiciones = posiciones.reduce((s, p) => s + p.assigned, 0) // real + provisional
   const provBase = asignadoPosiciones - excelBase
   const consumed = posiciones.reduce((s, p) => s + p.consumed, 0)
+  const inutilizables = posiciones.reduce((s, p) => s + p.inutilizables, 0)
+  const carryNeto = posiciones.reduce((s, p) => s + p.carryNeto, 0)
   const ampliaciones = (amps ?? []) as AmpliacionHoras[]
   const ampActiveSum = ampliaciones.filter((a) => a.active).reduce((s, a) => s + Number(a.hours), 0)
   const assigned = asignadoPosiciones + ampActiveSum
@@ -319,8 +344,10 @@ export async function getBancoHorasDetalle(
     movimientos: buildMovimientos(excelBase, consumosVisibles, ampliaciones),
     assigned,
     consumed,
-    remaining: assigned - consumed,
-    status: computeHorasStatus(assigned, consumed),
+    remaining: assigned - consumed - inutilizables,
+    inutilizables,
+    carryNeto,
+    status: computeHorasStatus(assigned - inutilizables, consumed),
     monthly,
     inScope,
   }

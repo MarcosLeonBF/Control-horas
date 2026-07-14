@@ -8,6 +8,8 @@ export interface BancoMensual {
   assigned: number
   consumed: number
   provisional?: boolean // true si `assigned` es un estimado provisional (no confirmado)
+  libres?: number // carry forward: 25% del sobrante (solo meses cerrados)
+  inutilizables?: number // 75% del sobrante que se pierde al cerrar el mes
 }
 
 export interface BancoHorasRow {
@@ -15,7 +17,9 @@ export interface BancoHorasRow {
   position: string // posición = columna del Excel (CRM, SEO, Growth Strategists…)
   assigned: number // horas del Excel para esa posición
   consumed: number // horas registradas por usuarios de esa posición en el proyecto
-  remaining: number
+  remaining: number // disponible real: assigned − consumed − inutilizables
+  inutilizables: number // Σ 75% de sobrantes de meses cerrados (carry forward)
+  carryNeto: number // Σ libres − Σ excesos de meses cerrados, con piso en 0
   status: HorasStatus
   monthly: BancoMensual[] // desglose mensual (ascendente); [] si no hay datos por mes
   projectEstado?: string // estado del proyecto (Excel Clientes_Proyectos): Activo/Finalizado/…
@@ -64,7 +68,9 @@ export interface BancoHorasDetalle {
   movimientos: MovimientoBanco[] // historial consumo + ampliación (más reciente primero)
   assigned: number // excelBase + provisional + Σ ampliaciones activas
   consumed: number
-  remaining: number
+  remaining: number // disponible real del proyecto (assigned − consumed − inutilizables)
+  inutilizables: number // Σ de las posiciones visibles
+  carryNeto: number // Σ de las posiciones visibles
   status: HorasStatus
   monthly: BancoDetalleMensual[] // cifras del proyecto por mes (ascendente)
 }
@@ -112,6 +118,8 @@ export interface BancoHorasProyecto {
   assigned: number
   consumed: number
   remaining: number
+  inutilizables: number
+  carryNeto: number
   status: HorasStatus // estado del banco a nivel proyecto (calculado sobre los totales)
   monthly: BancoMensual[]
 }
@@ -134,16 +142,19 @@ export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[
   for (const r of rows) {
     let g = map.get(r.project)
     if (!g) {
-      g = { project: r.project, projectEstado: r.projectEstado, manager: r.manager, fechaAuditoria: r.fechaAuditoria, positions: [], assigned: 0, consumed: 0, remaining: 0, status: 'sin_asignacion', monthly: [] }
+      g = { project: r.project, projectEstado: r.projectEstado, manager: r.manager, fechaAuditoria: r.fechaAuditoria, positions: [], assigned: 0, consumed: 0, remaining: 0, inutilizables: 0, carryNeto: 0, status: 'sin_asignacion', monthly: [] }
       map.set(r.project, g)
     }
     g.positions.push(r)
     g.assigned += r.assigned
     g.consumed += r.consumed
+    g.inutilizables += r.inutilizables
+    g.carryNeto += r.carryNeto
   }
   for (const g of map.values()) {
-    g.remaining = g.assigned - g.consumed
-    g.status = computeHorasStatus(g.assigned, g.consumed)
+    // Cifras efectivas: el disponible real descuenta los inutilizables del carry forward.
+    g.remaining = g.assigned - g.consumed - g.inutilizables
+    g.status = computeHorasStatus(g.assigned - g.inutilizables, g.consumed)
     g.positions.sort((a, b) => a.position.localeCompare(b.position))
     // Mensual del proyecto = suma de lo mensual de sus posiciones.
     const byMonth = new Map<string, BancoMensual>()
@@ -153,6 +164,8 @@ export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[
         acc.assigned += m.assigned
         acc.consumed += m.consumed
         if (m.provisional) acc.provisional = true
+        if (m.libres) acc.libres = (acc.libres ?? 0) + m.libres
+        if (m.inutilizables) acc.inutilizables = (acc.inutilizables ?? 0) + m.inutilizables
         byMonth.set(m.month, acc)
       }
     }
