@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Clock } from 'lucide-react'
+import { Fragment, useMemo, useState } from 'react'
+import { Clock, ChevronRight } from 'lucide-react'
 import type { BancoHorasDetalle } from '@/lib/horas/bancos-status'
 import { HORAS_BAR_COLOR } from '@/lib/horas/bancos-status'
 import { formatHoras, currentMonth, mesCorto } from '@/lib/horas/format'
@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import MonthPicker from '@/components/ui/month-picker'
 import AnularAmpliacionButton from '@/components/horas/AnularAmpliacionButton'
-import CarryForwardCharts, { HATCH } from '@/components/horas/CarryForwardCharts'
+import { HATCH, LeyendaCierre, CierrePosicionPanel, tieneCierre } from '@/components/horas/CarryForwardCharts'
 
 export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle; isAdmin: boolean }) {
   const [vista, setVista] = useState<'total' | 'mensual'>('total')
@@ -43,6 +43,18 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
   const inutil = esMensual ? 0 : d.inutilizables
   const restante = cab.assigned - cab.consumed - inutil
   const hayCartasCarry = !esMensual && (d.carryNeto > 0 || d.inutilizables > 0)
+
+  // Cierre de mes integrado en "Por posición": cada fila con meses se despliega y
+  // muestra su cierre ahí mismo (leyenda junto al título; sin sección aparte).
+  const hayCierre = d.posiciones.some(tieneCierre)
+  const [posAbiertas, setPosAbiertas] = useState<Set<string>>(new Set())
+  const togglePos = (pos: string) =>
+    setPosAbiertas((prev) => {
+      const next = new Set(prev)
+      if (next.has(pos)) next.delete(pos)
+      else next.add(pos)
+      return next
+    })
 
   const mesEsProvisional = (month: string) => (d.monthly.find((m) => m.month === month)?.provisional ?? 0) > 0
 
@@ -156,9 +168,19 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
       </div>
 
       <section className="mb-10">
-        <h2 className="font-display mb-1 text-xl font-semibold">{esMensual ? 'Banco mensual por posición' : 'Por posición'}</h2>
-        {esMensual && <p className="mb-4 text-sm text-muted-foreground">Consumido / asignado por mes. El asignado puede ser provisional (estimado) en los meses aún no cargados.</p>}
-        {!esMensual && <div className="mb-4" />}
+        <div className="mb-1 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+          <h2 className="font-display text-xl font-semibold">{esMensual ? 'Banco mensual por posición' : 'Por posición'}</h2>
+          {!esMensual && hayCierre && <LeyendaCierre />}
+        </div>
+        {esMensual ? (
+          <p className="mb-4 text-sm text-muted-foreground">Consumido / asignado por mes. El asignado puede ser provisional (estimado) en los meses aún no cargados.</p>
+        ) : hayCierre ? (
+          <p className="mb-4 text-sm text-muted-foreground">
+            Desplegá una posición para ver su cierre mes a mes: consumido, inutilizables (75% del sobrante) y libres (25%, arrastran como carry forward). El mes en curso aún no sufre el corte.
+          </p>
+        ) : (
+          <div className="mb-4" />
+        )}
 
         {d.posiciones.length === 0 ? (
           <p className="text-sm text-muted-foreground">Este proyecto no tiene posiciones con banco.</p>
@@ -207,29 +229,54 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                 </tr>
               </thead>
               <tbody>
-                {d.posiciones.map((p) => (
-                  <tr key={p.position} className="border-t border-border">
-                    <td className="px-4 py-2.5">
-                      <div className="font-medium">{p.position}</div>
-                      {p.assigned > 0 && (
-                        <div className="mt-1.5 h-1.5 w-40 max-w-full overflow-hidden rounded-full bg-(--muted-surface)">
-                          <div className={cn('h-full rounded-full', HORAS_BAR_COLOR[p.status])} style={{ width: `${Math.min((p.consumed / p.assigned) * 100, 100)}%` }} />
-                        </div>
+                {d.posiciones.map((p) => {
+                  const expandible = tieneCierre(p)
+                  const abierta = expandible && posAbiertas.has(p.position)
+                  return (
+                    <Fragment key={p.position}>
+                      <tr
+                        className={cn('border-t border-border', expandible && 'cursor-pointer transition-colors hover:bg-(--muted-surface)/50')}
+                        onClick={expandible ? () => togglePos(p.position) : undefined}
+                        role={expandible ? 'button' : undefined}
+                        tabIndex={expandible ? 0 : undefined}
+                        aria-expanded={expandible ? abierta : undefined}
+                        onKeyDown={expandible ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePos(p.position) } } : undefined}
+                      >
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            {expandible && (
+                              <ChevronRight className={cn('size-4 shrink-0 text-muted-foreground/60 transition-transform duration-300', abierta && 'rotate-90')} />
+                            )}
+                            <div className="min-w-0">
+                              <div className="font-medium">{p.position}</div>
+                              {p.assigned > 0 && (
+                                <div className="mt-1.5 h-1.5 w-40 max-w-full overflow-hidden rounded-full bg-(--muted-surface)">
+                                  <div className={cn('h-full rounded-full', HORAS_BAR_COLOR[p.status])} style={{ width: `${Math.min((p.consumed / p.assigned) * 100, 100)}%` }} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.assigned)}</td>
+                        <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.consumed)}</td>
+                        <td className={`tabular-money px-4 py-2.5 text-right ${p.remaining < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(p.remaining)}</td>
+                        <td className="px-4 py-2.5 text-right"><HorasStatusBadge status={p.status} /></td>
+                      </tr>
+                      {abierta && (
+                        <tr className="border-t border-border/60">
+                          <td colSpan={5} className="bg-(--muted-surface)/40 px-4 pb-4 pt-3 md:pl-12">
+                            <CierrePosicionPanel posicion={p} />
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.assigned)}</td>
-                    <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.consumed)}</td>
-                    <td className={`tabular-money px-4 py-2.5 text-right ${p.remaining < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(p.remaining)}</td>
-                    <td className="px-4 py-2.5 text-right"><HorasStatusBadge status={p.status} /></td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
       </section>
-
-      {!esMensual && <CarryForwardCharts posiciones={d.posiciones} />}
 
       <section>
         <h2 className="font-display mb-4 text-xl font-semibold">Ampliaciones</h2>
