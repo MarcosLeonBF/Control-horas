@@ -1,7 +1,8 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { BancoHorasRow, BancoMensual } from '@/lib/horas/bancos-status'
 import { currentMonth, formatHoras, mesCorto } from '@/lib/horas/format'
 import { cn } from '@/lib/utils'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 
 // Piezas del "cierre de mes" del banco (spec carry forward 2026-07-14). Ya no hay una
 // sección propia: la tabla "Por posición" del detalle despliega cada fila y muestra el
@@ -25,6 +26,53 @@ function Swatch({ className, style, label }: { className?: string; style?: CSSPr
     </span>
   )
 }
+
+// ── Tooltip de desglose (burbuja oscura de shadcn: los swatches van en versión clara) ──
+
+const HATCH_OSCURO: CSSProperties = {
+  backgroundImage:
+    'repeating-linear-gradient(135deg, color-mix(in srgb, var(--background) 55%, transparent) 0 2px, transparent 2px 5px)',
+}
+
+function FilaDesglose({ swatch, label, value }: { swatch: ReactNode; label: string; value: string }) {
+  return (
+    <li className="flex items-center justify-between gap-6">
+      <span className="flex items-center gap-1.5 text-background/70">{swatch}{label}</span>
+      <span className="tabular-money font-medium">{value}</span>
+    </li>
+  )
+}
+
+const sw = (className: string, style?: CSSProperties) => (
+  <span aria-hidden className={cn('size-2 shrink-0 rounded-xs', className)} style={style} />
+)
+
+// Panel del tooltip: la distribución de una barra, fila por fila, con total asignado.
+function Desglose({ titulo, provisional, consumido, inutilizables, libres, restante, exceso, asignado }: {
+  titulo: string; provisional?: boolean
+  consumido: number; inutilizables: number; libres: number; restante: number; exceso: number; asignado: number
+}) {
+  return (
+    <div className="min-w-44">
+      <p className="mb-2 flex items-center justify-between gap-3 font-medium">
+        {titulo}
+        {provisional && <span className="rounded-full bg-background/15 px-1.5 py-px text-[0.6rem] font-medium text-background/80">estimado</span>}
+      </p>
+      <ul className="space-y-1.5">
+        <FilaDesglose swatch={sw('bg-(--brand)')} label="Consumido" value={formatHoras(consumido)} />
+        {inutilizables > 0 && <FilaDesglose swatch={sw('bg-background/15', HATCH_OSCURO)} label="Inutilizables" value={`−${formatHoras(inutilizables)}`} />}
+        {libres > 0 && <FilaDesglose swatch={sw('bg-(--status-disponible)')} label="Libres (carry)" value={`+${formatHoras(libres)}`} />}
+        {restante > 0 && <FilaDesglose swatch={sw('bg-background/20 ring-1 ring-inset ring-background/30')} label="Restante" value={formatHoras(restante)} />}
+        {exceso > 0 && <FilaDesglose swatch={sw('bg-(--brand)')} label="Exceso" value={`+${formatHoras(exceso)}`} />}
+      </ul>
+      <p className="mt-2 flex items-center justify-between gap-6 border-t border-background/20 pt-1.5">
+        <span className="text-background/70">Asignado</span>
+        <span className="tabular-money font-medium">{formatHoras(asignado)}</span>
+      </p>
+    </div>
+  )
+}
+
 
 // Leyenda del cierre: se muestra junto al título "Por posición" (vista Total).
 export function LeyendaCierre() {
@@ -50,20 +98,30 @@ export function BarraMes({ m, enCurso, className }: { m: BancoMensual; enCurso: 
     if ((m.inutilizables ?? 0) > 0) partes.push({ pct: pct(m.inutilizables!), className: 'bg-foreground/10', style: HATCH })
     if ((m.libres ?? 0) > 0) partes.push({ pct: pct(m.libres!), className: 'bg-(--status-disponible)' })
   }
-  const detalle = [
-    `Consumido ${formatHoras(m.consumed)}`,
-    (m.inutilizables ?? 0) > 0 && `Inutilizables ${formatHoras(m.inutilizables!)}`,
-    (m.libres ?? 0) > 0 && `Libres ${formatHoras(m.libres!)}`,
-    enCurso && m.assigned > m.consumed && `Restante ${formatHoras(m.assigned - m.consumed)} (en curso)`,
-    m.provisional && 'asignado estimado (provisional)',
-  ].filter(Boolean).join(' · ')
 
   return (
-    <span title={`${mesCorto(m.month)} — ${detalle}`} className={cn('flex h-3 gap-0.5 overflow-hidden rounded-full bg-(--muted-surface)', className)}>
-      {partes.filter((p) => p.pct > 0).map((p, i) => (
-        <span key={i} className={p.className} style={{ width: `${p.pct}%`, ...p.style }} />
-      ))}
-    </span>
+    <TooltipProvider delay={150}>
+      <Tooltip>
+        {/* La barra misma es el trigger (ancla del tooltip). */}
+        <TooltipTrigger render={<span className={cn('flex h-3 gap-0.5 overflow-hidden rounded-full bg-(--muted-surface)', className)} />}>
+          {partes.filter((p) => p.pct > 0).map((p, i) => (
+            <span key={i} className={p.className} style={{ width: `${p.pct}%`, ...p.style }} />
+          ))}
+        </TooltipTrigger>
+        <TooltipContent className="block px-3 py-2.5">
+          <Desglose
+            titulo={mesCorto(m.month)}
+            provisional={!!m.provisional}
+            consumido={m.consumed}
+            inutilizables={m.inutilizables ?? 0}
+            libres={m.libres ?? 0}
+            restante={enCurso ? Math.max(m.assigned - m.consumed, 0) : 0}
+            exceso={Math.max(m.consumed - m.assigned, 0)}
+            asignado={m.assigned}
+          />
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -114,17 +172,27 @@ export function BarraComposicion({ posicion, className }: { posicion: BancoHoras
     { pct: pct(inutil), className: 'bg-foreground/10', style: HATCH },
     { pct: pct(libres), className: 'bg-(--status-disponible)' },
   ].filter((p) => p.pct > 0)
-  const detalle = [
-    `Consumido ${formatHoras(consumido)}`,
-    inutil > 0 && `Inutilizables ${formatHoras(inutil)}`,
-    libres > 0 && `Libres ${formatHoras(libres)}`,
-  ].filter(Boolean).join(' · ')
   return (
-    <span title={`${detalle} — de ${formatHoras(asignado)} asignadas`} className={cn('flex gap-0.5 overflow-hidden rounded-full bg-(--muted-surface)', className)}>
-      {partes.map((p, i) => (
-        <span key={i} className={p.className} style={{ width: `${p.pct}%`, ...p.style }} />
-      ))}
-    </span>
+    <TooltipProvider delay={150}>
+      <Tooltip>
+        <TooltipTrigger render={<span className={cn('flex gap-0.5 overflow-hidden rounded-full bg-(--muted-surface)', className)} />}>
+          {partes.map((p, i) => (
+            <span key={i} className={p.className} style={{ width: `${p.pct}%`, ...p.style }} />
+          ))}
+        </TooltipTrigger>
+        <TooltipContent className="block px-3 py-2.5">
+          <Desglose
+            titulo="Todos los meses"
+            consumido={posicion.consumed}
+            inutilizables={inutil}
+            libres={libres}
+            restante={Math.max(asignado - consumido - inutil - libres, 0)}
+            exceso={posicion.consumed - consumido}
+            asignado={asignado}
+          />
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
