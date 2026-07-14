@@ -93,6 +93,40 @@ export function tieneCierre(p: BancoHorasRow): boolean {
   return p.monthly.some((m) => m.assigned > 0 || m.consumed > 0)
 }
 
+// Composición total de una posición (mini barra bajo el nombre en la tabla): en qué
+// terminó cada hora asignada. Mapea 1:1 con las columnas: carmín = Consumido,
+// rayado = Inutilizables, verde + tramo vacío = Disponible real.
+export function BarraComposicion({ posicion, className }: { posicion: BancoHorasRow; className?: string }) {
+  let consumido = 0
+  let inutil = 0
+  let libres = 0
+  for (const m of posicion.monthly) {
+    consumido += Math.min(m.consumed, m.assigned)
+    inutil += m.inutilizables ?? 0
+    libres += m.libres ?? 0
+  }
+  const asignado = posicion.assigned
+  if (asignado <= 0) return null
+  const pct = (h: number) => (h / asignado) * 100
+  const partes: { pct: number; className: string; style?: CSSProperties }[] = [
+    { pct: pct(consumido), className: 'bg-(--brand)' },
+    { pct: pct(inutil), className: 'bg-foreground/10', style: HATCH },
+    { pct: pct(libres), className: 'bg-(--status-disponible)' },
+  ].filter((p) => p.pct > 0)
+  const detalle = [
+    `Consumido ${formatHoras(consumido)}`,
+    inutil > 0 && `Inutilizables ${formatHoras(inutil)}`,
+    libres > 0 && `Libres ${formatHoras(libres)}`,
+  ].filter(Boolean).join(' · ')
+  return (
+    <span title={`${detalle} — de ${formatHoras(asignado)} asignadas`} className={cn('flex gap-0.5 overflow-hidden rounded-full bg-(--muted-surface)', className)}>
+      {partes.map((p, i) => (
+        <span key={i} className={p.className} style={{ width: `${p.pct}%`, ...p.style }} />
+      ))}
+    </span>
+  )
+}
+
 // Panel desplegado de una posición dentro de la tabla "Por posición": resumen del
 // carry acumulado + una barrita por mes (el 16/16 de la spec).
 export function CierrePosicionPanel({ posicion }: { posicion: BancoHorasRow }) {

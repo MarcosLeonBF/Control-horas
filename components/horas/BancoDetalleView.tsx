@@ -3,13 +3,12 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Clock, ChevronRight } from 'lucide-react'
 import type { BancoHorasDetalle } from '@/lib/horas/bancos-status'
-import { HORAS_BAR_COLOR } from '@/lib/horas/bancos-status'
 import { formatHoras, currentMonth, mesCorto } from '@/lib/horas/format'
 import { cn } from '@/lib/utils'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import MonthPicker from '@/components/ui/month-picker'
 import AnularAmpliacionButton from '@/components/horas/AnularAmpliacionButton'
-import { HATCH, LeyendaCierre, CierrePosicionPanel, tieneCierre } from '@/components/horas/CarryForwardCharts'
+import { HATCH, LeyendaCierre, CierrePosicionPanel, BarraComposicion, tieneCierre } from '@/components/horas/CarryForwardCharts'
 
 export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle; isAdmin: boolean }) {
   const [vista, setVista] = useState<'total' | 'mensual'>('total')
@@ -224,7 +223,8 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                   <th className="px-4 py-2.5 font-medium">Posición</th>
                   <th className="px-4 py-2.5 font-medium text-right">Asignado</th>
                   <th className="px-4 py-2.5 font-medium text-right">Consumido</th>
-                  <th className="px-4 py-2.5 font-medium text-right">Restante</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Inutilizables</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Disponible real</th>
                   <th className="px-4 py-2.5 font-medium text-right">Estado</th>
                 </tr>
               </thead>
@@ -249,22 +249,21 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                             )}
                             <div className="min-w-0">
                               <div className="font-medium">{p.position}</div>
-                              {p.assigned > 0 && (
-                                <div className="mt-1.5 h-1.5 w-40 max-w-full overflow-hidden rounded-full bg-(--muted-surface)">
-                                  <div className={cn('h-full rounded-full', HORAS_BAR_COLOR[p.status])} style={{ width: `${Math.min((p.consumed / p.assigned) * 100, 100)}%` }} />
-                                </div>
-                              )}
+                              <BarraComposicion posicion={p} className="mt-1.5 h-2 w-48 max-w-full" />
                             </div>
                           </div>
                         </td>
                         <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.assigned)}</td>
-                        <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.consumed)}</td>
-                        <td className={`tabular-money px-4 py-2.5 text-right ${p.remaining < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(p.remaining)}</td>
+                        <td className={cn('tabular-money px-4 py-2.5 text-right', p.consumed === 0 && 'text-muted-foreground/50')}>{formatHoras(p.consumed)}</td>
+                        <td className="tabular-money px-4 py-2.5 text-right text-foreground/60">
+                          {p.inutilizables > 0 ? formatHoras(p.inutilizables) : <span className="text-muted-foreground/40">—</span>}
+                        </td>
+                        <td className={cn('tabular-money px-4 py-2.5 text-right font-medium', p.remaining < 0 && 'text-(--status-excedido)')}>{formatHoras(p.remaining)}</td>
                         <td className="px-4 py-2.5 text-right"><HorasStatusBadge status={p.status} /></td>
                       </tr>
                       {abierta && (
                         <tr className="border-t border-border/60">
-                          <td colSpan={5} className="bg-(--muted-surface)/40 px-4 pb-4 pt-3 md:pl-12">
+                          <td colSpan={6} className="bg-(--muted-surface)/40 px-4 pb-4 pt-3 md:pl-12">
                             <CierrePosicionPanel posicion={p} />
                           </td>
                         </tr>

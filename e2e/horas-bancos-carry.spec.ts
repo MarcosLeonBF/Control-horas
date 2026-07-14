@@ -10,8 +10,8 @@ test('el detalle muestra Disponible real y el cierre desplegable por posición',
     await primera.click()
     await page.waitForURL(/\/bancos\/.+/, { timeout: 2500 })
   }).toPass({ timeout: 15000 })
-  // KPI nuevo (vista Total).
-  await expect(page.getByText('Disponible real')).toBeVisible()
+  // KPI nuevo (vista Total). first(): "Disponible real" también es columna de la tabla.
+  await expect(page.getByText('Disponible real').first()).toBeVisible()
   // El cierre vive DENTRO de "Por posición": si hay filas con meses, se despliegan
   // (tolerante: un proyecto sin datos mensuales no tiene filas expandibles).
   const fila = page.locator('tr[aria-expanded]').first()
