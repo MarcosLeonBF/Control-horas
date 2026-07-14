@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import MonthPicker from '@/components/ui/month-picker'
 import AnularAmpliacionButton from '@/components/horas/AnularAmpliacionButton'
-import CarryForwardCharts from '@/components/horas/CarryForwardCharts'
+import CarryForwardCharts, { HATCH } from '@/components/horas/CarryForwardCharts'
 
 export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle; isAdmin: boolean }) {
   const [vista, setVista] = useState<'total' | 'mensual'>('total')
@@ -36,13 +36,12 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
     return { assigned: excelBase + ampliado + provisional, excelBase, ampliado, consumed, provisional }
   }, [esMensual, d, selSet])
   const incluyeProv = cab.provisional > 0
-  // Disponible real (vista Total): descuenta los inutilizables del carry forward y
-  // desglosa normales vs carry (spec 2026-07-14). En Mensual no aplica el corte.
+  // Disponible real (vista Total): descuenta los inutilizables del carry forward
+  // (spec 2026-07-14). En Mensual no aplica el corte. El desglose libres/inutilizables
+  // vive en sus propias cards informativas (ya están sumadas/descontadas del total).
   const inutil = esMensual ? 0 : d.inutilizables
   const restante = cab.assigned - cab.consumed - inutil
-  const carryNeto = esMensual ? 0 : d.carryNeto
-  const normalMostrado = Math.max(restante - carryNeto, 0)
-  const carryMostrado = Math.max(restante - normalMostrado, 0)
+  const hayCartasCarry = !esMensual && (d.carryNeto > 0 || d.inutilizables > 0)
 
   const mesEsProvisional = (month: string) => (d.monthly.find((m) => m.month === month)?.provisional ?? 0) > 0
 
@@ -100,7 +99,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
         </div>
       )}
 
-      <div className="mb-10 grid gap-4 sm:grid-cols-3">
+      <div className={cn('mb-10 grid gap-4 sm:grid-cols-3', hayCartasCarry && 'lg:grid-cols-5')}>
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <p className="flex items-center gap-1.5 text-xs text-foreground/50">
             Asignado
@@ -124,16 +123,30 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
           <p className={`tabular-money mt-1 text-2xl font-semibold ${restante < 0 ? 'text-(--status-excedido)' : ''}`}>
             {formatHoras(restante)}
           </p>
-          {!esMensual && restante >= 0 && (
-            <p className="mt-1 text-xs text-foreground/45">
-              {[
-                normalMostrado > 0 && `${formatHoras(normalMostrado)} del mes`,
-                carryMostrado > 0 && `${formatHoras(carryMostrado)} carry forward`,
-                inutil > 0 && `${formatHoras(inutil)} inutilizables`,
-              ].filter(Boolean).join(' · ') || 'Sin horas disponibles'}
-            </p>
-          )}
         </div>
+
+        {/* Cards informativas del carry: ya sumadas/descontadas del disponible real.
+            El swatch replica la leyenda de "Cierre de mes por posición". */}
+        {hayCartasCarry && (
+          <>
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <p className="flex items-center gap-1.5 text-xs text-foreground/50">
+                <span aria-hidden className="size-2.5 shrink-0 rounded-[3px] bg-(--status-disponible)" />
+                Libres (carry)
+              </p>
+              <p className="tabular-money mt-1 text-2xl font-semibold text-(--status-disponible)">+{formatHoras(d.carryNeto)}</p>
+              <p className="mt-1 text-xs text-foreground/45">Ya sumadas al disponible real</p>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <p className="flex items-center gap-1.5 text-xs text-foreground/50">
+                <span aria-hidden className="size-2.5 shrink-0 rounded-[3px] bg-foreground/10" style={HATCH} />
+                Inutilizables
+              </p>
+              <p className="tabular-money mt-1 text-2xl font-semibold text-foreground/70">{formatHoras(d.inutilizables)}</p>
+              <p className="mt-1 text-xs text-foreground/45">Ya descontadas del disponible real</p>
+            </div>
+          </>
+        )}
       </div>
 
       <section className="mb-10">
