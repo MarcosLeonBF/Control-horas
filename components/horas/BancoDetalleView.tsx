@@ -66,13 +66,16 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
     () =>
       d.posiciones.map((p) => {
         const porMes = mesesOrden.map((month) => ({ month, m: p.monthly.find((x) => x.month === month) }))
+        // Disponible real de los meses elegidos: asignado − consumido − inutilizables.
+        // LA MISMA cifra (y formato) que la columna Disponible real de la vista Total.
+        const totBruto = porMes.reduce((s, c) => s + (c.m?.assigned ?? 0), 0)
+        const totInutil = porMes.reduce((s, c) => s + (c.m?.inutilizables ?? 0), 0)
+        const totConsumed = porMes.reduce((s, c) => s + (c.m?.consumed ?? 0), 0)
         return {
           position: p.position,
           porMes,
-          // Total EFECTIVO: el asignado de los meses elegidos menos sus inutilizables
-          // (lo que de verdad se puede usar; coordina con el Disponible real).
-          totAssigned: porMes.reduce((s, c) => s + (c.m?.assigned ?? 0) - (c.m?.inutilizables ?? 0), 0),
-          totConsumed: porMes.reduce((s, c) => s + (c.m?.consumed ?? 0), 0),
+          disponible: totBruto - totConsumed - totInutil,
+          sinDatos: totBruto === 0 && totConsumed === 0,
         }
       }),
     [d.posiciones, mesesOrden],
@@ -81,16 +84,6 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
   // Ampliaciones y movimientos: en Mensual, solo los de los meses elegidos.
   const ampliaciones = esMensual ? d.ampliaciones.filter((a) => selSet.has(a.entry_date.slice(0, 7))) : d.ampliaciones
   const movimientos = esMensual ? d.movimientos.filter((m) => selSet.has(m.date.slice(0, 7))) : d.movimientos
-
-  const celda = (assigned: number, consumed: number, bold = false) => {
-    const sinDato = assigned === 0 && consumed === 0
-    if (sinDato) return <span className="text-muted-foreground/40">—</span>
-    return (
-      <span className={cn('tabular-money', bold && 'font-medium', assigned - consumed < 0 && 'text-(--status-excedido)')}>
-        {formatHoras(consumed)} <span className="text-muted-foreground/60">/ {formatHoras(assigned)}</span>
-      </span>
-    )
-  }
 
   // Celda de un mes en la matriz: mismo criterio que el cierre — mes cerrado sano
   // muestra asignado/asignado (todo contabilizado) y la micro-barra reparte la
@@ -218,7 +211,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                       </span>
                     </th>
                   ))}
-                  <th title="Consumido / asignado efectivo de los meses elegidos (el asignado descuenta los inutilizables del cierre)" className="px-3 py-2.5 text-right font-medium">Total efectivo</th>
+                  <th title="Asignado de los meses elegidos menos consumido e inutilizables: la misma cifra que el Disponible real de la vista Total" className="px-3 py-2.5 text-right font-medium">Disponible real</th>
                 </tr>
               </thead>
               <tbody>
@@ -228,7 +221,11 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                     {row.porMes.map((c) => (
                       <td key={c.month} className="px-3 py-2.5 text-center whitespace-nowrap">{celdaMes(c.month, c.m)}</td>
                     ))}
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">{celda(row.totAssigned, row.totConsumed, true)}</td>
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      {row.sinDatos
+                        ? <span className="text-muted-foreground/40">—</span>
+                        : <span className={cn('tabular-money font-medium', row.disponible < 0 && 'text-(--status-excedido)')}>{formatHoras(row.disponible)}</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
