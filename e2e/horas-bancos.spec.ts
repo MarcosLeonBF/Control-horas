@@ -61,7 +61,8 @@ test('el detalle del banco alterna Total y Mensual', async ({ page }) => {
     await page.waitForURL(/\/bancos\/.+/, { timeout: 2500 })
   }).toPass({ timeout: 15000 })
   // En Total el detalle muestra la sección "Por posición" (aserción específica del detalle).
-  await expect(page.getByRole('heading', { name: 'Por posición' })).toBeVisible()
+  // exact: true porque "Cierre de mes por posición" (charts de carry forward) también matchea por substring.
+  await expect(page.getByRole('heading', { name: 'Por posición', exact: true })).toBeVisible()
 
   const mensual = page.getByRole('button', { name: 'Mensual' })
   if (!(await mensual.isVisible().catch(() => false))) return // Excel sin columna Fecha
