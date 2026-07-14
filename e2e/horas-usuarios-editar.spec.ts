@@ -9,7 +9,8 @@ test('el admin crea, ve en el panel y desactiva un usuario', async ({ page }) =>
   await page.getByLabel('Nombre').fill('Editable E2E')
   await page.getByLabel('Correo').fill(email)
   await page.getByLabel('Contraseña').fill('E2e-Edit-Pass-123')
-  await page.getByLabel('Posición').fill('Tester')
+  // Posición es un <select> del catálogo: se elige la primera posición real.
+  await page.getByLabel('Posición').selectOption({ index: 1 })
   await page.getByRole('button', { name: 'Crear usuario' }).click()
   await expect(page.getByText('Usuario creado')).toBeVisible()
 
