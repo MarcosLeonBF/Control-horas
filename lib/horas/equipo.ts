@@ -69,7 +69,9 @@ export async function getEquipoComposicion(scope: ViewerScope): Promise<Composic
     }
   }
 
-  const sortMiembros = (m: MiembroEquipo[]) => m.sort((a, b) => a.name.localeCompare(b.name))
+  // Activos primero (los inactivos cierran cada grupo, atenuados en la UI).
+  const sortMiembros = (m: MiembroEquipo[]) =>
+    m.sort((a, b) => (a.status === b.status ? a.name.localeCompare(b.name) : a.status === 'activo' ? -1 : 1))
   const areas = [...byArea.values()]
     .map((e) => ({ ...e, managers: sortMiembros(e.managers), operativos: sortMiembros(e.operativos) }))
     .sort((a, b) => a.area.localeCompare(b.area))

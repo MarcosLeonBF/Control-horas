@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getViewerScope } from '@/lib/horas/scope'
 import { getEquipoComposicion, type MiembroEquipo } from '@/lib/horas/equipo'
+import { areaIcon } from '@/lib/horas/area-icon'
 import { cn } from '@/lib/utils'
 import EquipoRegistros, { type EquipoLog } from '@/components/horas/EquipoRegistros'
 
@@ -9,24 +10,32 @@ function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '·'
 }
 
-function Persona({ m, manager = false }: { m: MiembroEquipo; manager?: boolean }) {
+// Chip compacto: los nombres fluyen en línea (densidad) en vez de cuadrícula
+// dispersa. El manager se distingue por el chip teñido de marca (sin repetir
+// el rótulo "Manager" en cada nombre: lo pone el eyebrow del grupo).
+function PersonaChip({ m, manager = false }: { m: MiembroEquipo; manager?: boolean }) {
   const inactive = m.status === 'inactivo'
   return (
-    <div className="flex items-center gap-2.5">
+    <span
+      className={cn(
+        'inline-flex max-w-full items-center gap-2 rounded-full py-1 pl-1 pr-3',
+        manager ? 'bg-(--brand)/8 ring-1 ring-(--brand)/25' : 'bg-(--muted-surface) ring-1 ring-border',
+        inactive && 'opacity-55',
+      )}
+    >
       <span
         className={cn(
-          'grid size-8 shrink-0 place-items-center rounded-full text-[0.68rem] font-semibold',
-          manager ? 'bg-(--brand) text-white shadow-sm' : 'bg-(--muted-surface) text-foreground/55 ring-1 ring-border',
-          inactive && 'opacity-50',
+          'grid size-6 shrink-0 place-items-center rounded-full text-[0.55rem] font-semibold',
+          manager ? 'bg-(--brand) text-white' : 'bg-background text-foreground/55 ring-1 ring-border',
         )}
       >
         {initials(m.name)}
       </span>
-      <div className="min-w-0 leading-tight">
-        <p className={cn('truncate text-sm', inactive ? 'text-muted-foreground line-through' : 'text-foreground/85')}>{m.name}</p>
-        {manager && <p className="text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-(--brand)">Manager</p>}
-      </div>
-    </div>
+      <span className={cn('truncate text-sm', manager ? 'font-medium text-foreground' : 'text-foreground/85', inactive && 'text-muted-foreground')}>
+        {m.name}
+      </span>
+      {inactive && <span className="text-[0.55rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">Inactivo</span>}
+    </span>
   )
 }
 
@@ -92,33 +101,44 @@ export default async function EquipoPage() {
         ) : (
           <div className="rounded-2xl border border-border bg-card px-6 shadow-sm">
             {composicion.map((a) => {
-              const count = a.managers.length + a.operativos.length
+              const Icono = areaIcon(a.area)
+              const partes: string[] = []
+              if (a.managers.length) partes.push(`${a.managers.length} ${a.managers.length === 1 ? 'manager' : 'managers'}`)
+              if (a.operativos.length) partes.push(`${a.operativos.length} ${a.operativos.length === 1 ? 'operativo' : 'operativos'}`)
               return (
                 <div
                   key={a.area}
-                  className="grid gap-x-10 gap-y-4 border-b border-border py-7 last:border-b-0 sm:grid-cols-[190px_1fr]"
+                  className="grid gap-x-10 gap-y-4 border-b border-border py-6 last:border-b-0 sm:grid-cols-[210px_1fr]"
                 >
                   <div className="relative">
-                    <span className="absolute -left-6 top-1 h-7 w-[3px] rounded-r-full bg-(--brand)" />
-                    <h3 className="font-display text-xl font-semibold tracking-tight">{a.area}</h3>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{count} {count === 1 ? 'persona' : 'personas'}</p>
+                    <span className="absolute -left-6 top-1.5 h-7 w-[3px] rounded-r-full bg-(--brand)" />
+                    <div className="flex items-start gap-3">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-(--brand)/10 text-(--brand-strong)">
+                        <Icono className="size-4.5" />
+                      </span>
+                      <div className="min-w-0">
+                        <h3 className="font-display text-xl font-semibold tracking-tight">{a.area}</h3>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{partes.join(' · ') || 'Sin personas'}</p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-5">
+                  <div className="space-y-4">
                     {a.managers.length > 0 && (
-                      <div className="flex flex-wrap gap-x-8 gap-y-3">
-                        {a.managers.map((m, i) => <Persona key={i} m={m} manager />)}
+                      <div>
+                        <p className="mb-2 text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Managers</p>
+                        <div className="flex flex-wrap gap-2">
+                          {a.managers.map((m, i) => <PersonaChip key={i} m={m} manager />)}
+                        </div>
                       </div>
                     )}
                     <div>
-                      {a.managers.length > 0 && (
-                        <p className="mb-2 text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Operativos</p>
-                      )}
+                      <p className="mb-2 text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Operativos</p>
                       {a.operativos.length === 0 ? (
                         <p className="text-sm text-muted-foreground/60">Sin operativos en esta área.</p>
                       ) : (
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-3">
-                          {a.operativos.map((m, i) => <Persona key={i} m={m} />)}
+                        <div className="flex flex-wrap gap-2">
+                          {a.operativos.map((m, i) => <PersonaChip key={i} m={m} />)}
                         </div>
                       )}
                     </div>
