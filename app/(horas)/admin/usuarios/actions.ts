@@ -87,6 +87,32 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
   return { ok: true }
 }
 
+// Eliminar definitivamente (solo admin). Pensado para altas erróneas o usuarios sin
+// actividad: si el usuario tiene registros de horas u otra actividad, las FKs de la
+// base lo impiden (time_logs.user_id es RESTRICT) y se le indica desactivar en su lugar.
+export async function eliminarUsuario(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'No autenticado.' }
+  const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (me?.role !== 'admin') return { ok: false, error: 'Solo un administrador puede eliminar usuarios.' }
+  if (id === user.id) return { ok: false, error: 'No puedes eliminarte a ti mismo.' }
+
+  const admin = createAdminClient()
+  const { count } = await admin.from('time_logs').select('id', { count: 'exact', head: true }).eq('user_id', id)
+  if ((count ?? 0) > 0) {
+    return { ok: false, error: `Tiene ${count} ${count === 1 ? 'registro' : 'registros'} de horas: desactívalo en su lugar para conservar el histórico.` }
+  }
+
+  // user_areas cae en cascada; el resto de FKs bloquean si hay actividad asociada.
+  const { error } = await admin.auth.admin.deleteUser(id)
+  if (error) {
+    const bloqueado = /foreign key|violates|database error/i.test(error.message)
+    return { ok: false, error: bloqueado ? 'El usuario tiene actividad asociada (ediciones o movimientos): desactívalo en su lugar.' : error.message }
+  }
+  return { ok: true }
+}
+
 // Activar/desactivar rápido (PDF §8: estado activo/inactivo). Solo admin.
 export async function cambiarEstadoUsuario(id: string, status: 'activo' | 'inactivo'): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient()

@@ -26,6 +26,27 @@ test('el admin crea, ve en el panel y desactiva un usuario', async ({ page }) =>
   await expect(page.getByRole('row').filter({ hasText: email }).getByText('inactivo', { exact: true })).toBeVisible()
 })
 
+// El admin elimina definitivamente a un usuario sin registros (alta errónea).
+test('el admin elimina a un usuario recién creado', async ({ page }) => {
+  const email = `e2e-nuevo-del-${Date.now()}@horas.test`
+  await page.goto('/admin/usuarios')
+
+  await page.getByLabel('Nombre').fill('Borrable E2E')
+  await page.getByLabel('Correo').fill(email)
+  await page.getByLabel('Contraseña').fill('E2e-Del-Pass-123')
+  await page.getByRole('button', { name: 'Crear usuario' }).click()
+  await expect(page.getByText('Usuario creado')).toBeVisible()
+
+  await page.reload()
+  const fila = page.getByRole('row').filter({ hasText: email })
+  await expect(fila).toBeVisible()
+
+  page.once('dialog', (d) => d.accept())
+  await fila.getByRole('button', { name: 'Eliminar' }).click()
+  await expect(page.getByText('Usuario eliminado')).toBeVisible()
+  await expect(page.getByRole('row').filter({ hasText: email })).toHaveCount(0)
+})
+
 // El admin concede el permiso de alta a un usuario nuevo y ve el badge en el panel.
 test('el admin concede el permiso de alta de usuarios', async ({ page }) => {
   const email = `e2e-nuevo-flag-${Date.now()}@horas.test`

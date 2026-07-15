@@ -2,7 +2,7 @@
 import { Fragment, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { actualizarUsuario, cambiarEstadoUsuario, type EdicionUsuario } from '@/app/(horas)/admin/usuarios/actions'
+import { actualizarUsuario, cambiarEstadoUsuario, eliminarUsuario, type EdicionUsuario } from '@/app/(horas)/admin/usuarios/actions'
 import type { AreaRow } from '@/lib/horas/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -149,6 +149,16 @@ export default function UsuariosPanel({ usuarios, areas, posiciones, readOnly = 
     router.refresh()
   }
 
+  async function eliminar(u: UsuarioRow) {
+    if (!confirm(`¿Eliminar a "${u.full_name}" definitivamente? No se puede deshacer. Si tiene registros de horas, desactívalo en su lugar.`)) return
+    setBusy(u.id)
+    const res = await eliminarUsuario(u.id)
+    setBusy(null)
+    if (!res.ok) { toast.error(res.error); return }
+    toast.success('Usuario eliminado')
+    router.refresh()
+  }
+
   return (
     <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
       <Table>
@@ -186,6 +196,9 @@ export default function UsuariosPanel({ usuarios, areas, posiciones, readOnly = 
                     <Button variant="link" size="sm" className="px-1" onClick={() => setEditing(editing === u.id ? null : u.id)}>Editar</Button>
                     <Button variant="ghost" size="sm" disabled={busy === u.id} onClick={() => toggle(u)}>
                       {u.status === 'activo' ? 'Desactivar' : 'Activar'}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={busy === u.id} onClick={() => eliminar(u)}>
+                      Eliminar
                     </Button>
                   </TableCell>
                 )}
