@@ -24,10 +24,16 @@ export async function getViewerScope(): Promise<ViewerScope | null> {
     const { data: mine } = await supabase.from('user_areas').select('area_id').eq('user_id', user.id)
     const areaIds = (mine ?? []).map((a) => a.area_id as string)
 
+    // El equipo sale de las POSICIONES (modelo 0028): usuarios cuya posición
+    // pertenece a alguna de mis áreas de visibilidad (misma regla que la RLS 0036).
     const team = new Set<string>([user.id])
     if (areaIds.length) {
-      const { data: peers } = await supabase.from('user_areas').select('user_id').in('area_id', areaIds)
-      for (const p of (peers ?? []) as { user_id: string }[]) team.add(p.user_id)
+      const { data: posiciones } = await supabase.from('position_areas').select('position_id').in('area_id', areaIds)
+      const positionIds = [...new Set((posiciones ?? []).map((p) => p.position_id as string))]
+      if (positionIds.length) {
+        const { data: peers } = await supabase.from('profiles').select('id').in('position_id', positionIds)
+        for (const p of (peers ?? []) as { id: string }[]) team.add(p.id)
+      }
     }
     return { role: 'manager', userId: user.id, areaIds, teamUserIds: [...team] }
   }
