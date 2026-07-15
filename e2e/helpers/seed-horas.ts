@@ -7,6 +7,9 @@ const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SU
 const OPERATIVO = { email: 'e2e-operativo@horas.test', password: 'E2e-Op-Pass-123', full_name: 'Operativo E2E' }
 const ADMIN_USER = { email: 'e2e-admin@horas.test', password: 'E2e-Admin-Pass-123', full_name: 'Admin E2E' }
 const RRHH = { email: 'e2e-rrhh@horas.test', password: 'E2e-Rrhh-Pass-123', full_name: 'RRHH E2E' }
+// Miembro con POSICIÓN: la página Equipo agrupa por las áreas de la posición (modelo 0028).
+// Usuario aparte del operativo porque los specs de registrar dependen de que aquel no tenga posición.
+const MIEMBRO = { email: 'e2e-miembro@horas.test', password: 'E2e-Mbr-Pass-123', full_name: 'Miembro E2E' }
 
 export async function seedHorasFixture() {
   await cleanupHorasFixture()
@@ -55,6 +58,19 @@ export async function seedHorasFixture() {
     role: 'operativo', status: 'activo', must_change_password: false, can_create_users: true,
   }).eq('id', rrhhUserId)
 
+  // Miembro del equipo: operativo con una posición que pertenece al área CRM,
+  // para verificar que Equipo lo agrupa por las áreas de su posición.
+  const { data: posCrm } = await admin.from('position_areas').select('position_id').eq('area_id', area!.id).limit(1).single()
+  const { data: createdMiembro, error: miembroError } = await admin.auth.admin.createUser({
+    email: MIEMBRO.email, password: MIEMBRO.password, email_confirm: true,
+    user_metadata: { full_name: MIEMBRO.full_name },
+  })
+  if (miembroError) throw miembroError
+  const miembroUserId = createdMiembro.user!.id
+  await admin.from('profiles').update({
+    role: 'operativo', status: 'activo', must_change_password: false, position_id: posCrm!.position_id,
+  }).eq('id', miembroUserId)
+
   return {
     operativoEmail: OPERATIVO.email,
     operativoPassword: OPERATIVO.password,
@@ -85,6 +101,12 @@ export async function cleanupHorasFixture() {
     // Delete admin E2E user
     if (u.email === ADMIN_USER.email) {
       await admin.from('horas_ampliaciones').delete().eq('created_by', u.id)
+      await admin.from('time_logs').delete().eq('user_id', u.id)
+      await admin.from('user_areas').delete().eq('user_id', u.id)
+      await admin.auth.admin.deleteUser(u.id)
+    }
+    // Delete miembro E2E user (composición de Equipo)
+    if (u.email === MIEMBRO.email) {
       await admin.from('time_logs').delete().eq('user_id', u.id)
       await admin.from('user_areas').delete().eq('user_id', u.id)
       await admin.auth.admin.deleteUser(u.id)
