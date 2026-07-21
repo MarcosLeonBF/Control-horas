@@ -20,12 +20,17 @@ const ICONS: Record<HorasStatus, LucideIcon> = {
   sin_asignacion: CircleDashed,
 }
 
-export default function HorasStatusBadge({ status }: { status: HorasStatus }) {
+// `label` permite matizar el texto sin cambiar el estado ni su color: la lista de
+// bancos lo usa para "Excedido en <posición>" cuando no lo están todas.
+export default function HorasStatusBadge({ status, label, title }: { status: HorasStatus; label?: string; title?: string }) {
   const Icon = ICONS[status]
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${STYLES[status]}`}>
+    <span
+      title={title}
+      className={`inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${STYLES[status]}`}
+    >
       <Icon aria-hidden className="size-3 shrink-0" />
-      {HORAS_STATUS_LABELS[status]}
+      <span className="truncate">{label ?? HORAS_STATUS_LABELS[status]}</span>
     </span>
   )
 }

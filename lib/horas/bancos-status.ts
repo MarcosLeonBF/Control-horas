@@ -123,6 +123,7 @@ export interface BancoHorasProyecto {
   inutilizables: number
   carryNeto: number
   status: HorasStatus // estado del banco a nivel proyecto (calculado sobre los totales)
+  excedidas: string[] // posiciones concretas en estado 'excedido' (para matizar el badge)
   monthly: BancoMensual[]
 }
 
@@ -144,7 +145,7 @@ export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[
   for (const r of rows) {
     let g = map.get(r.project)
     if (!g) {
-      g = { project: r.project, projectEstado: r.projectEstado, manager: r.manager, fechaAuditoria: r.fechaAuditoria, positions: [], assigned: 0, consumed: 0, remaining: 0, inutilizables: 0, carryNeto: 0, status: 'sin_asignacion', monthly: [] }
+      g = { project: r.project, projectEstado: r.projectEstado, manager: r.manager, fechaAuditoria: r.fechaAuditoria, positions: [], assigned: 0, consumed: 0, remaining: 0, inutilizables: 0, carryNeto: 0, status: 'sin_asignacion', excedidas: [], monthly: [] }
       map.set(r.project, g)
     }
     g.positions.push(r)
@@ -158,6 +159,9 @@ export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[
     g.remaining = g.assigned - g.consumed - g.inutilizables
     g.status = computeHorasStatus(g.assigned - g.inutilizables, g.consumed)
     g.positions.sort((a, b) => a.position.localeCompare(b.position))
+    // Qué posiciones están excedidas: permite distinguir "excedido en una" de
+    // "excedido en todas", que a nivel proyecto se ven igual sobre los totales.
+    g.excedidas = g.positions.filter((p) => p.status === 'excedido').map((p) => p.position)
     // Mensual del proyecto = suma de lo mensual de sus posiciones.
     const byMonth = new Map<string, BancoMensual>()
     for (const p of g.positions) {

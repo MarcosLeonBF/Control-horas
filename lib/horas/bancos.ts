@@ -36,7 +36,7 @@ async function loadPositionContext(scope: BancosScope) {
   const [{ data: positions }, { data: posAreas }, { data: profiles }] = await Promise.all([
     db.from('positions').select('id, name'),
     db.from('position_areas').select('position_id, area_id'),
-    db.from('profiles').select('id, position_id'),
+    db.from('profiles').select('id, position_id, full_name'),
   ])
 
   const posNameById = new Map<string, string>()
@@ -55,14 +55,17 @@ async function loadPositionContext(scope: BancosScope) {
     }
   }
 
-  // usuario → nombre de su posición (para atribuir el consumo).
+  // usuario → nombre de su posición (para atribuir el consumo) y → su nombre
+  // (el histórico no trae autor por línea: se resuelve desde el perfil).
   const userPosition = new Map<string, string>()
-  for (const pr of (profiles ?? []) as { id: string; position_id: string | null }[]) {
+  const userName = new Map<string, string>()
+  for (const pr of (profiles ?? []) as { id: string; position_id: string | null; full_name: string | null }[]) {
     const name = pr.position_id ? posNameById.get(pr.position_id) : undefined
     if (name) userPosition.set(pr.id, name)
+    if (pr.full_name) userName.set(pr.id, pr.full_name)
   }
 
-  return { allowed, userPosition }
+  return { allowed, userPosition, userName }
 }
 
 const visible = (allowed: Set<string> | null, position: string) => allowed === null || allowed.has(position)
@@ -260,7 +263,7 @@ export async function getBancoHorasDetalle(
     db.from('horas_historicas').select('project, month, hours, user_id').eq('project', name),
   ])
 
-  const { allowed, userPosition } = await loadPositionContext(scope)
+  const { allowed, userPosition, userName } = await loadPositionContext(scope)
 
   type RawLine = {
     hours: number; description: string | null
@@ -373,12 +376,15 @@ export async function getBancoHorasDetalle(
     return Boolean(position && visible(allowed, position))
   }
   const consumosVisibles = lineasPlataforma.filter((l) => esVisible(l.time_logs.user_id))
-  // El histórico no tiene día, solo mes: se agrega en un movimiento por mes para que
-  // el saldo del historial siga cuadrando con los totales del proyecto.
-  const historicoPorMes = new Map<string, number>()
+  // El histórico no tiene día ni autor por línea: se agrega por (mes, persona), así
+  // cada movimiento lleva su nombre y el saldo sigue cuadrando con los totales.
+  const historicoPorMesUsuario = new Map<string, { month: string; userId: string; hours: number }>()
   for (const h of rawHistoricas) {
     if (!esVisible(h.user_id)) continue
-    historicoPorMes.set(h.month, (historicoPorMes.get(h.month) ?? 0) + Number(h.hours))
+    const k = `${h.month}\0${h.user_id}`
+    const cur = historicoPorMesUsuario.get(k) ?? { month: h.month, userId: h.user_id, hours: 0 }
+    cur.hours += Number(h.hours)
+    historicoPorMesUsuario.set(k, cur)
   }
 
   return {
@@ -387,7 +393,12 @@ export async function getBancoHorasDetalle(
     excelBase,
     provisional: provBase,
     ampliaciones,
-    movimientos: buildMovimientos(excelBase, consumosVisibles, ampliaciones, [...historicoPorMes].map(([month, hours]) => ({ month, hours }))),
+    movimientos: buildMovimientos(
+      excelBase,
+      consumosVisibles,
+      ampliaciones,
+      [...historicoPorMesUsuario.values()].map((h) => ({ month: h.month, hours: h.hours, actor: userName.get(h.userId) ?? '—' })),
+    ),
     assigned,
     consumed,
     remaining: assigned - consumed - inutilizables,
@@ -405,7 +416,7 @@ function buildMovimientos(
   excelBase: number,
   lines: { hours: number; description: string | null; time_logs: { entry_date: string; profiles: { full_name: string } | null } }[],
   ampliaciones: AmpliacionHoras[],
-  historico: { month: string; hours: number }[] = [],
+  historico: { month: string; hours: number; actor: string }[] = [],
 ): MovimientoBanco[] {
   type Raw = { date: string; kind: 'consumo' | 'ampliacion'; hours: number; actor: string; detail: string }
   const raw: Raw[] = [
@@ -416,13 +427,15 @@ function buildMovimientos(
       actor: l.time_logs.profiles?.full_name ?? '—',
       detail: l.description ?? '',
     })),
-    // Un movimiento por mes: el histórico es un cierre mensual, no un registro diario.
+    // Un movimiento por (mes, persona): el histórico es un cierre mensual, no un
+    // registro diario. El autor es la persona; "Histórico" va en el detalle, que es
+    // donde se explica de dónde viene el movimiento.
     ...historico.map((h) => ({
       date: finDeMes(h.month),
       kind: 'consumo' as const,
       hours: h.hours,
-      actor: 'Histórico',
-      detail: 'Cierre mensual',
+      actor: h.actor,
+      detail: 'Histórico',
     })),
     ...ampliaciones.filter((a) => a.active).map((a) => ({
       date: a.entry_date,

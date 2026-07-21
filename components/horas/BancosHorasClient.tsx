@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Search, AlertTriangle, TrendingDown, Download, ChevronRight, X, Clock } from 'lucide-react'
-import type { BancoHorasRow, HorasStatus } from '@/lib/horas/bancos-status'
+import type { BancoHorasRow, HorasStatus, BancoHorasProyecto } from '@/lib/horas/bancos-status'
 import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProject, estadoProyectoBadgeClass, computeHorasStatus } from '@/lib/horas/bancos-status'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, formatFechaISO, currentMonth } from '@/lib/horas/format'
@@ -24,6 +24,22 @@ function estadoOrden(estado?: string): number {
   if (e.includes('paus')) return 1
   if (e === 'finalizado') return 3
   return 2
+}
+
+// Un proyecto excedido en UNA posición y otro excedido en TODAS se ven igual en el
+// badge, porque el estado se calcula sobre los totales. Cuando solo lo están algunas
+// se nombra cuál (o cuántas); si lo están todas, "Excedido" a secas ya es exacto.
+function excedidoParcial(g: BancoHorasProyecto): boolean {
+  return g.status === 'excedido' && g.excedidas.length > 0 && g.excedidas.length < g.positions.length
+}
+function excedidoLabel(g: BancoHorasProyecto): string | undefined {
+  if (!excedidoParcial(g)) return undefined
+  return g.excedidas.length === 1
+    ? `Excedido en ${g.excedidas[0]}`
+    : `Excedido en ${g.excedidas.length} de ${g.positions.length}`
+}
+function excedidoTitle(g: BancoHorasProyecto): string | undefined {
+  return excedidoParcial(g) ? `Excedido en: ${g.excedidas.join(', ')}` : undefined
 }
 
 const selectClass =
@@ -359,10 +375,10 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                       <span className="text-muted-foreground">/{formatHoras(g.assigned)}</span>
                     </span>
 
-                    <span className="flex w-28 shrink-0 items-center justify-end">
+                    <span className="flex w-28 shrink-0 items-center justify-end md:w-40">
                       {vista === 'mensual' && g.assigned === 0 && g.consumed === 0 && !marcaProv
                         ? <span aria-label="Sin datos este mes" className="text-sm text-muted-foreground/50">—</span>
-                        : <HorasStatusBadge status={g.status} />}
+                        : <HorasStatusBadge status={g.status} label={excedidoLabel(g)} title={excedidoTitle(g)} />}
                     </span>
                     <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-(--brand) md:block" />
                   </Link>
