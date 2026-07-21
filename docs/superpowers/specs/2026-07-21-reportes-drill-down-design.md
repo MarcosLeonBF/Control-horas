@@ -101,6 +101,5 @@ corporativo existente. El desglose calca colores, barra y tipografía de la tabl
 ## Verificación
 
 - `npx tsc --noEmit` (gate de tipos; lint está roto repo-wide desde Next 16).
-- `e2e/horas-reportes.spec.ts`: caso nuevo que pincha la primera fila de datos,
-  comprueba que el Dialog abre con la cabecera correcta, que muestra ≥1 usuario
-  en el nivel 1, y que al abrir un usuario aparecen sus líneas de registro.
+- **Testing funcional a cargo del usuario:** esta feature no añade tests e2e; la
+  prueba en navegador la hace él.

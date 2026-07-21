@@ -1,13 +1,18 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Download, Filter, X } from 'lucide-react'
-import type { ReporteLine, ReporteFilterOptions, GroupBy } from '@/lib/horas/reportes-types'
-import { GROUP_LABELS, GROUP_ORDER, aggregate } from '@/lib/horas/reportes-types'
+import { useMemo, useState, type ReactNode } from 'react'
+import { ChevronRight, Download, Filter, X } from 'lucide-react'
+import type { ReporteLine, ReporteFilterOptions, GroupBy, AggRow } from '@/lib/horas/reportes-types'
+import { GROUP_LABELS, GROUP_ORDER, aggregate, groupKeyOf } from '@/lib/horas/reportes-types'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
-import { formatHoras, formatHorasTotal } from '@/lib/horas/format'
+import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import NativeSelect from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
+
+// Rejilla compartida por la tabla principal y el nivel 1 del modal, para que las
+// columnas (#/etiqueta/barra/horas/%) queden alineadas en ambos sitios.
+const ROW_GRID = 'grid w-full grid-cols-[2.5rem_1fr_minmax(8rem,1.4fr)_5rem_3.5rem] items-center gap-3'
 
 const selectClass =
   'h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
@@ -45,6 +50,44 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   )
 }
 
+// Fila de ranking: etiqueta + barra de reparto + horas + %. La usa la tabla
+// principal (leading = nº de orden) y el nivel 1 del modal (leading = chevron).
+// Si recibe onClick se renderiza como <button> (foco y Enter/Espacio nativos).
+function RankRow({
+  leading, label, hours, pct, barW, onClick,
+}: {
+  leading: ReactNode
+  label: string
+  hours: number
+  pct: number
+  barW: number
+  onClick?: () => void
+}) {
+  const inner = (
+    <>
+      <span className="text-right text-xs tabular-money text-muted-foreground">{leading}</span>
+      <span className="truncate text-left font-medium text-foreground" title={label}>{label}</span>
+      <span className="h-2 overflow-hidden rounded-full bg-(--muted-surface)">
+        <span className="block h-full rounded-full bg-(--brand)" style={{ width: `${barW}%` }} />
+      </span>
+      <span className="text-right tabular-money font-medium">{formatHoras(hours)}</span>
+      <span className="text-right text-xs tabular-money text-muted-foreground">{pct.toFixed(0)}%</span>
+    </>
+  )
+  const base = cn(ROW_GRID, 'px-5 py-3 text-sm')
+  return onClick ? (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(base, 'cursor-pointer transition-colors hover:bg-(--muted-surface)/60 focus:outline-none focus-visible:bg-(--muted-surface)/60')}
+    >
+      {inner}
+    </button>
+  ) : (
+    <div className={base}>{inner}</div>
+  )
+}
+
 export default function ReportesView({
   lines,
   options,
@@ -61,6 +104,9 @@ export default function ReportesView({
   const [fUser, setFUser] = useState('')
   const [fArea, setFArea] = useState('')
   const [fPosition, setFPosition] = useState('')
+  // Drill-down: fila abierta en el modal + qué sub-filas tienen sus registros desplegados.
+  const [selected, setSelected] = useState<AggRow | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   // Nombre a mostrar por usuario (con email si hay homónimos), indexado por id.
   const userLabel = useMemo(() => new Map(options.users.map((u) => [u.id, u.label])), [options.users])
@@ -93,6 +139,41 @@ export default function ReportesView({
   const max = rows.reduce((m, r) => Math.max(m, r.hours), 0)
   const hasFilters = fProject || fUser || fArea || fPosition
   const dimLabel = GROUP_LABELS[groupBy]
+
+  // --- Drill-down -----------------------------------------------------------
+  // El desglose es siempre por usuario; si ya agrupamos por usuario, por proyecto
+  // (desglosar usuario dentro de usuario no aporta nada).
+  const subGroupBy: GroupBy = groupBy === 'user' ? 'project' : 'user'
+
+  // Líneas de la fila abierta (parten de `filtered`: el modal respeta los filtros).
+  const subLines = useMemo(
+    () => (selected ? filtered.filter((l) => groupKeyOf(l, groupBy) === selected.key) : []),
+    [selected, filtered, groupBy],
+  )
+  const subRows = useMemo(() => aggregate(subLines, subGroupBy), [subLines, subGroupBy])
+  const subMax = subRows.reduce((m, r) => Math.max(m, r.hours), 0)
+
+  // Nivel 2: registros de una sub-fila, de más reciente a más antiguo.
+  function registrosDe(subKey: string): ReporteLine[] {
+    return subLines
+      .filter((l) => groupKeyOf(l, subGroupBy) === subKey)
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+  }
+
+  function abrirFila(row: AggRow) {
+    setSelected(row)
+    setExpanded(new Set())
+  }
+  function toggleSubFila(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+  // Etiqueta a mostrar de una clave (los usuarios llevan email si hay homónimos).
+  const labelDe = (dim: GroupBy, row: AggRow) => (dim === 'user' ? (userLabel.get(row.key) ?? row.label) : row.label)
 
   // Resumen agrupado (consumo por la dimensión elegida).
   function buildResumen(): ExportRow[] {
@@ -218,25 +299,18 @@ export default function ReportesView({
           </p>
         ) : (
           <ul>
-            {rows.map((r, i) => {
-              const pct = totals.total > 0 ? (r.hours / totals.total) * 100 : 0
-              const barW = max > 0 ? (r.hours / max) * 100 : 0
-              const label = groupBy === 'user' ? (userLabel.get(r.key) ?? r.label) : r.label
-              return (
-                <li
-                  key={r.key}
-                  className="grid grid-cols-[2.5rem_1fr_minmax(8rem,1.4fr)_5rem_3.5rem] items-center gap-3 border-b border-border/60 px-5 py-3 text-sm transition-colors last:border-0 hover:bg-(--muted-surface)/60"
-                >
-                  <span className="text-right text-xs tabular-money text-muted-foreground">{i + 1}</span>
-                  <span className="truncate font-medium text-foreground" title={label}>{label}</span>
-                  <span className="h-2 overflow-hidden rounded-full bg-(--muted-surface)">
-                    <span className="block h-full rounded-full bg-(--brand)" style={{ width: `${barW}%` }} />
-                  </span>
-                  <span className="text-right tabular-money font-medium">{formatHoras(r.hours)}</span>
-                  <span className="text-right text-xs tabular-money text-muted-foreground">{pct.toFixed(0)}%</span>
-                </li>
-              )
-            })}
+            {rows.map((r, i) => (
+              <li key={r.key} className="border-b border-border/60 last:border-0">
+                <RankRow
+                  leading={i + 1}
+                  label={labelDe(groupBy, r)}
+                  hours={r.hours}
+                  pct={totals.total > 0 ? (r.hours / totals.total) * 100 : 0}
+                  barW={max > 0 ? (r.hours / max) * 100 : 0}
+                  onClick={() => abrirFila(r)}
+                />
+              </li>
+            ))}
           </ul>
         )}
         {rows.length > 0 && (
@@ -251,6 +325,55 @@ export default function ReportesView({
         </div>
         </div>
       </div>
+
+      {/* Desglose de la fila pinchada: nivel 1 = sub-dimensión, nivel 2 = registros. */}
+      <Dialog open={selected !== null} onOpenChange={(open) => { if (!open) setSelected(null) }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selected ? `${labelDe(groupBy, selected)} — ${formatHorasTotal(selected.hours)}` : ''}
+            </DialogTitle>
+            <DialogDescription>
+              Desglose por {GROUP_LABELS[subGroupBy].toLowerCase()}. Abre una fila para ver sus registros.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <ul>
+              {subRows.map((sr) => {
+                const abierto = expanded.has(sr.key)
+                return (
+                  <li key={sr.key} className="border-b border-border/60 last:border-0">
+                    <RankRow
+                      leading={<ChevronRight className={cn('inline size-3.5 transition-transform', abierto && 'rotate-90')} />}
+                      label={labelDe(subGroupBy, sr)}
+                      hours={sr.hours}
+                      pct={selected && selected.hours > 0 ? (sr.hours / selected.hours) * 100 : 0}
+                      barW={subMax > 0 ? (sr.hours / subMax) * 100 : 0}
+                      onClick={() => toggleSubFila(sr.key)}
+                    />
+                    {abierto && (
+                      <ul className="border-t border-border/40 bg-(--muted-surface)/40 py-1">
+                        {registrosDe(sr.key).map((l, i) => (
+                          <li
+                            key={`${l.date}-${i}`}
+                            className="grid grid-cols-[6rem_1fr_4.5rem] items-baseline gap-3 py-1.5 pr-5 pl-13 text-xs"
+                          >
+                            <span className="tabular-money text-muted-foreground">{formatFechaISO(l.date)}</span>
+                            <span className="truncate text-foreground/80" title={l.description || undefined}>
+                              {l.description || '—'}
+                            </span>
+                            <span className="text-right tabular-money font-medium">{formatHoras(l.hours)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

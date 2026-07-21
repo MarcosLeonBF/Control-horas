@@ -62,6 +62,13 @@ export interface AggRow {
   hours: number
 }
 
+// Identidad del grupo al que pertenece una línea según la dimensión elegida.
+// Reutiliza KEY (misma lógica que aggregate): para "usuario" la clave es el id.
+// Sirve para el drill-down: filtrar las líneas de una fila y volver a agregarlas.
+export function groupKeyOf(line: ReporteLine, groupBy: GroupBy): string {
+  return KEY[groupBy](line).key
+}
+
 // Agrupa y suma horas por la dimensión elegida, orden desc.
 export function aggregate(lines: ReporteLine[], groupBy: GroupBy): AggRow[] {
   const by = new Map<string, { label: string; hours: number }>()
