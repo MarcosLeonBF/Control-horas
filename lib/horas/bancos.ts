@@ -13,7 +13,22 @@ import { carrySplit } from '@/lib/horas/carry-forward'
 //     ligadas a sus áreas asignadas (positions ↔ areas).
 export type BancosScope = { role: 'admin' } | { role: 'manager'; areaIds: string[] }
 
+// Corte histórico/plataforma (spec 2026-07-21-horas-historicas-banco): horas_historicas
+// manda hasta 2026-06 incluido y time_log_lines desde 2026-07. Evita contar dos veces
+// junio-2026: el único registro previo de la plataforma (Arturo, 30/06, 37h) resultó ser
+// un subconjunto del cierre mensual del histórico (167,5h), no un dato adicional.
+export const MES_CORTE_HISTORICO = '2026-06'
+
 const key = (project: string, position: string) => `${project}\0${position}`
+
+// Fila del histórico mensual tal como la consume el banco.
+type HistoricaRow = { project: string; month: string; hours: number; user_id: string }
+
+// El último día de un mes 'YYYY-MM' (para fechar el movimiento de cierre mensual).
+function finDeMes(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
+}
 
 // Catálogo de posiciones + qué posiciones quedan dentro del alcance.
 async function loadPositionContext(scope: BancosScope) {
@@ -63,10 +78,13 @@ export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[
   try { horasProvSetup = await getCachedHorasProvisionalesSetup() } catch { horasProvSetup = new Map() }
 
   const db = createAdminClient()
-  const { data: lines } = await db
-    .from('time_log_lines')
-    .select('project, hours, time_logs!inner(status, user_id, entry_date)')
-    .neq('time_logs.status', 'anulado')
+  const [{ data: lines }, { data: historicas }] = await Promise.all([
+    db
+      .from('time_log_lines')
+      .select('project, hours, time_logs!inner(status, user_id, entry_date)')
+      .neq('time_logs.status', 'anulado'),
+    db.from('horas_historicas').select('project, month, hours, user_id'),
+  ])
 
   const { allowed, userPosition } = await loadPositionContext(scope)
 
@@ -80,20 +98,29 @@ export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[
   const consumed = new Map<string, number>()
   const consumedMes = new Map<string, Map<string, number>>()
   const posConsumoPorProyecto = new Map<string, Set<string>>()
-  for (const l of (lines ?? []) as unknown as { project: string; hours: number; time_logs: { user_id: string; entry_date: string } }[]) {
-    const project = l.project.trim()
-    if (project === 'Departamento') continue // horas internas: no consumen banco
-    const position = userPosition.get(l.time_logs.user_id)
-    if (!position) continue // usuario sin posición: no se atribuye
+  // Misma acumulación para las dos fuentes (plataforma e histórico).
+  const acumula = (rawProject: string, userId: string, month: string, hours: number) => {
+    const project = rawProject.trim()
+    if (project === 'Departamento') return // horas internas: no consumen banco
+    const position = userPosition.get(userId)
+    if (!position) return // usuario sin posición: no se atribuye
     const k = key(project, position)
-    consumed.set(k, (consumed.get(k) ?? 0) + Number(l.hours))
-    const month = l.time_logs.entry_date.slice(0, 7)
+    consumed.set(k, (consumed.get(k) ?? 0) + hours)
     let porMes = consumedMes.get(k)
     if (!porMes) { porMes = new Map(); consumedMes.set(k, porMes) }
-    porMes.set(month, (porMes.get(month) ?? 0) + Number(l.hours))
+    porMes.set(month, (porMes.get(month) ?? 0) + hours)
     let ps = posConsumoPorProyecto.get(project)
     if (!ps) { ps = new Set(); posConsumoPorProyecto.set(project, ps) }
     ps.add(position)
+  }
+
+  for (const l of (lines ?? []) as unknown as { project: string; hours: number; time_logs: { user_id: string; entry_date: string } }[]) {
+    const month = l.time_logs.entry_date.slice(0, 7)
+    if (month <= MES_CORTE_HISTORICO) continue // ese tramo lo cubre el histórico
+    acumula(l.project, l.time_logs.user_id, month, Number(l.hours))
+  }
+  for (const h of (historicas ?? []) as HistoricaRow[]) {
+    acumula(h.project, h.user_id, h.month, Number(h.hours))
   }
 
   const excelByProject = new Map<string, BancoHorasProyecto>()
@@ -219,7 +246,7 @@ export async function getBancoHorasDetalle(
     : new Map<string, BancoMensual[]>()
 
   const db = createAdminClient()
-  const [{ data: lines }, { data: amps }] = await Promise.all([
+  const [{ data: lines }, { data: amps }, { data: historicas }] = await Promise.all([
     db
       .from('time_log_lines')
       .select('hours, description, time_logs!inner(status, user_id, entry_date, profiles!time_logs_user_id_fkey(full_name))')
@@ -230,6 +257,7 @@ export async function getBancoHorasDetalle(
       .select('id, project, hours, reason, entry_date, actor_name, active')
       .eq('project', name)
       .order('entry_date', { ascending: false }),
+    db.from('horas_historicas').select('project, month, hours, user_id').eq('project', name),
   ])
 
   const { allowed, userPosition } = await loadPositionContext(scope)
@@ -239,18 +267,26 @@ export async function getBancoHorasDetalle(
     time_logs: { user_id: string; entry_date: string; profiles: { full_name: string } | null }
   }
   const rawLines = (lines ?? []) as unknown as RawLine[]
+  const rawHistoricas = (historicas ?? []) as HistoricaRow[]
+  // Las líneas de plataforma anteriores al corte las cubre el histórico (no se cuentan dos veces).
+  const lineasPlataforma = rawLines.filter((l) => l.time_logs.entry_date.slice(0, 7) > MES_CORTE_HISTORICO)
 
   // Consumido por posición (solo las visibles).
   const consumedByPos = new Map<string, number>()
   const consumedByPosMes = new Map<string, Map<string, number>>() // posición → mes → horas
-  for (const l of rawLines) {
-    const position = userPosition.get(l.time_logs.user_id)
-    if (!position || !visible(allowed, position)) continue
-    consumedByPos.set(position, (consumedByPos.get(position) ?? 0) + Number(l.hours))
-    const month = l.time_logs.entry_date.slice(0, 7)
+  const acumulaPos = (userId: string, month: string, hours: number) => {
+    const position = userPosition.get(userId)
+    if (!position || !visible(allowed, position)) return
+    consumedByPos.set(position, (consumedByPos.get(position) ?? 0) + hours)
     let porMes = consumedByPosMes.get(position)
     if (!porMes) { porMes = new Map(); consumedByPosMes.set(position, porMes) }
-    porMes.set(month, (porMes.get(month) ?? 0) + Number(l.hours))
+    porMes.set(month, (porMes.get(month) ?? 0) + hours)
+  }
+  for (const l of lineasPlataforma) {
+    acumulaPos(l.time_logs.user_id, l.time_logs.entry_date.slice(0, 7), Number(l.hours))
+  }
+  for (const h of rawHistoricas) {
+    acumulaPos(h.user_id, h.month, Number(h.hours))
   }
 
   // Desglose por posición: une columnas del Excel visibles + consumos.
@@ -332,10 +368,18 @@ export async function getBancoHorasDetalle(
   const monthly = [...detalleByMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
 
   // Movimientos del proyecto: consumos visibles + ampliaciones activas, con saldo.
-  const consumosVisibles = rawLines.filter((l) => {
-    const position = userPosition.get(l.time_logs.user_id)
-    return position && visible(allowed, position)
-  })
+  const esVisible = (userId: string) => {
+    const position = userPosition.get(userId)
+    return Boolean(position && visible(allowed, position))
+  }
+  const consumosVisibles = lineasPlataforma.filter((l) => esVisible(l.time_logs.user_id))
+  // El histórico no tiene día, solo mes: se agrega en un movimiento por mes para que
+  // el saldo del historial siga cuadrando con los totales del proyecto.
+  const historicoPorMes = new Map<string, number>()
+  for (const h of rawHistoricas) {
+    if (!esVisible(h.user_id)) continue
+    historicoPorMes.set(h.month, (historicoPorMes.get(h.month) ?? 0) + Number(h.hours))
+  }
 
   return {
     project: name,
@@ -343,7 +387,7 @@ export async function getBancoHorasDetalle(
     excelBase,
     provisional: provBase,
     ampliaciones,
-    movimientos: buildMovimientos(excelBase, consumosVisibles, ampliaciones),
+    movimientos: buildMovimientos(excelBase, consumosVisibles, ampliaciones, [...historicoPorMes].map(([month, hours]) => ({ month, hours }))),
     assigned,
     consumed,
     remaining: assigned - consumed - inutilizables,
@@ -361,6 +405,7 @@ function buildMovimientos(
   excelBase: number,
   lines: { hours: number; description: string | null; time_logs: { entry_date: string; profiles: { full_name: string } | null } }[],
   ampliaciones: AmpliacionHoras[],
+  historico: { month: string; hours: number }[] = [],
 ): MovimientoBanco[] {
   type Raw = { date: string; kind: 'consumo' | 'ampliacion'; hours: number; actor: string; detail: string }
   const raw: Raw[] = [
@@ -370,6 +415,14 @@ function buildMovimientos(
       hours: Number(l.hours),
       actor: l.time_logs.profiles?.full_name ?? '—',
       detail: l.description ?? '',
+    })),
+    // Un movimiento por mes: el histórico es un cierre mensual, no un registro diario.
+    ...historico.map((h) => ({
+      date: finDeMes(h.month),
+      kind: 'consumo' as const,
+      hours: h.hours,
+      actor: 'Histórico',
+      detail: 'Cierre mensual',
     })),
     ...ampliaciones.filter((a) => a.active).map((a) => ({
       date: a.entry_date,
