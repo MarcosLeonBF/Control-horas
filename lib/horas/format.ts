@@ -1,19 +1,19 @@
-// Formato español: separador de miles con punto (1.000) y decimal con coma (1,5).
+// Formato español: separador de miles con punto (1.000) y decimal con coma (1,50).
 // useGrouping:'always' fuerza el punto de miles también en 4 cifras, porque el
-// locale es-ES por defecto (minimumGroupingDigits:2) no agruparía "1000". Las
-// horas conservan hasta 1 decimal (medias horas: 1,5h); los enteros van sin decimales.
-const HORAS = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1, useGrouping: 'always' })
+// locale es-ES por defecto (minimumGroupingDigits:2) no agruparía "1000". Las horas
+// se muestran con dos decimales fijos (8,00h; 1,50h; 1.234,50h).
+const HORAS = new Intl.NumberFormat('es-ES', {
+  minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: 'always',
+})
 
 export function formatHoras(n: number): string {
   return HORAS.format(Number(n)) + 'h'
 }
 
-// Horas redondeadas a entero, para totales/KPIs (sin decimales). Mismo separador de
-// miles. Los valores individuales usan formatHoras (conservan la media hora: 0,5h).
-const HORAS_ENTERAS = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0, useGrouping: 'always' })
-
+// Alias semántico para totales/KPIs. Mismo formato de dos decimales que los valores
+// individuales; se mantiene el nombre para no tocar las llamadas existentes.
 export function formatHorasTotal(n: number): string {
-  return HORAS_ENTERAS.format(Number(n)) + 'h'
+  return HORAS.format(Number(n)) + 'h'
 }
 
 // ISO "YYYY-MM-DD" → "DD/MM/YYYY" (sin desfase de zona horaria). Si no es una fecha
@@ -47,6 +47,14 @@ export function mesCorto(month: string): string {
   if (!y || !m) return month
   const s = MES_CORTO.format(new Date(Date.UTC(y, m - 1, 1))).replace('.', '')
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+// 'YYYY-MM' → ISO del último día de ese mes ('2026-06' → '2026-06-30'). El histórico
+// mensual se fecha así (cierre de mes) allí donde hace falta un día concreto.
+export function finDeMes(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  if (!y || !m) return month
+  return `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`
 }
 
 // Suma delta meses a un 'YYYY-MM' (delta puede ser negativo).
