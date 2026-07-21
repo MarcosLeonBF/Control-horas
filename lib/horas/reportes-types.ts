@@ -65,11 +65,16 @@ export interface AggRow {
   hours: number
 }
 
-// Identidad del grupo al que pertenece una línea según la dimensión elegida.
-// Reutiliza KEY (misma lógica que aggregate): para "usuario" la clave es el id.
-// Sirve para el drill-down: filtrar las líneas de una fila y volver a agregarlas.
+// Clave (identidad) y etiqueta del grupo al que pertenece una línea según la
+// dimensión elegida. Misma lógica que aggregate: para "usuario" la clave es el id,
+// no el nombre. La matriz de /historico la usa para agrupar y rotular a la vez.
+export function groupOf(line: ReporteLine, groupBy: GroupBy): { key: string; label: string } {
+  return KEY[groupBy](line)
+}
+
+// Solo la identidad: el drill-down la usa para filtrar las líneas de una fila.
 export function groupKeyOf(line: ReporteLine, groupBy: GroupBy): string {
-  return KEY[groupBy](line).key
+  return groupOf(line, groupBy).key
 }
 
 // Agrupa y suma horas por la dimensión elegida, orden desc.

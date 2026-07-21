@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   Clock, FileText, Users, Wallet, BarChart3, PiggyBank, LayoutDashboard,
-  RefreshCw, UserCog, History, Tags, LogOut, ChevronsLeft, ChevronsRight, Menu, X, User,
+  RefreshCw, UserCog, History, CalendarRange, Tags, LogOut, ChevronsLeft, ChevronsRight, Menu, X, User,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -27,6 +27,7 @@ function buildSections(role: string, canCreateUsers: boolean): Section[] {
         { href: '/equipo', label: 'Equipo', icon: Users, show: isMgr },
         { href: '/bancos', label: 'Bancos de horas', icon: Wallet, show: isMgr },
         { href: '/reportes', label: 'Reportes', icon: BarChart3, show: isMgr },
+        { href: '/historico', label: 'Histórico', icon: CalendarRange, show: isMgr },
       ],
     },
     {

@@ -5,6 +5,7 @@ import type { BancoHorasProyecto } from '@/lib/types'
 import { currentMonth, finDeMes } from '@/lib/horas/format'
 import { ultimoRegistroGlobal, mesesVentana, provisionalPorPosicion } from '@/lib/horas/provisionales'
 import { carrySplit } from '@/lib/horas/carry-forward'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 // Banco de horas POR POSICIÓN (PDF + lógica nueva):
 //   - Asignado: cada columna del Excel (CRM, SEO, Growth Strategists…) por proyecto.
@@ -75,12 +76,20 @@ export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[
   try { horasProvSetup = await getCachedHorasProvisionalesSetup() } catch { horasProvSetup = new Map() }
 
   const db = createAdminClient()
-  const [{ data: lines }, { data: historicas }] = await Promise.all([
-    db
-      .from('time_log_lines')
-      .select('project, hours, time_logs!inner(status, user_id, entry_date)')
-      .neq('time_logs.status', 'anulado'),
-    db.from('horas_historicas').select('project, month, hours, user_id'),
+  // Ambas consultas traen la tabla entera y superan (o superarán) las 1.000 filas que
+  // devuelve PostgREST por petición: sin paginar, el consumo saldría corto en silencio.
+  const [lines, historicas] = await Promise.all([
+    fetchAllRows<{ project: string; hours: number; time_logs: { user_id: string; entry_date: string } }>(
+      (desde, hasta) =>
+        db
+          .from('time_log_lines')
+          .select('project, hours, time_logs!inner(status, user_id, entry_date)')
+          .neq('time_logs.status', 'anulado')
+          .range(desde, hasta),
+    ),
+    fetchAllRows<HistoricaRow>((desde, hasta) =>
+      db.from('horas_historicas').select('project, month, hours, user_id').range(desde, hasta),
+    ),
   ])
 
   const { allowed, userPosition } = await loadPositionContext(scope)
@@ -111,12 +120,12 @@ export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[
     ps.add(position)
   }
 
-  for (const l of (lines ?? []) as unknown as { project: string; hours: number; time_logs: { user_id: string; entry_date: string } }[]) {
+  for (const l of lines) {
     const month = l.time_logs.entry_date.slice(0, 7)
     if (month <= MES_CORTE_HISTORICO) continue // ese tramo lo cubre el histórico
     acumula(l.project, l.time_logs.user_id, month, Number(l.hours))
   }
-  for (const h of (historicas ?? []) as HistoricaRow[]) {
+  for (const h of historicas) {
     acumula(h.project, h.user_id, h.month, Number(h.hours))
   }
 
