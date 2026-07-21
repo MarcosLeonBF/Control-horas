@@ -89,7 +89,8 @@ export default function ReportesView({
     return { total, internas, cliente: total - internas, lineas: filtered.length }
   }, [filtered])
 
-  const max = rows[0]?.hours ?? 0
+  // Máximo real: con orden por fecha el primer registro ya no es el mayor.
+  const max = rows.reduce((m, r) => Math.max(m, r.hours), 0)
   const hasFilters = fProject || fUser || fArea || fPosition
   const dimLabel = GROUP_LABELS[groupBy]
 

@@ -1,6 +1,8 @@
 // Tipos y agregación del reporte de horas. SIN imports de servidor (lo usa el
-// componente cliente y la página).
-export type GroupBy = 'project' | 'user' | 'area' | 'department' | 'etapa' | 'position'
+// componente cliente y la página). format.ts es puro (solo Intl), sin servidor.
+import { formatFechaISO } from '@/lib/horas/format'
+
+export type GroupBy = 'project' | 'user' | 'area' | 'department' | 'etapa' | 'position' | 'date'
 
 export const GROUP_LABELS: Record<GroupBy, string> = {
   project: 'Proyecto',
@@ -9,9 +11,10 @@ export const GROUP_LABELS: Record<GroupBy, string> = {
   department: 'Departamento',
   etapa: 'Etapa',
   position: 'Posición',
+  date: 'Fecha',
 }
 
-export const GROUP_ORDER: GroupBy[] = ['project', 'user', 'area', 'department', 'etapa', 'position']
+export const GROUP_ORDER: GroupBy[] = ['project', 'user', 'area', 'department', 'etapa', 'position', 'date']
 
 // Una línea de registro aplanada (con nombres ya resueltos), lista para agrupar.
 export interface ReporteLine {
@@ -49,6 +52,8 @@ const KEY: Record<GroupBy, (l: ReporteLine) => { key: string; label: string }> =
   department: (l) => ({ key: l.department || '—', label: l.department || '—' }),
   etapa: (l) => ({ key: l.etapa || '—', label: l.etapa || '—' }),
   position: (l) => ({ key: l.position || '—', label: l.position || '—' }),
+  // Clave = fecha ISO (orden estable y cronológico); etiqueta = DD/MM/AAAA.
+  date: (l) => ({ key: l.date || '—', label: l.date ? formatFechaISO(l.date) : '—' }),
 }
 
 export interface AggRow {
@@ -67,7 +72,10 @@ export function aggregate(lines: ReporteLine[], groupBy: GroupBy): AggRow[] {
     cur.hours += l.hours
     by.set(key, cur)
   }
-  return [...by.entries()]
-    .map(([key, { label, hours }]) => ({ key, label, hours: Math.round(hours * 100) / 100 }))
-    .sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label))
+  const rows = [...by.entries()].map(([key, { label, hours }]) => ({ key, label, hours: Math.round(hours * 100) / 100 }))
+  // Por fecha: orden cronológico descendente (clave ISO, más reciente arriba).
+  // Resto de dimensiones: por horas descendente.
+  return groupBy === 'date'
+    ? rows.sort((a, b) => b.key.localeCompare(a.key))
+    : rows.sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label))
 }
