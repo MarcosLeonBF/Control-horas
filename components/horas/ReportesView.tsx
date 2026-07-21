@@ -107,6 +107,10 @@ export default function ReportesView({
   // Drill-down: fila abierta en el modal + qué sub-filas tienen sus registros desplegados.
   const [selected, setSelected] = useState<AggRow | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // El histórico son cierres MENSUALES previos a la plataforma (fechados a fin de mes,
+  // sin área ni descripción). Se incluye por defecto; el interruptor deja verlo aparte.
+  const [conHistorico, setConHistorico] = useState(true)
+  const hayHistorico = useMemo(() => lines.some((l) => l.historico), [lines])
 
   // Nombre a mostrar por usuario (con email si hay homónimos), indexado por id.
   const userLabel = useMemo(() => new Map(options.users.map((u) => [u.id, u.label])), [options.users])
@@ -115,12 +119,13 @@ export default function ReportesView({
     () =>
       lines.filter(
         (l) =>
+          (conHistorico || !l.historico) &&
           (!fProject || l.project === fProject) &&
           (!fUser || l.userId === fUser) &&
           (!fArea || l.area === fArea) &&
           (!fPosition || l.position === fPosition),
       ),
-    [lines, fProject, fUser, fArea, fPosition],
+    [lines, conHistorico, fProject, fUser, fArea, fPosition],
   )
 
   const rows = useMemo(() => aggregate(filtered, groupBy), [filtered, groupBy])
@@ -241,6 +246,20 @@ export default function ReportesView({
           >
             <X className="size-3.5" /> Limpiar
           </button>
+        )}
+        {hayHistorico && (
+          <label
+            title="Cierres mensuales previos a la plataforma: van fechados a fin de mes y no traen área ni descripción."
+            className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <input
+              type="checkbox"
+              checked={conHistorico}
+              onChange={(e) => setConHistorico(e.target.checked)}
+              className="size-4 accent-(--brand)"
+            />
+            Incluir histórico
+          </label>
         )}
       </div>
 

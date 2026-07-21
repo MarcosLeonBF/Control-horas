@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCachedProyectosEstado } from '@/lib/graph/client'
 import type { ViewerScope } from '@/lib/horas/scope'
 import type { ReporteLine, ReporteFilterOptions } from '@/lib/horas/reportes-types'
+import { finDeMes } from '@/lib/horas/format'
 
 interface RawLine {
   project: string
@@ -13,20 +14,42 @@ interface RawLine {
   time_logs: { entry_date: string; user_id: string; profiles: { full_name: string; positions: { name: string } | null } | null } | null
 }
 
+interface RawHistorica {
+  month: string
+  project: string
+  department: string
+  etapa: string
+  hours: number
+  user_id: string
+  profiles: { full_name: string; positions: { name: string } | null } | null
+}
+
 // Líneas de registro (no anuladas) dentro de un rango de fechas, con nombres resueltos.
+// Incluye el histórico mensual previo a la plataforma, fechado al cierre de su mes
+// (spec 2026-07-21-horas-historicas-reportes). La UI decide si mostrarlo con el flag
+// `historico` de cada línea.
 export async function getReporteLines(from: string, to: string): Promise<ReporteLine[]> {
   const supabase = await createClient()
-  const { data } = await supabase
-    .from('time_log_lines')
-    .select(
-      'project, hours, department, description, areas(name), etapas(name), time_logs!inner(entry_date, status, user_id, profiles!time_logs_user_id_fkey(full_name, positions(name)))',
-    )
-    .neq('time_logs.status', 'anulado')
-    .gte('time_logs.entry_date', from)
-    .lte('time_logs.entry_date', to)
-    .order('entry_date', { ascending: false, referencedTable: 'time_logs' })
+  const [{ data }, { data: hist }, { data: etapas }] = await Promise.all([
+    supabase
+      .from('time_log_lines')
+      .select(
+        'project, hours, department, description, areas(name), etapas(name), time_logs!inner(entry_date, status, user_id, profiles!time_logs_user_id_fkey(full_name, positions(name)))',
+      )
+      .neq('time_logs.status', 'anulado')
+      .gte('time_logs.entry_date', from)
+      .lte('time_logs.entry_date', to)
+      .order('entry_date', { ascending: false, referencedTable: 'time_logs' }),
+    // Meses que solapan el rango; el recorte fino al día se hace abajo con finDeMes.
+    supabase
+      .from('horas_historicas')
+      .select('month, project, department, etapa, hours, user_id, profiles(full_name, positions(name))')
+      .gte('month', from.slice(0, 7))
+      .lte('month', to.slice(0, 7)),
+    supabase.from('etapas').select('name'),
+  ])
 
-  return ((data ?? []) as unknown as RawLine[]).map((l) => ({
+  const lines: ReporteLine[] = ((data ?? []) as unknown as RawLine[]).map((l) => ({
     date: l.time_logs?.entry_date ?? '',
     project: l.project,
     area: l.areas?.name ?? '—',
@@ -38,7 +61,35 @@ export async function getReporteLines(from: string, to: string): Promise<Reporte
     hours: Number(l.hours),
     description: l.description ?? '',
     isInternal: l.project === 'Departamento',
+    historico: false,
   }))
+
+  // El histórico guarda la etapa como texto tal cual vino de la hoja. Se casa con el
+  // catálogo ignorando mayúsculas para que "Servicios mensuales" no salga como una
+  // etapa distinta de "Servicios Mensuales" al agrupar.
+  const etapaCanonica = new Map<string, string>()
+  for (const e of (etapas ?? []) as { name: string }[]) etapaCanonica.set(e.name.toLocaleLowerCase('es'), e.name)
+
+  for (const h of (hist ?? []) as unknown as RawHistorica[]) {
+    const date = finDeMes(h.month)
+    if (date < from || date > to) continue // el cierre de ese mes cae fuera del rango
+    lines.push({
+      date,
+      project: h.project,
+      area: '—', // el histórico no trae área
+      etapa: etapaCanonica.get(h.etapa.toLocaleLowerCase('es')) ?? h.etapa,
+      department: h.department,
+      userId: h.user_id,
+      user: h.profiles?.full_name ?? '—',
+      position: h.profiles?.positions?.name ?? '—',
+      hours: Number(h.hours),
+      description: '', // el histórico no trae descripción
+      isInternal: h.project === 'Departamento',
+      historico: true,
+    })
+  }
+
+  return lines
 }
 
 // Opciones para los filtros (derivadas del catálogo + Excel + perfiles).

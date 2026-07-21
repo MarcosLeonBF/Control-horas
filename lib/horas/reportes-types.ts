@@ -29,6 +29,9 @@ export interface ReporteLine {
   hours: number
   description: string
   isInternal: boolean // project === 'Departamento'
+  // true = cierre mensual del histórico previo a la plataforma (fechado a fin de mes,
+  // sin área ni descripción). El interruptor de /reportes lo usa para incluirlo o no.
+  historico: boolean
 }
 
 // Usuario para el filtro: id (valor/identidad) + label a mostrar (nombre, o

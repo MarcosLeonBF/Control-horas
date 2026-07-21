@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedBancoHoras, getCachedProyectosEstado, getCachedHorasProvisionales, getCachedHorasProvisionalesSetup, type ProyectoEstado, type HorasProvisionales } from '@/lib/graph/client'
 import { computeHorasStatus, HORAS_SEVERITY, type BancoHorasRow, type BancoHorasDetalle, type AmpliacionHoras, type MovimientoBanco, type BancoMensual, type BancoDetalleMensual } from '@/lib/horas/bancos-status'
 import type { BancoHorasProyecto } from '@/lib/types'
-import { currentMonth } from '@/lib/horas/format'
+import { currentMonth, finDeMes } from '@/lib/horas/format'
 import { ultimoRegistroGlobal, mesesVentana, provisionalPorPosicion } from '@/lib/horas/provisionales'
 import { carrySplit } from '@/lib/horas/carry-forward'
 
@@ -23,12 +23,6 @@ const key = (project: string, position: string) => `${project}\0${position}`
 
 // Fila del histórico mensual tal como la consume el banco.
 type HistoricaRow = { project: string; month: string; hours: number; user_id: string }
-
-// El último día de un mes 'YYYY-MM' (para fechar el movimiento de cierre mensual).
-function finDeMes(month: string): string {
-  const [y, m] = month.split('-').map(Number)
-  return `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
-}
 
 // Catálogo de posiciones + qué posiciones quedan dentro del alcance.
 async function loadPositionContext(scope: BancosScope) {
