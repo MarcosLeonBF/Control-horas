@@ -83,7 +83,7 @@ begin
   ok := true;
   begin perform public.guardar_registro(null, jsonb_build_array(
     jsonb_build_object('entry_date', current_date,      'project','X','area_id',v_area,'department','Clientes','etapa_id',v_etapa,'hours',1,'description',v_libre),
-    jsonb_build_object('entry_date', current_date - 10, 'project','Y','area_id',v_area,'department','Clientes','etapa_id',v_etapa,'hours',1,'description',v_libre))); ok := false;
+    jsonb_build_object('entry_date', current_date - 40, 'project','Y','area_id',v_area,'department','Clientes','etapa_id',v_etapa,'hours',1,'description',v_libre))); ok := false;
   exception when others then null; end;
   if not ok then raise exception 'línea con fecha vieja no fue rechazada para operativo'; end if;
 
