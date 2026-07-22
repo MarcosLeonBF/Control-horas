@@ -378,8 +378,8 @@ export default function ReportesView({
                             className="grid grid-cols-[6rem_1fr_4.5rem] items-baseline gap-3 py-1.5 pr-5 pl-13 text-xs"
                           >
                             <span className="tabular-money text-muted-foreground">{formatFechaISO(l.date)}</span>
-                            <span className="truncate text-foreground/80" title={l.description || undefined}>
-                              {l.description || '—'}
+                            <span className="truncate text-foreground/80" title={l.description || (l.historico ? 'Histórico' : undefined)}>
+                              {l.description || (l.historico ? 'Histórico' : '—')}
                             </span>
                             <span className="text-right tabular-money font-medium">{formatHoras(l.hours)}</span>
                           </li>
