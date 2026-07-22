@@ -61,3 +61,39 @@ test('aplicarSync crea proyectos con base, asigna manager y reporta no-matcheado
   await db.from('projects').delete().like('name', 'Sync E2E%')
   await db.auth.admin.deleteUser(mgrId)
 })
+
+test('aplicarSync archiva un proyecto que cae a Hucha=0 y lo reactiva si vuelve', async () => {
+  const proyecto = `Sync E2E Archivar ${Date.now()}`
+
+  // 1) Alta con presupuesto -> queda activo.
+  const r1 = await aplicarSync({ proyectos: [{ proyecto, hucha: 2500 }], managerPorProyecto: new Map() }, db)
+  expect(r1.proyectosCreados).toBe(1)
+  const { data: p1 } = await db.from('projects').select('id, status').eq('name', proyecto).single()
+  expect(p1!.status).toBe('activo')
+
+  // 2) Cae a 0 en el Excel -> se archiva; el banco NO se toca.
+  const r2 = await aplicarSync({ proyectos: [{ proyecto, hucha: 0 }], managerPorProyecto: new Map() }, db)
+  expect(r2.proyectosArchivados).toBe(1)
+  expect(r2.saltadosSinHucha).toBe(0)
+  const { data: p2 } = await db.from('projects').select('status').eq('id', p1!.id).single()
+  expect(p2!.status).toBe('archivado')
+  const { data: bank2 } = await db.from('hucha_banks').select('excel_hucha, assigned_total').eq('project_id', p1!.id).single()
+  expect(Number(bank2!.excel_hucha)).toBe(2500)
+  expect(Number(bank2!.assigned_total)).toBe(2500)
+
+  // 3) Re-sync con 0 otra vez -> ya archivado, nada que hacer.
+  const r3 = await aplicarSync({ proyectos: [{ proyecto, hucha: 0 }], managerPorProyecto: new Map() }, db)
+  expect(r3.proyectosArchivados).toBe(0)
+  expect(r3.saltadosSinHucha).toBe(1)
+
+  // 4) Vuelve con presupuesto -> se reactiva y recupera base.
+  const r4 = await aplicarSync({ proyectos: [{ proyecto, hucha: 3000 }], managerPorProyecto: new Map() }, db)
+  expect(r4.proyectosReactivados).toBe(1)
+  const { data: p4 } = await db.from('projects').select('status').eq('id', p1!.id).single()
+  expect(p4!.status).toBe('activo')
+  const { data: bank4 } = await db.from('hucha_banks').select('excel_hucha, assigned_total').eq('project_id', p1!.id).single()
+  expect(Number(bank4!.excel_hucha)).toBe(3000)
+
+  // Limpieza (cascade borra banco y movimientos).
+  await db.from('projects').delete().like('name', 'Sync E2E Archivar%')
+})

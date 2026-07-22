@@ -5,6 +5,8 @@ export interface HuchaExcelData { proyectos: ExcelProyecto[]; managerPorProyecto
 export interface SyncReport {
   proyectosCreados: number
   proyectosActualizados: number
+  proyectosArchivados: number
+  proyectosReactivados: number
   managersAsignados: number
   managersNoEncontrados: { proyecto: string; manager: string }[]
   saltadosSinHucha: number
@@ -13,8 +15,9 @@ export interface SyncReport {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function aplicarSync(data: HuchaExcelData, db: SupabaseClient<any>): Promise<SyncReport> {
   const report: SyncReport = {
-    proyectosCreados: 0, proyectosActualizados: 0, managersAsignados: 0,
-    managersNoEncontrados: [], saltadosSinHucha: 0,
+    proyectosCreados: 0, proyectosActualizados: 0,
+    proyectosArchivados: 0, proyectosReactivados: 0,
+    managersAsignados: 0, managersNoEncontrados: [], saltadosSinHucha: 0,
   }
 
   // Cargar perfiles una vez para matchear manager por nombre (case-insensitive).
@@ -27,13 +30,31 @@ export async function aplicarSync(data: HuchaExcelData, db: SupabaseClient<any>)
   }
 
   for (const { proyecto, hucha } of data.proyectos) {
-    if (!(hucha > 0)) { report.saltadosSinHucha++; continue }
+    if (!(hucha > 0)) {
+      // Hucha = 0 en el Excel: archivar si el proyecto existe y está activo; si no, saltar.
+      const { data: existing } = await db.from('projects').select('id, status').eq('name', proyecto).maybeSingle()
+      if (existing && existing.status === 'activo') {
+        const { error } = await db.from('projects').update({ status: 'archivado' }).eq('id', existing.id)
+        if (error) throw new Error(`archivar "${proyecto}": ${error.message}`)
+        report.proyectosArchivados++
+      } else {
+        report.saltadosSinHucha++
+      }
+      continue
+    }
 
     // Upsert proyecto por nombre.
-    const { data: existing } = await db.from('projects').select('id').eq('name', proyecto).maybeSingle()
+    const { data: existing } = await db.from('projects').select('id, status').eq('name', proyecto).maybeSingle()
     let projectId: string
-    if (existing) { projectId = existing.id; report.proyectosActualizados++ }
-    else {
+    if (existing) {
+      projectId = existing.id
+      report.proyectosActualizados++
+      if (existing.status === 'archivado') {
+        const { error } = await db.from('projects').update({ status: 'activo' }).eq('id', projectId)
+        if (error) throw new Error(`reactivar "${proyecto}": ${error.message}`)
+        report.proyectosReactivados++
+      }
+    } else {
       const { data: created, error } = await db.from('projects').insert({ name: proyecto }).select('id').single()
       if (error) throw new Error(`crear proyecto "${proyecto}": ${error.message}`)
       projectId = created.id; report.proyectosCreados++
