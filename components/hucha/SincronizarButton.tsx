@@ -28,6 +28,8 @@ export default function SincronizarButton() {
         <div className="rounded-lg border border-border p-4 text-sm">
           <p>Proyectos creados: <strong>{report.proyectosCreados}</strong></p>
           <p>Proyectos actualizados: <strong>{report.proyectosActualizados}</strong></p>
+          <p>Proyectos archivados (perdieron su HUCHA): <strong>{report.proyectosArchivados}</strong></p>
+          <p>Proyectos reactivados: <strong>{report.proyectosReactivados}</strong></p>
           <p>Managers asignados: <strong>{report.managersAsignados}</strong></p>
           <p>Saltados (sin HUCHA): <strong>{report.saltadosSinHucha}</strong></p>
           {report.managersNoEncontrados.length > 0 && (
