@@ -15,6 +15,13 @@ import NativeSelect from '@/components/ui/native-select'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
+// Piso mínimo de registro (espejo de guardar_registro, migración 0039):
+// normal 7 días; en julio 2026 se relaja al 01/07 (el más permisivo). Solo pista de UI.
+const registroMinDate = () => {
+  const base = daysAgo(7)
+  if (today() > '2026-07-31') return base
+  return base < '2026-07-01' ? base : '2026-07-01'
+}
 // El departamento solo aplica al proyecto "Departamento". El resto de líneas lo
 // llevan fijo en 'Clientes' (valor canónico histórico; la RPC también lo normaliza).
 // No usar departamentos[0]: el catálogo es editable y su primer nombre cambia.
@@ -161,7 +168,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
     const deptDescripciones = isDep ? descripciones : []
 
     const fecha = (
-      <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : daysAgo(14)}
+      <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : registroMinDate()}
         onChange={(e) => update(i, { entry_date: e.target.value })} />
     )
     const proyecto = (
@@ -222,10 +229,10 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
       <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
         <label htmlFor="fecha" className="text-sm font-medium text-foreground">Fecha por defecto</label>
         <Input
-          id="fecha" type="date" value={defaultDate} max={today()} min={canBackdate ? undefined : daysAgo(14)}
+          id="fecha" type="date" value={defaultDate} max={today()} min={canBackdate ? undefined : registroMinDate()}
           onChange={(e) => changeDefaultDate(e.target.value)} className="w-auto"
         />
-        {!canBackdate && <span className="text-xs text-muted-foreground">Hasta 14 días atrás</span>}
+        {!canBackdate && <span className="text-xs text-muted-foreground">{today() <= '2026-07-31' ? 'En julio podés registrar desde el 1' : 'Hasta 7 días atrás'}</span>}
       </div>
 
       {/* Escritorio: tabla */}
