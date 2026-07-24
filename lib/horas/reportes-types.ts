@@ -117,3 +117,12 @@ export function conMesesVacios(rows: AggRow[], from: string, to: string): AggRow
     .map((m) => ({ key: m, label: mesCorto(m), hours: 0 }))
   return [...rows, ...vacios].sort((a, b) => b.key.localeCompare(a.key))
 }
+
+// Segunda línea del desglose de /reportes: "Etapa · Motivo". Se descartan las partes
+// vacías y las que valen '—' (getReporteLines rellena así la etapa que falta), para que
+// no quede un separador colgando. El histórico no trae motivo: se rotula "Histórico",
+// igual que en la descarga de Detalle.
+export function detalleDeLinea(line: ReporteLine): string {
+  const motivo = line.description || (line.historico ? 'Histórico' : '')
+  return [line.etapa, motivo].filter((p) => p && p !== '—').join(' · ')
+}

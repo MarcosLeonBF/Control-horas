@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { mesesEnRango } from '../lib/horas/format'
 import type { ReporteLine } from '../lib/horas/reportes-types'
-import { aggregate, conMesesVacios } from '../lib/horas/reportes-types'
+import { aggregate, conMesesVacios, detalleDeLinea } from '../lib/horas/reportes-types'
 
 // Línea mínima: para agrupar por mes solo importan `date` y `hours`.
 const linea = (date: string, hours: number): ReporteLine => ({
@@ -60,4 +60,34 @@ test('conMesesVacios no duplica un mes que ya venía', () => {
 // años daría 36 filas huecas que no dicen nada.
 test('conMesesVacios sin filas no inventa meses', () => {
   expect(conMesesVacios([], '2024-01-01', '2026-12-31')).toEqual([])
+})
+
+// Línea a medida: aquí lo que importa son `etapa`, `description` e `historico`.
+const conDetalle = (etapa: string, description: string, historico = false): ReporteLine => ({
+  date: '2026-07-15', project: 'Vancubic', area: 'Área', etapa, department: 'Clientes',
+  userId: 'u1', user: 'Usuario', position: 'Posición', hours: 1, description,
+  isInternal: false, historico,
+})
+
+test('detalleDeLinea junta etapa y motivo con un punto medio', () => {
+  expect(detalleDeLinea(conDetalle('Servicios Mensuales', 'Ajustes del CRM')))
+    .toBe('Servicios Mensuales · Ajustes del CRM')
+})
+
+// getReporteLines rellena `etapa` con '—' cuando falta, no con cadena vacía.
+test('detalleDeLinea descarta la etapa cuando vale la raya', () => {
+  expect(detalleDeLinea(conDetalle('—', 'Ajustes del CRM'))).toBe('Ajustes del CRM')
+})
+
+test('detalleDeLinea sin motivo deja solo la etapa, sin separador colgando', () => {
+  expect(detalleDeLinea(conDetalle('Desarrollo', ''))).toBe('Desarrollo')
+})
+
+test('detalleDeLinea rotula el historico donde iria el motivo', () => {
+  expect(detalleDeLinea(conDetalle('Servicios Mensuales', '', true)))
+    .toBe('Servicios Mensuales · Histórico')
+})
+
+test('detalleDeLinea sin nada que decir devuelve cadena vacia', () => {
+  expect(detalleDeLinea(conDetalle('—', ''))).toBe('')
 })
