@@ -23,8 +23,8 @@ export function formatFechaISO(iso: string): string {
   return y && m && d ? `${d}/${m}/${y}` : iso
 }
 
-// 'YYYY-MM' → "Julio 2026" (es-ES, inicial mayúscula). Si no es un mes válido,
-// devuelve la entrada tal cual. timeZone UTC para no deslizarse de mes.
+// 'YYYY-MM' → "Julio de 2026" (es-ES, inicial mayúscula; el "de" lo pone Intl). Si no
+// es un mes válido, devuelve la entrada tal cual. timeZone UTC para no deslizarse de mes.
 const MES = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 export function formatMes(month: string): string {
@@ -61,4 +61,17 @@ export function finDeMes(month: string): string {
 export function addMonths(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 7)
+}
+
+// Los meses ('YYYY-MM') que toca un rango de fechas ISO, en orden y con los dos
+// extremos incluidos ('2026-06-15' → '2026-08-03' da junio, julio y agosto). La vista
+// por mes de /reportes lo usa para rellenar los meses del rango que no tienen ni una
+// línea. Si `to` es anterior a `from`, no hay meses.
+export function mesesEnRango(from: string, to: string): string[] {
+  const fin = to.slice(0, 7)
+  const meses: string[] = []
+  // Comparación de cadenas: 'YYYY-MM' ordena lexicográficamente igual que
+  // cronológicamente, así que no hace falta pasar por Date.
+  for (let m = from.slice(0, 7); m <= fin; m = addMonths(m, 1)) meses.push(m)
+  return meses
 }

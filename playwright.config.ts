@@ -14,14 +14,14 @@ export default defineConfig({
     },
     {
       name: 'node-horas',
-      testMatch: ['**/horas-alertas.spec.ts', '**/horas-carry.spec.ts'],
+      testMatch: ['**/horas-alertas.spec.ts', '**/horas-carry.spec.ts', '**/horas-reportes-mes.spec.ts'],
     },
     { name: 'chromium', use: { storageState: 'e2e/.auth/manager.json' }, testIgnore: ['**/horas-*.spec.ts', '**/hucha-sync.spec.ts', '**/hucha-sync-ui.spec.ts', '**/hucha-admin-*.spec.ts'] },
     {
       name: 'chromium-horas',
       use: { storageState: 'e2e/.auth/operativo.json' },
       testMatch: '**/horas-*.spec.ts',
-      testIgnore: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos*.spec.ts', '**/horas-reportes.spec.ts', '**/horas-alertas.spec.ts', '**/horas-usuarios-editar.spec.ts', '**/horas-usuarios-alta-delegada.spec.ts', '**/horas-auditoria.spec.ts', '**/horas-registros-editar.spec.ts', '**/horas-carry.spec.ts'],
+      testIgnore: ['**/horas-alta-usuario.spec.ts', '**/horas-equipo.spec.ts', '**/horas-bancos*.spec.ts', '**/horas-reportes.spec.ts', '**/horas-alertas.spec.ts', '**/horas-usuarios-editar.spec.ts', '**/horas-usuarios-alta-delegada.spec.ts', '**/horas-auditoria.spec.ts', '**/horas-registros-editar.spec.ts', '**/horas-carry.spec.ts', '**/horas-reportes-mes.spec.ts'],
     },
     {
       name: 'chromium-horas-admin',
