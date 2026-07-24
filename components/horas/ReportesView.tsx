@@ -1,9 +1,9 @@
 'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
-import { ChevronRight, Download, Filter, X } from 'lucide-react'
-import type { ReporteLine, ReporteFilterOptions, GroupBy, AggRow } from '@/lib/horas/reportes-types'
-import { GROUP_LABELS, GROUP_ORDER, aggregate, conMesesVacios, detalleDeLinea, groupKeyOf } from '@/lib/horas/reportes-types'
+import { ChevronDown, ChevronRight, ChevronUp, Download, Filter, X } from 'lucide-react'
+import type { ReporteLine, ReporteFilterOptions, GroupBy, AggRow, OrdenTabla } from '@/lib/horas/reportes-types'
+import { GROUP_LABELS, GROUP_ORDER, aggregate, conMesesVacios, detalleDeLinea, groupKeyOf, ordenarFilas } from '@/lib/horas/reportes-types'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -112,10 +112,17 @@ export default function ReportesView({
   // El histórico son cierres MENSUALES previos a la plataforma (fechados a fin de mes,
   // sin área ni descripción). Se incluye por defecto; el interruptor deja verlo aparte.
   const [conHistorico, setConHistorico] = useState(true)
+  // Orden manual de la tabla. null = el orden por defecto de la dimensión activa.
+  const [orden, setOrden] = useState<OrdenTabla>(null)
   const hayHistorico = useMemo(() => lines.some((l) => l.historico), [lines])
 
   // Nombre a mostrar por usuario (con email si hay homónimos), indexado por id.
   const userLabel = useMemo(() => new Map(options.users.map((u) => [u.id, u.label])), [options.users])
+
+  // Etiqueta a mostrar de una clave (los usuarios llevan email si hay homónimos).
+  // Vive aquí arriba porque el useMemo de `rows` la usa para ordenar alfabéticamente:
+  // declarada más abajo daría ReferenceError al ejecutarse el memo durante el render.
+  const labelDe = (dim: GroupBy, row: AggRow) => (dim === 'user' ? (userLabel.get(row.key) ?? row.label) : row.label)
 
   const filtered = useMemo(
     () =>
@@ -134,8 +141,9 @@ export default function ReportesView({
     const base = aggregate(filtered, groupBy)
     // Solo Mes rellena huecos. Rellenar días vacíos metería cada fin de semana y cada
     // festivo como fila: ruido, no información.
-    return groupBy === 'month' ? conMesesVacios(base, from, to) : base
-  }, [filtered, groupBy, from, to])
+    const conHuecos = groupBy === 'month' ? conMesesVacios(base, from, to) : base
+    return ordenarFilas(conHuecos, orden, (r) => labelDe(groupBy, r))
+  }, [filtered, groupBy, from, to, orden, labelDe])
 
   const totals = useMemo(() => {
     let total = 0
@@ -155,6 +163,22 @@ export default function ReportesView({
   // ahí el ordinal afirmaría un puesto que no existe ("Jul 2026 es el nº 1" cuando
   // julio solo es el más reciente).
   const esTiempo = groupBy === 'month' || groupBy === 'date'
+  // El ordinal solo se muestra cuando la tabla es el ranking que el número dice ser:
+  // orden por defecto y dimensión no temporal.
+  const mostrarOrdinal = !esTiempo && orden === null
+
+  function ordenarPor(col: 'label' | 'hours') {
+    // Primer clic según el tipo de dato, como en una hoja de cálculo: texto A→Z,
+    // números de mayor a menor. El segundo invierte.
+    setOrden((prev) =>
+      prev?.col === col
+        ? { col, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { col, dir: col === 'label' ? 'asc' : 'desc' },
+    )
+  }
+
+  const caret = (col: 'label' | 'hours') =>
+    orden?.col !== col ? null : orden.dir === 'asc' ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />
 
   // --- Drill-down -----------------------------------------------------------
   // El desglose es siempre por usuario; si ya agrupamos por usuario, por proyecto
@@ -188,8 +212,6 @@ export default function ReportesView({
       return next
     })
   }
-  // Etiqueta a mostrar de una clave (los usuarios llevan email si hay homónimos).
-  const labelDe = (dim: GroupBy, row: AggRow) => (dim === 'user' ? (userLabel.get(row.key) ?? row.label) : row.label)
 
   // Resumen agrupado (consumo por la dimensión elegida).
   function buildResumen(): ExportRow[] {
@@ -287,7 +309,9 @@ export default function ReportesView({
             {GROUP_ORDER.map((g) => (
               <button
                 key={g}
-                onClick={() => setGroupBy(g)}
+                // "Ordenar por horas" no significa lo mismo en Proyecto que en Mes:
+                // cambiar de dimensión vuelve al orden por defecto de la nueva.
+                onClick={() => { setGroupBy(g); setOrden(null) }}
                 className={cn(
                   'shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
                   groupBy === g ? 'bg-(--brand) text-white shadow-sm' : 'text-foreground/55 hover:text-foreground',
@@ -332,10 +356,24 @@ export default function ReportesView({
         <div className="grid grid-cols-[2.5rem_1fr_minmax(8rem,1.4fr)_5rem_3.5rem] items-center gap-3 border-b border-border bg-(--muted-surface) px-5 py-3 text-[0.7rem] uppercase tracking-[0.12em] text-muted-foreground">
           {/* La columna no se colapsa: ROW_GRID la comparten esta tabla y el nivel 1
               del modal, y estrecharla desalinearía el modal. */}
-          <span className="text-right">{esTiempo ? '' : '#'}</span>
-          <span>{dimLabel}</span>
+          <span className="text-right">{mostrarOrdinal ? '#' : ''}</span>
+          <button
+            type="button"
+            onClick={() => ordenarPor('label')}
+            title={`Ordenar por ${dimLabel.toLowerCase()}`}
+            className="inline-flex items-center gap-1 text-left uppercase tracking-[0.12em] transition-colors hover:text-foreground focus:outline-none focus-visible:text-foreground"
+          >
+            {dimLabel}{caret('label')}
+          </button>
           <span>Reparto</span>
-          <span className="text-right">Horas</span>
+          <button
+            type="button"
+            onClick={() => ordenarPor('hours')}
+            title="Ordenar por horas"
+            className="inline-flex items-center justify-end gap-1 uppercase tracking-[0.12em] transition-colors hover:text-foreground focus:outline-none focus-visible:text-foreground"
+          >
+            Horas{caret('hours')}
+          </button>
           <span className="text-right">%</span>
         </div>
         {rows.length === 0 ? (
@@ -347,7 +385,7 @@ export default function ReportesView({
             {rows.map((r, i) => (
               <li key={r.key} className="border-b border-border/60 last:border-0">
                 <RankRow
-                  leading={esTiempo ? '' : i + 1}
+                  leading={mostrarOrdinal ? i + 1 : ''}
                   label={labelDe(groupBy, r)}
                   hours={r.hours}
                   pct={totals.total > 0 ? (r.hours / totals.total) * 100 : 0}
