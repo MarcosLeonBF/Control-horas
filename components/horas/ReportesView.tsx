@@ -151,6 +151,10 @@ export default function ReportesView({
   const max = rows.reduce((m, r) => Math.max(m, r.hours), 0)
   const hasFilters = fProject || fUser || fArea || fPosition
   const dimLabel = GROUP_LABELS[groupBy]
+  // La tabla es un ranking, pero las dimensiones de tiempo van en orden cronológico:
+  // ahí el ordinal afirmaría un puesto que no existe ("Jul 2026 es el nº 1" cuando
+  // julio solo es el más reciente).
+  const esTiempo = groupBy === 'month' || groupBy === 'date'
 
   // --- Drill-down -----------------------------------------------------------
   // El desglose es siempre por usuario; si ya agrupamos por usuario, por proyecto
@@ -326,7 +330,9 @@ export default function ReportesView({
         <div className="overflow-x-auto">
         <div className="min-w-136">
         <div className="grid grid-cols-[2.5rem_1fr_minmax(8rem,1.4fr)_5rem_3.5rem] items-center gap-3 border-b border-border bg-(--muted-surface) px-5 py-3 text-[0.7rem] uppercase tracking-[0.12em] text-muted-foreground">
-          <span className="text-right">#</span>
+          {/* La columna no se colapsa: ROW_GRID la comparten esta tabla y el nivel 1
+              del modal, y estrecharla desalinearía el modal. */}
+          <span className="text-right">{esTiempo ? '' : '#'}</span>
           <span>{dimLabel}</span>
           <span>Reparto</span>
           <span className="text-right">Horas</span>
@@ -341,7 +347,7 @@ export default function ReportesView({
             {rows.map((r, i) => (
               <li key={r.key} className="border-b border-border/60 last:border-0">
                 <RankRow
-                  leading={i + 1}
+                  leading={esTiempo ? '' : i + 1}
                   label={labelDe(groupBy, r)}
                   hours={r.hours}
                   pct={totals.total > 0 ? (r.hours / totals.total) * 100 : 0}
