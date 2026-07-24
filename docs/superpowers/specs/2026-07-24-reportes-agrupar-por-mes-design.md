@@ -57,7 +57,10 @@ dimensión `date` y el ordinal de ranking sobre listas cronológicas.
   - `GroupBy` gana `'month'`; `GROUP_LABELS.month = 'Mes'`; `GROUP_ORDER` la inserta
     entre `'position'` y `'date'`.
   - `KEY.month`: clave `l.date.slice(0, 7)` (ISO, ordena cronológicamente sola),
-    etiqueta `formatMes()` → "Julio 2026". `formatMes` ya existe.
+    etiqueta `mesCorto()` → "Jul 2026". Ya existe y es la forma en que la app rotula
+    meses en la matriz de histórico, el detalle de banco y los gráficos de carry.
+    No se usa `formatMes`: en es-ES devuelve "Julio **de** 2026" (el comentario del
+    propio helper dice "Julio 2026" y está mal; se corrige de paso).
   - `aggregate`: el orden cronológico descendente pasa a aplicarse a `'date'`
     **y** `'month'`.
   - `conMesesVacios(rows, from, to): AggRow[]` — completa los meses del rango que la
