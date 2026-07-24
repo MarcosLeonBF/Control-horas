@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { ChevronRight, Download, Filter, X } from 'lucide-react'
 import type { ReporteLine, ReporteFilterOptions, GroupBy, AggRow } from '@/lib/horas/reportes-types'
-import { GROUP_LABELS, GROUP_ORDER, aggregate, groupKeyOf } from '@/lib/horas/reportes-types'
+import { GROUP_LABELS, GROUP_ORDER, aggregate, conMesesVacios, groupKeyOf } from '@/lib/horas/reportes-types'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -54,7 +54,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 // principal (leading = nº de orden) y el nivel 1 del modal (leading = chevron).
 // Si recibe onClick se renderiza como <button> (foco y Enter/Espacio nativos).
 function RankRow({
-  leading, label, hours, pct, barW, onClick,
+  leading, label, hours, pct, barW, onClick, muted = false,
 }: {
   leading: ReactNode
   label: string
@@ -62,15 +62,17 @@ function RankRow({
   pct: number
   barW: number
   onClick?: () => void
+  // Fila sin horas (un mes vacío del rango): se lee como hueco, no como fila rota.
+  muted?: boolean
 }) {
   const inner = (
     <>
       <span className="text-right text-xs tabular-money text-muted-foreground">{leading}</span>
-      <span className="truncate text-left font-medium text-foreground" title={label}>{label}</span>
+      <span className={cn('truncate text-left', muted ? 'text-muted-foreground' : 'font-medium text-foreground')} title={label}>{label}</span>
       <span className="h-2 overflow-hidden rounded-full bg-(--muted-surface)">
         <span className="block h-full rounded-full bg-(--brand)" style={{ width: `${barW}%` }} />
       </span>
-      <span className="text-right tabular-money font-medium">{formatHoras(hours)}</span>
+      <span className={cn('text-right tabular-money', muted ? 'text-muted-foreground' : 'font-medium')}>{formatHoras(hours)}</span>
       <span className="text-right text-xs tabular-money text-muted-foreground">{pct.toFixed(0)}%</span>
     </>
   )
@@ -128,7 +130,12 @@ export default function ReportesView({
     [lines, conHistorico, fProject, fUser, fArea, fPosition],
   )
 
-  const rows = useMemo(() => aggregate(filtered, groupBy), [filtered, groupBy])
+  const rows = useMemo(() => {
+    const base = aggregate(filtered, groupBy)
+    // Solo Mes rellena huecos. Rellenar días vacíos metería cada fin de semana y cada
+    // festivo como fila: ruido, no información.
+    return groupBy === 'month' ? conMesesVacios(base, from, to) : base
+  }, [filtered, groupBy, from, to])
 
   const totals = useMemo(() => {
     let total = 0
@@ -185,10 +192,15 @@ export default function ReportesView({
     return rows.map((r) => ({ [dimLabel]: groupBy === 'user' ? (userLabel.get(r.key) ?? r.label) : r.label, Horas: r.hours }))
   }
   // Detalle: líneas de registro crudas (§17.5 "descarga de líneas de registro").
+  // El histórico no trae descripción: se rotula "Histórico" igual que en pantalla, para
+  // que en la descarga se distinga de un registro de la plataforma al que le falta el
+  // motivo (ese sí se va en blanco). El área del histórico se queda en "—": esa hoja
+  // tampoco la trae y se decidió no inventarla.
   function buildDetalle(): ExportRow[] {
     return filtered.map((l) => ({
       Fecha: l.date, Usuario: userLabel.get(l.userId) ?? l.user, Posición: l.position, Proyecto: l.project, Área: l.area,
-      Departamento: l.department, Etapa: l.etapa, Horas: l.hours, Descripción: l.description,
+      Departamento: l.department, Etapa: l.etapa, Horas: l.hours,
+      Descripción: l.description || (l.historico ? 'Histórico' : ''),
     }))
   }
   // Registros de horas: totales diarios por usuario (§17.5 "descarga de registros de horas").
@@ -301,6 +313,14 @@ export default function ReportesView({
         </div>
       </div>
 
+      {/* Agrupando por mes con un rango dentro del mismo mes sale una única fila al
+          100%, que se lee como un fallo. El rango no se toca: es del manager. */}
+      {groupBy === 'month' && from.slice(0, 7) === to.slice(0, 7) && (
+        <p className="text-sm text-muted-foreground">
+          Solo hay un mes en el rango. Amplía las fechas para comparar mes a mes.
+        </p>
+      )}
+
       {/* Tabla */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
@@ -326,7 +346,10 @@ export default function ReportesView({
                   hours={r.hours}
                   pct={totals.total > 0 ? (r.hours / totals.total) * 100 : 0}
                   barW={max > 0 ? (r.hours / max) * 100 : 0}
-                  onClick={() => abrirFila(r)}
+                  // Sin horas no hay desglose que abrir: RankRow cae a <div> y pierde
+                  // foco y cursor sin trabajo extra.
+                  onClick={r.hours > 0 ? () => abrirFila(r) : undefined}
+                  muted={r.hours === 0}
                 />
               </li>
             ))}
