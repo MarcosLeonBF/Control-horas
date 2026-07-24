@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { ChevronRight, Download, Filter, X } from 'lucide-react'
 import type { ReporteLine, ReporteFilterOptions, GroupBy, AggRow } from '@/lib/horas/reportes-types'
-import { GROUP_LABELS, GROUP_ORDER, aggregate, conMesesVacios, groupKeyOf } from '@/lib/horas/reportes-types'
+import { GROUP_LABELS, GROUP_ORDER, aggregate, conMesesVacios, detalleDeLinea, groupKeyOf } from '@/lib/horas/reportes-types'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -401,18 +401,23 @@ export default function ReportesView({
                     />
                     {abierto && (
                       <ul className="border-t border-border/40 bg-(--muted-surface)/40 py-1">
-                        {registrosDe(sr.key).map((l, i) => (
-                          <li
-                            key={`${l.date}-${i}`}
-                            className="grid grid-cols-[6rem_1fr_4.5rem] items-baseline gap-3 py-1.5 pr-5 pl-13 text-xs"
-                          >
-                            <span className="tabular-money text-muted-foreground">{formatFechaISO(l.date)}</span>
-                            <span className="truncate text-foreground/80" title={l.description || (l.historico ? 'Histórico' : undefined)}>
-                              {l.description || (l.historico ? 'Histórico' : '—')}
-                            </span>
-                            <span className="text-right tabular-money font-medium">{formatHoras(l.hours)}</span>
-                          </li>
-                        ))}
+                        {registrosDe(sr.key).map((l, i) => {
+                          const detalle = detalleDeLinea(l)
+                          return (
+                            <li key={`${l.date}-${i}`} className="py-1.5 pr-5 pl-13 text-xs">
+                              <div className="grid grid-cols-[6rem_1fr_4.5rem] items-baseline gap-3">
+                                <span className="tabular-money text-muted-foreground">{formatFechaISO(l.date)}</span>
+                                <span className="truncate text-foreground/80" title={l.project}>{l.project}</span>
+                                <span className="text-right tabular-money font-medium">{formatHoras(l.hours)}</span>
+                              </div>
+                              {/* Sangría = ancho de la columna de fecha (6rem) + el hueco de
+                                  la rejilla (gap-3 = 0.75rem), para alinear con el proyecto. */}
+                              {detalle && (
+                                <p className="truncate pl-27 text-muted-foreground" title={detalle}>{detalle}</p>
+                              )}
+                            </li>
+                          )
+                        })}
                       </ul>
                     )}
                   </li>
