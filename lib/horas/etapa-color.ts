@@ -23,17 +23,31 @@ function normalizar(name: string): string {
   return name.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
-// Orden fijo para las etapas que ya existen. No es decorativo: garantiza que las tres
-// que copan las líneas de cliente salgan en tonos distintos, cosa que un hash no puede
-// prometer. Si una etapa nueva se vuelve importante, se añade aquí a mano — una decisión
-// deliberada, no un sorteo.
+// Reparto fijo de las 11 etapas del catálogo. No es decorativo y no se deja al hash: un
+// hash agolpa (la primera versión dejaba el rosa sin usar y el violeta en cuatro etapas).
+//
+// Con 11 etapas y 4 tonos, repetir es inevitable —eso no lo arregla ningún reparto—. Lo
+// que sí se puede garantizar, y es lo que hace esta tabla:
+//   · los cuatro tonos se usan;
+//   · las etapas que más aparecen salen todas distintas;
+//   · dentro de la familia "Gastos Generales", que se ve junta en las filas internas,
+//     ninguna comparte tono con otra de la familia.
+// Si una etapa nueva se vuelve importante, se añade aquí a mano: una decisión, no un
+// sorteo.
 const SLOT_FIJO: Readonly<Record<string, number>> = {
+  // Cliente, por volumen de líneas
   'servicios mensuales': 0,
   setup: 1,
   'sales coach': 2,
-  'captacion de talento': 3,
-  'servicios adicionales': 0,
-  crm: 1,
+  'captacion de talento': 1,
+  crm: 2,
+  'servicios adicionales': 3,
+  // Internas: la familia entera separada entre sí
+  'gastos generales clientes': 3,
+  'gastos generales corporativos': 0,
+  'gastos generales ventas': 1,
+  'gastos generales marketing': 2,
+  'gastos indirectos captacion': 3,
 }
 
 export function etapaColor(etapa: string): string {

@@ -130,9 +130,27 @@ test('etapaColor es estable: la misma etapa siempre da el mismo color', () => {
   expect(etapaColor('Setup')).toBe(etapaColor('Setup'))
 })
 
-test('las tres etapas que copan las lineas de cliente salen en tonos distintos', () => {
-  const tonos = ['Servicios Mensuales', 'Setup', 'Sales Coach'].map(etapaColor)
-  expect(new Set(tonos).size).toBe(3)
+test('las cuatro etapas que mas aparecen salen en tonos distintos', () => {
+  const tonos = ['Servicios Mensuales', 'Gastos Generales Clientes', 'Setup', 'Sales Coach'].map(etapaColor)
+  expect(new Set(tonos).size).toBe(4)
+})
+
+// La familia "Gastos Generales" se ve junta en las filas internas: ahí el color tiene que
+// separar, no agolpar.
+test('ninguna etapa de Gastos Generales comparte tono con otra de la familia', () => {
+  const familia = ['Gastos Generales Clientes', 'Gastos Generales Corporativos', 'Gastos Generales Ventas', 'Gastos Generales Marketing']
+  expect(new Set(familia.map(etapaColor)).size).toBe(familia.length)
+})
+
+// Un reparto que deja un tono sin usar desperdicia un cuarto de la paleta, que es justo
+// lo que hacía el hash.
+test('el catalogo entero usa los cuatro tonos', () => {
+  const catalogo = [
+    'Servicios Mensuales', 'Setup', 'Sales Coach', 'Captación de Talento', 'CRM', 'Servicios Adicionales',
+    'Gastos Generales Clientes', 'Gastos Generales Corporativos', 'Gastos Generales Ventas',
+    'Gastos Generales Marketing', 'Gastos Indirectos Captación',
+  ]
+  expect(new Set(catalogo.map(etapaColor)).size).toBe(4)
 })
 
 test('etapaColor tolera acentos y mayusculas del catalogo', () => {
