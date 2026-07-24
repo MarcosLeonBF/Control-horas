@@ -1,8 +1,8 @@
 // Tipos y agregación del reporte de horas. SIN imports de servidor (lo usa el
 // componente cliente y la página). format.ts es puro (solo Intl), sin servidor.
-import { formatFechaISO } from '@/lib/horas/format'
+import { formatFechaISO, mesCorto } from '@/lib/horas/format'
 
-export type GroupBy = 'project' | 'user' | 'area' | 'department' | 'etapa' | 'position' | 'date'
+export type GroupBy = 'project' | 'user' | 'area' | 'department' | 'etapa' | 'position' | 'month' | 'date'
 
 export const GROUP_LABELS: Record<GroupBy, string> = {
   project: 'Proyecto',
@@ -11,10 +11,12 @@ export const GROUP_LABELS: Record<GroupBy, string> = {
   department: 'Departamento',
   etapa: 'Etapa',
   position: 'Posición',
+  month: 'Mes',
   date: 'Fecha',
 }
 
-export const GROUP_ORDER: GroupBy[] = ['project', 'user', 'area', 'department', 'etapa', 'position', 'date']
+// 'month' va entre 'position' y 'date': de escala gruesa a fina.
+export const GROUP_ORDER: GroupBy[] = ['project', 'user', 'area', 'department', 'etapa', 'position', 'month', 'date']
 
 // Una línea de registro aplanada (con nombres ya resueltos), lista para agrupar.
 export interface ReporteLine {
@@ -55,6 +57,9 @@ const KEY: Record<GroupBy, (l: ReporteLine) => { key: string; label: string }> =
   department: (l) => ({ key: l.department || '—', label: l.department || '—' }),
   etapa: (l) => ({ key: l.etapa || '—', label: l.etapa || '—' }),
   position: (l) => ({ key: l.position || '—', label: l.position || '—' }),
+  // Clave = 'YYYY-MM' (ordena cronológicamente sola, sin pasar por Date); etiqueta =
+  // "Jul 2026", como rotula meses el resto de la app.
+  month: (l) => ({ key: l.date ? l.date.slice(0, 7) : '—', label: l.date ? mesCorto(l.date.slice(0, 7)) : '—' }),
   // Clave = fecha ISO (orden estable y cronológico); etiqueta = DD/MM/AAAA.
   date: (l) => ({ key: l.date || '—', label: l.date ? formatFechaISO(l.date) : '—' }),
 }
@@ -88,9 +93,9 @@ export function aggregate(lines: ReporteLine[], groupBy: GroupBy): AggRow[] {
     by.set(key, cur)
   }
   const rows = [...by.entries()].map(([key, { label, hours }]) => ({ key, label, hours: Math.round(hours * 100) / 100 }))
-  // Por fecha: orden cronológico descendente (clave ISO, más reciente arriba).
-  // Resto de dimensiones: por horas descendente.
-  return groupBy === 'date'
+  // Dimensiones de tiempo: orden cronológico descendente (la clave es ISO, así que lo
+  // más reciente queda arriba). Resto de dimensiones: por horas descendente.
+  return groupBy === 'date' || groupBy === 'month'
     ? rows.sort((a, b) => b.key.localeCompare(a.key))
     : rows.sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label))
 }

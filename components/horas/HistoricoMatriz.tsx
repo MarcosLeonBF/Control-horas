@@ -8,8 +8,9 @@ import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, mesCorto } from '@/lib/horas/format'
 import { cn } from '@/lib/utils'
 
-// El tiempo son las columnas: "Fecha" no tiene sentido como dimensión de fila.
-const DIMENSIONES = GROUP_ORDER.filter((g) => g !== 'date')
+// El tiempo son las columnas: ni "Día" ni "Mes" tienen sentido como dimensión de fila
+// (esta matriz ya tiene un mes por columna).
+const DIMENSIONES = GROUP_ORDER.filter((g) => g !== 'date' && g !== 'month')
 
 interface Fila {
   key: string
