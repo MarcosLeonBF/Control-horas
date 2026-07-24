@@ -6,6 +6,8 @@ import type { ReporteLine, ReporteFilterOptions, GroupBy, AggRow, OrdenTabla } f
 import { GROUP_LABELS, GROUP_ORDER, aggregate, conMesesVacios, detalleDeLinea, groupKeyOf, ordenarFilas } from '@/lib/horas/reportes-types'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
+import { etapaColor } from '@/lib/horas/etapa-color'
+import { departamentoIcon } from '@/lib/horas/departamento-icon'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import NativeSelect from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
@@ -177,8 +179,32 @@ export default function ReportesView({
     )
   }
 
-  const caret = (col: 'label' | 'hours') =>
-    orden?.col !== col ? null : orden.dir === 'asc' ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />
+  // Agrupando por Día, el título del modal ya dice la fecha y repetirla en cada registro
+  // gasta 6,75rem del ancho que necesita el motivo. En las demás dimensiones las filas sí
+  // pueden ser de días distintos, así que la columna se gana su sitio.
+  const muestraFecha = groupBy !== 'date'
+
+  // La afordancia es el propio caret: presente siempre en las columnas ordenables —tenue
+  // en reposo, marcado al pasar por encima, opaco y orientado cuando manda el orden— y
+  // ausente en Reparto y %. Ese contraste dice "esto se pincha" sin escribirlo.
+  const caret = (col: 'label' | 'hours') => {
+    const activo = orden?.col === col
+    const Icono = activo && orden.dir === 'asc' ? ChevronUp : ChevronDown
+    return (
+      <Icono
+        className={cn('size-3 shrink-0 transition-opacity', activo ? 'opacity-100' : 'opacity-25 group-hover:opacity-70')}
+        aria-hidden
+      />
+    )
+  }
+
+  const cabeceraOrdenable = (col: 'label' | 'hours') =>
+    cn(
+      'group -mx-1.5 inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 uppercase tracking-[0.12em]',
+      'transition-colors hover:bg-foreground/5 hover:text-foreground',
+      'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+      orden?.col === col && 'text-foreground',
+    )
 
   // --- Drill-down -----------------------------------------------------------
   // El desglose es siempre por usuario; si ya agrupamos por usuario, por proyecto
@@ -191,6 +217,14 @@ export default function ReportesView({
     [selected, filtered, groupBy],
   )
   const subRows = useMemo(() => aggregate(subLines, subGroupBy), [subLines, subGroupBy])
+
+  // Índice de color: solo las etapas que de verdad hay en la fila abierta, no el catálogo
+  // entero. Una leyenda que enumera colores que no salen en pantalla estorba más que ayuda.
+  const etapasVisibles = useMemo(() => {
+    const vistas = new Map<string, string>()
+    for (const l of subLines) if (l.etapa && l.etapa !== '—') vistas.set(l.etapa, etapaColor(l.etapa))
+    return [...vistas].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [subLines])
   const subMax = subRows.reduce((m, r) => Math.max(m, r.hours), 0)
 
   // Nivel 2: registros de una sub-fila, de más reciente a más antiguo.
@@ -361,7 +395,7 @@ export default function ReportesView({
             type="button"
             onClick={() => ordenarPor('label')}
             title={`Ordenar por ${dimLabel.toLowerCase()}`}
-            className="inline-flex items-center gap-1 text-left uppercase tracking-[0.12em] transition-colors hover:text-foreground focus:outline-none focus-visible:text-foreground"
+            className={cn(cabeceraOrdenable('label'), 'justify-self-start')}
           >
             {dimLabel}{caret('label')}
           </button>
@@ -370,7 +404,7 @@ export default function ReportesView({
             type="button"
             onClick={() => ordenarPor('hours')}
             title="Ordenar por horas"
-            className="inline-flex items-center justify-end gap-1 uppercase tracking-[0.12em] transition-colors hover:text-foreground focus:outline-none focus-visible:text-foreground"
+            className={cn(cabeceraOrdenable('hours'), 'justify-self-end')}
           >
             Horas{caret('hours')}
           </button>
@@ -414,7 +448,9 @@ export default function ReportesView({
 
       {/* Desglose de la fila pinchada: nivel 1 = sub-dimensión, nivel 2 = registros. */}
       <Dialog open={selected !== null} onOpenChange={(open) => { if (!open) setSelected(null) }}>
-        <DialogContent className="sm:max-w-2xl">
+        {/* Ancho generoso a propósito: el motivo de cada registro es texto libre y en
+            42rem se cortaba a mitad de frase, que es justo el dato que se viene a leer. */}
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>
               {selected ? `${labelDe(groupBy, selected)} — ${formatHorasTotal(selected.hours)}` : ''}
@@ -423,6 +459,18 @@ export default function ReportesView({
               Desglose por {GROUP_LABELS[subGroupBy].toLowerCase()}. Abre una fila para ver sus registros.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Con una sola etapa no hace falta índice: su nombre ya está junto al punto. */}
+          {etapasVisibles.length > 1 && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border/60 pb-3 text-xs text-muted-foreground">
+              {etapasVisibles.map(([etapa, color]) => (
+                <span key={etapa} className="inline-flex items-center gap-1.5">
+                  <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />
+                  {etapa}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="max-h-[60vh] overflow-y-auto">
             <ul>
               {subRows.map((sr) => {
@@ -441,17 +489,37 @@ export default function ReportesView({
                       <ul className="border-t border-border/40 bg-(--muted-surface)/40 py-1">
                         {registrosDe(sr.key).map((l, i) => {
                           const detalle = detalleDeLinea(l)
+                          // El trabajo interno no es un cliente: en vez de un tono de la
+                          // paleta lleva el icono de su departamento, el mismo que se ve
+                          // al registrar. Distingue por forma, no solo por color.
+                          const IconoDepto = departamentoIcon(l.department)
                           return (
-                            <li key={`${l.date}-${i}`} className="py-1.5 pr-5 pl-13 text-xs">
-                              <div className="grid grid-cols-[6rem_1fr_4.5rem] items-baseline gap-3">
-                                <span className="tabular-money text-muted-foreground">{formatFechaISO(l.date)}</span>
-                                <span className="truncate text-foreground/80" title={l.project}>{l.project}</span>
+                            <li key={`${l.date}-${i}`} className="py-2 pr-5 pl-13 text-xs">
+                              <div className={cn('grid items-baseline gap-3', muestraFecha ? 'grid-cols-[6rem_1fr_4.5rem]' : 'grid-cols-[1fr_4.5rem]')}>
+                                {muestraFecha && (
+                                  <span className="tabular-money text-muted-foreground">{formatFechaISO(l.date)}</span>
+                                )}
+                                <span className="flex min-w-0 items-center gap-2">
+                                  {l.isInternal && <IconoDepto className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
+                                  <span className="truncate font-medium text-foreground/85" title={l.project}>{l.project}</span>
+                                </span>
                                 <span className="text-right tabular-money font-medium">{formatHoras(l.hours)}</span>
                               </div>
-                              {/* Sangría = ancho de la columna de fecha (6rem) + el hueco de
-                                  la rejilla (gap-3 = 0.75rem), para alinear con el proyecto. */}
+                              {/* Sangría hasta el texto del proyecto: columna de fecha (6rem)
+                                  + hueco (0.75rem) + punto (0.5rem) + hueco (0.5rem). Sin
+                                  fecha solo quedan el punto y su hueco. */}
+                              {/* El punto va pegado a la etapa que colorea, no al proyecto:
+                                  así el color no necesita leyenda, se explica con la
+                                  palabra que tiene al lado. */}
                               {detalle && (
-                                <p className="truncate pl-27 text-muted-foreground" title={detalle}>{detalle}</p>
+                                <p className={cn('flex items-center gap-2 text-muted-foreground', muestraFecha ? 'pl-27' : 'pl-0')}>
+                                  <span
+                                    className="size-2 shrink-0 rounded-full"
+                                    style={{ backgroundColor: etapaColor(l.etapa) }}
+                                    aria-hidden
+                                  />
+                                  <span className="truncate" title={detalle}>{detalle}</span>
+                                </p>
                               )}
                             </li>
                           )

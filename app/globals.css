@@ -100,6 +100,16 @@
     --status-excedido: #A0073A;
     --status-sin: #9A938D;
     --status-pausado: #2F5FA6;  /* azul acero: proyecto en pausa (Excel Clientes_Proyectos) */
+
+    /* Identificación de ETAPA en el desglose de /reportes. Cuatro tonos y no más: con el
+       carmín de marca y los seis de estado ya ocupados, es el máximo que pasa las
+       comprobaciones de daltonismo (azul y violeta colapsan entre sí bajo deuteranopía,
+       igual que oliva y naranja). Validados en claro y en oscuro con los mismos valores,
+       así que no llevan variante en .dark. Ver lib/horas/etapa-color.ts. */
+    --etapa-1: #0E8FA3;  /* teal */
+    --etapa-2: #7C3AED;  /* violeta */
+    --etapa-3: #DB2777;  /* rosa */
+    --etapa-4: #EA580C;  /* naranja */
 }
 
 .font-display { font-family: var(--font-display); }
