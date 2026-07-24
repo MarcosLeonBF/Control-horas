@@ -1,7 +1,7 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ChevronRight, Pencil, Ban } from 'lucide-react'
 import { formatHoras } from '@/lib/horas/format'
@@ -38,16 +38,45 @@ type Estado = 'todos' | 'guardado' | 'editado' | 'anulado'
 const inputCls = 'rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
 // Registros del equipo: una fila por registro diario que se despliega para ver sus líneas.
-// El admin ve acciones Editar/Anular en el panel desplegado. Un buscador + filtros acotan
-// la lista (client-side sobre los registros ya cargados).
-export default function EquipoRegistros({ logs, isAdmin = false }: { logs: EquipoLog[]; isAdmin?: boolean }) {
+// El admin ve acciones Editar/Anular en el panel desplegado.
+//
+// Quien manda en el rango de fechas es el servidor: viaja en la URL (?from&to) y lo
+// aplica la consulta, porque la página solo carga los registros de ese rango. Antes se
+// filtraba solo aquí, sobre una lista ya recortada a 200 registros, y eso ocultaba
+// registros que sí existían. El buscador y el estado sí son client-side: operan sobre
+// el rango ya cargado.
+export default function EquipoRegistros({
+  logs,
+  isAdmin = false,
+  from,
+  to,
+}: {
+  logs: EquipoLog[]
+  isAdmin?: boolean
+  from: string
+  to: string
+}) {
   const router = useRouter()
+  const pathname = usePathname()
+  const [pending, startTransition] = useTransition()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [estado, setEstado] = useState<Estado>('todos')
-  const [desde, setDesde] = useState('')
-  const [hasta, setHasta] = useState('')
+  // Copia local del rango para que el input responda al instante; la URL (y con ella
+  // la recarga del servidor) va detrás. Si el rango cambia por fuera —navegación,
+  // atrás/adelante— los inputs se realinean con lo que de verdad se cargó.
+  const [rango, setRango] = useState({ desde: from, hasta: to })
+  useEffect(() => setRango({ desde: from, hasta: to }), [from, to])
+
+  function setRangoUrl(next: { desde: string; hasta: string }) {
+    setRango(next)
+    const params = new URLSearchParams()
+    if (next.desde) params.set('from', next.desde)
+    if (next.hasta) params.set('to', next.hasta)
+    const qs = params.toString()
+    startTransition(() => router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false }))
+  }
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -66,13 +95,15 @@ export default function EquipoRegistros({ logs, isAdmin = false }: { logs: Equip
     toast.success('Registro anulado'); router.refresh()
   }
 
-  // Filtro client-side sobre los logs ya cargados (mismo patrón que la lista de bancos).
+  // Filtro client-side sobre los logs del rango ya cargado (mismo patrón que la lista
+  // de bancos). Las fechas ya vienen acotadas por el servidor: aquí solo se reaplican
+  // para que estrechar el rango se vea al instante, sin esperar a la recarga.
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return logs.filter((l) => {
       if (estado !== 'todos' && l.status !== estado) return false
-      if (desde && l.entry_date < desde) return false
-      if (hasta && l.entry_date > hasta) return false
+      if (rango.desde && l.entry_date < rango.desde) return false
+      if (rango.hasta && l.entry_date > rango.hasta) return false
       if (needle) {
         const inUser = l.user.toLowerCase().includes(needle)
         const inProject = l.lines.some((ln) => ln.project.toLowerCase().includes(needle))
@@ -80,7 +111,7 @@ export default function EquipoRegistros({ logs, isAdmin = false }: { logs: Equip
       }
       return true
     })
-  }, [logs, q, estado, desde, hasta])
+  }, [logs, q, estado, rango])
 
   return (
     <div className="space-y-3">
@@ -101,15 +132,27 @@ export default function EquipoRegistros({ logs, isAdmin = false }: { logs: Equip
         </label>
         <label className="space-y-1">
           <span className="block text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">Desde</span>
-          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} aria-label="Desde" className={inputCls} />
+          <input
+            type="date"
+            value={rango.desde}
+            onChange={(e) => setRangoUrl({ ...rango, desde: e.target.value })}
+            aria-label="Desde"
+            className={inputCls}
+          />
         </label>
         <label className="space-y-1">
           <span className="block text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">Hasta</span>
-          <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} aria-label="Hasta" className={inputCls} />
+          <input
+            type="date"
+            value={rango.hasta}
+            onChange={(e) => setRangoUrl({ ...rango, hasta: e.target.value })}
+            aria-label="Hasta"
+            className={inputCls}
+          />
         </label>
       </div>
 
-      <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
+      <div className={cn('overflow-hidden rounded-xl ring-1 ring-foreground/10 transition-opacity', pending && 'opacity-60')}>
         {/* Cabecera (escritorio) */}
         <div className="hidden items-center gap-4 border-b border-border bg-(--muted-surface) px-4 py-2.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-muted-foreground md:flex">
           <span className="w-4" aria-hidden />
@@ -120,7 +163,7 @@ export default function EquipoRegistros({ logs, isAdmin = false }: { logs: Equip
         </div>
 
         {logs.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Aún no hay registros.</p>
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">No hay registros en este rango de fechas.</p>
         ) : filtered.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-muted-foreground">No hay registros que coincidan con los filtros.</p>
         ) : (

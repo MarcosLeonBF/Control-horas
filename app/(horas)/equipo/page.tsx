@@ -3,8 +3,12 @@ import { createClient } from '@/lib/supabase/server'
 import { getViewerScope } from '@/lib/horas/scope'
 import { getEquipoComposicion, type MiembroEquipo } from '@/lib/horas/equipo'
 import { areaIcon } from '@/lib/horas/area-icon'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { cn } from '@/lib/utils'
 import EquipoRegistros, { type EquipoLog } from '@/components/horas/EquipoRegistros'
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const localISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
 function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '·'
@@ -39,26 +43,44 @@ function PersonaChip({ m, manager = false }: { m: MiembroEquipo; manager?: boole
   )
 }
 
-export default async function EquipoPage() {
+type RawLog = {
+  id: string; entry_date: string; total_hours: number; status: string
+  profiles: { full_name: string } | null
+  time_log_lines: { project: string; hours: number; description: string | null; department: string | null; areas: { name: string } | null; etapas: { name: string } | null }[] | null
+}
+
+export default async function EquipoPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+  const sp = await searchParams
   const viewer = await getViewerScope()
   if (!viewer) redirect('/login')
   if (viewer.role !== 'manager' && viewer.role !== 'admin') redirect('/registrar')
 
   const { areas: composicion, totalPersonas } = await getEquipoComposicion(viewer)
 
-  const supabase = await createClient()
-  const { data: logs } = await supabase
-    .from('time_logs')
-    .select('id, entry_date, total_hours, status, profiles!time_logs_user_id_fkey(full_name), time_log_lines(project, hours, description, department, areas(name), etapas(name))')
-    .order('entry_date', { ascending: false })
-    .limit(200)
+  // El rango de fechas se resuelve en la consulta, no en el cliente: antes se traían
+  // los 200 registros más recientes y el filtro de fecha se aplicaba sobre ESE recorte,
+  // así que nada anterior al corte podía aparecer por mucho que se ampliara el rango
+  // (y el día del corte salía a medias). Mismo criterio de rango que Reportes.
+  const now = new Date()
+  const from = sp.from || `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`
+  const to = sp.to || localISO(now)
 
-  type RawLog = {
-    id: string; entry_date: string; total_hours: number; status: string
-    profiles: { full_name: string } | null
-    time_log_lines: { project: string; hours: number; description: string | null; department: string | null; areas: { name: string } | null; etapas: { name: string } | null }[] | null
-  }
-  const registros: EquipoLog[] = ((logs ?? []) as unknown as RawLog[]).map((l) => ({
+  const supabase = await createClient()
+  // Paginado: un rango amplio supera las 1.000 filas de PostgREST y el corte sería
+  // silencioso. El orden incluye created_at para que sea total y las páginas no
+  // solapen ni pierdan registros dentro de un mismo día.
+  const logs = await fetchAllRows<RawLog>((desde, hasta) =>
+    supabase
+      .from('time_logs')
+      .select('id, entry_date, total_hours, status, profiles!time_logs_user_id_fkey(full_name), time_log_lines(project, hours, description, department, areas(name), etapas(name))')
+      .gte('entry_date', from)
+      .lte('entry_date', to)
+      .order('entry_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .range(desde, hasta),
+  )
+
+  const registros: EquipoLog[] = logs.map((l) => ({
     id: l.id, entry_date: l.entry_date, total_hours: Number(l.total_hours), status: l.status,
     user: l.profiles?.full_name ?? '—',
     lines: (l.time_log_lines ?? []).map((ln) => ({
@@ -153,8 +175,11 @@ export default async function EquipoPage() {
       {/* Registros del equipo */}
       <section>
         <h2 className="font-display mb-1 border-b border-border pb-2 text-lg font-semibold">Registros del equipo</h2>
-        <p className="mb-4 mt-2 text-sm text-muted-foreground">Cada registro se despliega para ver sus líneas: proyecto, área/departamento, etapa, horas y el motivo.</p>
-        <EquipoRegistros logs={registros} isAdmin={viewer.role === 'admin'} />
+        <p className="mb-4 mt-2 text-sm text-muted-foreground">
+          Cada registro se despliega para ver sus líneas: proyecto, área/departamento, etapa, horas y el motivo.
+          Se muestra el mes en curso; amplía el rango de fechas para ver registros anteriores.
+        </p>
+        <EquipoRegistros logs={registros} isAdmin={viewer.role === 'admin'} from={from} to={to} />
       </section>
     </div>
   )
