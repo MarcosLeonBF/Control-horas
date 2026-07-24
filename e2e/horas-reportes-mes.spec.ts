@@ -2,7 +2,6 @@ import { test, expect } from '@playwright/test'
 import { mesesEnRango } from '../lib/horas/format'
 import type { ReporteLine } from '../lib/horas/reportes-types'
 import { aggregate, conMesesVacios, detalleDeLinea, ordenarFilas } from '../lib/horas/reportes-types'
-import { PALETA_ETAPA, etapaColor } from '../lib/horas/etapa-color'
 
 // Línea mínima: para agrupar por mes solo importan `date` y `hours`.
 const linea = (date: string, hours: number): ReporteLine => ({
@@ -122,49 +121,4 @@ test('ordenarFilas no muta el array que recibe', () => {
   const original = [...FILAS]
   ordenarFilas(FILAS, { col: 'hours', dir: 'asc' }, porLabel)
   expect(FILAS).toEqual(original)
-})
-
-// Lo que el color promete: dos puntos iguales son la misma etapa. Para eso hace falta
-// que sea estable y que las etapas que copan las líneas no compartan tono.
-test('etapaColor es estable: la misma etapa siempre da el mismo color', () => {
-  expect(etapaColor('Setup')).toBe(etapaColor('Setup'))
-})
-
-test('las cuatro etapas que mas aparecen salen en tonos distintos', () => {
-  const tonos = ['Servicios Mensuales', 'Gastos Generales Clientes', 'Setup', 'Sales Coach'].map(etapaColor)
-  expect(new Set(tonos).size).toBe(4)
-})
-
-// La familia "Gastos Generales" se ve junta en las filas internas: ahí el color tiene que
-// separar, no agolpar.
-test('ninguna etapa de Gastos Generales comparte tono con otra de la familia', () => {
-  const familia = ['Gastos Generales Clientes', 'Gastos Generales Corporativos', 'Gastos Generales Ventas', 'Gastos Generales Marketing']
-  expect(new Set(familia.map(etapaColor)).size).toBe(familia.length)
-})
-
-// Un reparto que deja un tono sin usar desperdicia un cuarto de la paleta, que es justo
-// lo que hacía el hash.
-test('el catalogo entero usa los cuatro tonos', () => {
-  const catalogo = [
-    'Servicios Mensuales', 'Setup', 'Sales Coach', 'Captación de Talento', 'CRM', 'Servicios Adicionales',
-    'Gastos Generales Clientes', 'Gastos Generales Corporativos', 'Gastos Generales Ventas',
-    'Gastos Generales Marketing', 'Gastos Indirectos Captación',
-  ]
-  expect(new Set(catalogo.map(etapaColor)).size).toBe(4)
-})
-
-test('etapaColor tolera acentos y mayusculas del catalogo', () => {
-  expect(etapaColor('CAPTACIÓN DE TALENTO')).toBe(etapaColor('captacion de talento'))
-  expect(etapaColor('  Setup  ')).toBe(etapaColor('Setup'))
-})
-
-// Una etapa nueva no puede quedarse sin color ni inventarse un tono fuera de la paleta.
-test('una etapa nueva recibe un tono de la paleta, no un hueco', () => {
-  for (const e of ['Onboarding', 'Auditoría SEO', 'Consultoría', 'Formación interna']) {
-    expect(PALETA_ETAPA).toContain(etapaColor(e))
-  }
-})
-
-test('etapaColor no revienta con un nombre vacio', () => {
-  expect(PALETA_ETAPA).toContain(etapaColor(''))
 })

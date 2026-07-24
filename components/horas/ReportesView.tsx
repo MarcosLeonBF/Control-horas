@@ -6,7 +6,6 @@ import type { ReporteLine, ReporteFilterOptions, GroupBy, AggRow, OrdenTabla } f
 import { GROUP_LABELS, GROUP_ORDER, aggregate, conMesesVacios, detalleDeLinea, groupKeyOf, ordenarFilas } from '@/lib/horas/reportes-types'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
-import { etapaColor } from '@/lib/horas/etapa-color'
 import { departamentoIcon } from '@/lib/horas/departamento-icon'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import NativeSelect from '@/components/ui/native-select'
@@ -217,14 +216,6 @@ export default function ReportesView({
     [selected, filtered, groupBy],
   )
   const subRows = useMemo(() => aggregate(subLines, subGroupBy), [subLines, subGroupBy])
-
-  // Índice de color: solo las etapas que de verdad hay en la fila abierta, no el catálogo
-  // entero. Una leyenda que enumera colores que no salen en pantalla estorba más que ayuda.
-  const etapasVisibles = useMemo(() => {
-    const vistas = new Map<string, string>()
-    for (const l of subLines) if (l.etapa && l.etapa !== '—') vistas.set(l.etapa, etapaColor(l.etapa))
-    return [...vistas].sort((a, b) => a[0].localeCompare(b[0]))
-  }, [subLines])
   const subMax = subRows.reduce((m, r) => Math.max(m, r.hours), 0)
 
   // Nivel 2: registros de una sub-fila, de más reciente a más antiguo.
@@ -459,18 +450,6 @@ export default function ReportesView({
               Desglose por {GROUP_LABELS[subGroupBy].toLowerCase()}. Abre una fila para ver sus registros.
             </DialogDescription>
           </DialogHeader>
-
-          {/* Con una sola etapa no hace falta índice: su nombre ya está junto al punto. */}
-          {etapasVisibles.length > 1 && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border/60 pb-3 text-xs text-muted-foreground">
-              {etapasVisibles.map(([etapa, color]) => (
-                <span key={etapa} className="inline-flex items-center gap-1.5">
-                  <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />
-                  {etapa}
-                </span>
-              ))}
-            </div>
-          )}
           <div className="max-h-[60vh] overflow-y-auto">
             <ul>
               {subRows.map((sr) => {
@@ -500,7 +479,9 @@ export default function ReportesView({
                                   <span className="tabular-money text-muted-foreground">{formatFechaISO(l.date)}</span>
                                 )}
                                 <span className="flex min-w-0 items-center gap-2">
-                                  {l.isInternal && <IconoDepto className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
+                                  {/* Mismo tratamiento que en el selector de registrar:
+                                      icono del departamento en el carmín de marca. */}
+                                  {l.isInternal && <IconoDepto className="size-3.5 shrink-0 text-(--brand)" aria-hidden />}
                                   <span className="truncate font-medium text-foreground/85" title={l.project}>{l.project}</span>
                                 </span>
                                 <span className="text-right tabular-money font-medium">{formatHoras(l.hours)}</span>
@@ -508,17 +489,11 @@ export default function ReportesView({
                               {/* Sangría hasta el texto del proyecto: columna de fecha (6rem)
                                   + hueco (0.75rem) + punto (0.5rem) + hueco (0.5rem). Sin
                                   fecha solo quedan el punto y su hueco. */}
-                              {/* El punto va pegado a la etapa que colorea, no al proyecto:
-                                  así el color no necesita leyenda, se explica con la
-                                  palabra que tiene al lado. */}
+                              {/* Sangría hasta el texto del proyecto: columna de fecha (6rem)
+                                  + el hueco de la rejilla (gap-3 = 0.75rem). */}
                               {detalle && (
-                                <p className={cn('flex items-center gap-2 text-muted-foreground', muestraFecha ? 'pl-27' : 'pl-0')}>
-                                  <span
-                                    className="size-2 shrink-0 rounded-full"
-                                    style={{ backgroundColor: etapaColor(l.etapa) }}
-                                    aria-hidden
-                                  />
-                                  <span className="truncate" title={detalle}>{detalle}</span>
+                                <p className={cn('truncate text-muted-foreground', muestraFecha ? 'pl-27' : 'pl-0')} title={detalle}>
+                                  {detalle}
                                 </p>
                               )}
                             </li>
