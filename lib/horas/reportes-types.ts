@@ -126,3 +126,18 @@ export function detalleDeLinea(line: ReporteLine): string {
   const motivo = line.description || (line.historico ? 'Histórico' : '')
   return [line.etapa, motivo].filter((p) => p && p !== '—').join(' · ')
 }
+
+// Orden manual de la tabla de /reportes. `null` = el orden por defecto de cada
+// dimensión (horas descendente, o cronológico en Mes y Día).
+export type OrdenTabla = { col: 'label' | 'hours'; dir: 'asc' | 'desc' } | null
+
+// Ordena una copia, nunca el array que recibe. `etiqueta` llega como callback porque la
+// tabla no muestra siempre `row.label`: en la dimensión Usuario añade el email a los
+// homónimos, y el orden tiene que seguir a lo que se ve.
+export function ordenarFilas(rows: AggRow[], orden: OrdenTabla, etiqueta: (row: AggRow) => string): AggRow[] {
+  if (!orden) return rows
+  const factor = orden.dir === 'asc' ? 1 : -1
+  return [...rows].sort((a, b) =>
+    orden.col === 'hours' ? factor * (a.hours - b.hours) : factor * etiqueta(a).localeCompare(etiqueta(b)),
+  )
+}

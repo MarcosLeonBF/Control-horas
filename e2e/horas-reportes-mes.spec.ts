@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { mesesEnRango } from '../lib/horas/format'
 import type { ReporteLine } from '../lib/horas/reportes-types'
-import { aggregate, conMesesVacios, detalleDeLinea } from '../lib/horas/reportes-types'
+import { aggregate, conMesesVacios, detalleDeLinea, ordenarFilas } from '../lib/horas/reportes-types'
 
 // Línea mínima: para agrupar por mes solo importan `date` y `hours`.
 const linea = (date: string, hours: number): ReporteLine => ({
@@ -90,4 +90,35 @@ test('detalleDeLinea rotula el historico donde iria el motivo', () => {
 
 test('detalleDeLinea sin nada que decir devuelve cadena vacia', () => {
   expect(detalleDeLinea(conDetalle('—', ''))).toBe('')
+})
+
+const FILAS = [
+  { key: 'b', label: 'Bravo', hours: 5 },
+  { key: 'a', label: 'Alfa', hours: 20 },
+  { key: 'c', label: 'Charlie', hours: 12 },
+]
+const porLabel = (r: { label: string }) => r.label
+
+test('ordenarFilas sin orden devuelve las filas tal cual', () => {
+  expect(ordenarFilas(FILAS, null, porLabel)).toEqual(FILAS)
+})
+
+test('ordenarFilas por horas descendente', () => {
+  expect(ordenarFilas(FILAS, { col: 'hours', dir: 'desc' }, porLabel).map((r) => r.hours)).toEqual([20, 12, 5])
+})
+
+test('ordenarFilas por horas ascendente', () => {
+  expect(ordenarFilas(FILAS, { col: 'hours', dir: 'asc' }, porLabel).map((r) => r.hours)).toEqual([5, 12, 20])
+})
+
+test('ordenarFilas alfabetico usa la etiqueta que recibe, no row.label', () => {
+  // La tabla muestra el nombre con email en los homónimos: el orden debe seguir a eso.
+  const visible = (r: { key: string }) => ({ a: 'Zeta', b: 'Alfa', c: 'Mike' })[r.key] ?? ''
+  expect(ordenarFilas(FILAS, { col: 'label', dir: 'asc' }, visible).map((r) => r.key)).toEqual(['b', 'c', 'a'])
+})
+
+test('ordenarFilas no muta el array que recibe', () => {
+  const original = [...FILAS]
+  ordenarFilas(FILAS, { col: 'hours', dir: 'asc' }, porLabel)
+  expect(FILAS).toEqual(original)
 })
