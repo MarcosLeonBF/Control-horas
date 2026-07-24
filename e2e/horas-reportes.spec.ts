@@ -37,8 +37,8 @@ test('el manager puede agrupar el reporte por fecha (día a día del equipo)', a
   await page.goto('/reportes')
   await expect(page.getByRole('heading', { name: 'Reportes' })).toBeVisible()
 
-  // agrupar por Fecha (día a día)
-  await page.getByRole('button', { name: 'Fecha' }).click()
+  // agrupar por Día (día a día)
+  await page.getByRole('button', { name: 'Día' }).click()
 
   // el resumen agrupado por fecha se descarga con el nombre esperado
   // (el nombre lleva el groupBy activo → prueba que la agrupación es por fecha)

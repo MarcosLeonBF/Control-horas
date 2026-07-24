@@ -12,7 +12,9 @@ export const GROUP_LABELS: Record<GroupBy, string> = {
   etapa: 'Etapa',
   position: 'Posición',
   month: 'Mes',
-  date: 'Fecha',
+  // "Día", no "Fecha": con Mes en la lista, un mes también es una fecha. La clave
+  // interna sigue siendo `date` (de ella dependen los nombres de descarga).
+  date: 'Día',
 }
 
 // 'month' va entre 'position' y 'date': de escala gruesa a fina.
