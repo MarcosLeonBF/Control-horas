@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { mesesEnRango } from '../lib/horas/format'
 import type { ReporteLine } from '../lib/horas/reportes-types'
-import { aggregate } from '../lib/horas/reportes-types'
+import { aggregate, conMesesVacios } from '../lib/horas/reportes-types'
 
 // Línea mínima: para agrupar por mes solo importan `date` y `hours`.
 const linea = (date: string, hours: number): ReporteLine => ({
@@ -37,4 +37,27 @@ test('aggregate por mes suma las líneas de cada mes', () => {
 test('aggregate por mes ordena cronológico descendente, no por horas', () => {
   const rows = aggregate([linea('2026-06-10', 100), linea('2026-07-10', 1)], 'month')
   expect(rows.map((r) => r.key)).toEqual(['2026-07', '2026-06'])
+})
+
+test('conMesesVacios rellena a 0h el mes sin registros', () => {
+  const rows = [
+    { key: '2026-08', label: 'Ago 2026', hours: 10 },
+    { key: '2026-06', label: 'Jun 2026', hours: 20 },
+  ]
+  expect(conMesesVacios(rows, '2026-06-01', '2026-08-31')).toEqual([
+    { key: '2026-08', label: 'Ago 2026', hours: 10 },
+    { key: '2026-07', label: 'Jul 2026', hours: 0 },
+    { key: '2026-06', label: 'Jun 2026', hours: 20 },
+  ])
+})
+
+test('conMesesVacios no duplica un mes que ya venía', () => {
+  const rows = [{ key: '2026-07', label: 'Jul 2026', hours: 5 }]
+  expect(conMesesVacios(rows, '2026-07-01', '2026-07-24')).toEqual(rows)
+})
+
+// Sin ninguna línea, la tabla debe seguir mostrando su estado vacío. Un rango de tres
+// años daría 36 filas huecas que no dicen nada.
+test('conMesesVacios sin filas no inventa meses', () => {
+  expect(conMesesVacios([], '2024-01-01', '2026-12-31')).toEqual([])
 })

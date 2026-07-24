@@ -1,6 +1,6 @@
 // Tipos y agregación del reporte de horas. SIN imports de servidor (lo usa el
 // componente cliente y la página). format.ts es puro (solo Intl), sin servidor.
-import { formatFechaISO, mesCorto } from '@/lib/horas/format'
+import { formatFechaISO, mesCorto, mesesEnRango } from '@/lib/horas/format'
 
 export type GroupBy = 'project' | 'user' | 'area' | 'department' | 'etapa' | 'position' | 'month' | 'date'
 
@@ -98,4 +98,20 @@ export function aggregate(lines: ReporteLine[], groupBy: GroupBy): AggRow[] {
   return groupBy === 'date' || groupBy === 'month'
     ? rows.sort((a, b) => b.key.localeCompare(a.key))
     : rows.sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label))
+}
+
+// Completa los meses del rango que la agregación no produjo, a 0 h, en orden
+// cronológico descendente. Un mes sin registros es información —el manager ve el
+// hueco—, así que la vista por mes sí muestra ceros; el resto de dimensiones no (un
+// proyecto sin horas simplemente no existe).
+//
+// Con `rows` vacío devuelve vacío a propósito: si no hay ni una línea, la tabla debe
+// seguir mostrando su estado vacío en vez de una pared de meses a cero.
+export function conMesesVacios(rows: AggRow[], from: string, to: string): AggRow[] {
+  if (rows.length === 0) return []
+  const presentes = new Set(rows.map((r) => r.key))
+  const vacios = mesesEnRango(from, to)
+    .filter((m) => !presentes.has(m))
+    .map((m) => ({ key: m, label: mesCorto(m), hours: 0 }))
+  return [...rows, ...vacios].sort((a, b) => b.key.localeCompare(a.key))
 }
