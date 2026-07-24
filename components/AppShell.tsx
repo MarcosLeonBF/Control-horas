@@ -24,7 +24,6 @@ function buildSections(role: string, canCreateUsers: boolean): Section[] {
       items: [
         { href: '/registrar', label: 'Registrar', icon: Clock, show: true },
         { href: '/mis-registros', label: 'Mis registros', icon: FileText, show: true },
-        { href: '/equipo', label: 'Equipo', icon: Users, show: isMgr },
         { href: '/bancos', label: 'Bancos de horas', icon: Wallet, show: isMgr },
         { href: '/reportes', label: 'Reportes', icon: BarChart3, show: isMgr },
         { href: '/historico', label: 'Histórico', icon: CalendarRange, show: isMgr },
@@ -41,6 +40,7 @@ function buildSections(role: string, canCreateUsers: boolean): Section[] {
     {
       title: 'Administración',
       items: [
+        { href: '/equipo', label: 'Equipo', icon: Users, show: isAdmin },
         { href: '/admin/usuarios', label: 'Usuarios', icon: UserCog, show: isAdmin || canCreateUsers },
         { href: '/admin/catalogos', label: 'Catálogos', icon: Tags, show: isAdmin },
         { href: '/admin/auditoria', label: 'Auditoría', icon: History, show: isAdmin },

@@ -53,7 +53,9 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams
   const viewer = await getViewerScope()
   if (!viewer) redirect('/login')
-  if (viewer.role !== 'manager' && viewer.role !== 'admin') redirect('/registrar')
+  // Pantalla de administración: solo el admin. Los managers ven su equipo a través de
+  // Bancos, Reportes e Histórico.
+  if (viewer.role !== 'admin') redirect('/registrar')
 
   const { areas: composicion, totalPersonas } = await getEquipoComposicion(viewer)
 
@@ -95,9 +97,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-(--brand)">Bastida &amp; Farina</p>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Equipo</h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          {viewer.role === 'manager'
-            ? 'El equipo emerge de las áreas que gestionas: los operativos que comparten tus áreas, y sus registros.'
-            : 'Estructura del equipo por área —managers y operativos— y los registros de toda la operación.'}
+          Estructura del equipo por área —managers y operativos— y los registros de toda la operación.
         </p>
       </header>
 
@@ -105,7 +105,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
       <section>
         <div className="mb-4 flex items-baseline justify-between border-b border-border pb-2">
           <h2 className="font-display text-lg font-semibold">
-            {viewer.role === 'manager' ? 'Mi equipo' : 'Estructura por área'}
+            Estructura por área
           </h2>
           {composicion.length > 0 && (
             <span className="text-xs text-muted-foreground">
@@ -116,9 +116,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
 
         {composicion.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border bg-card/40 px-5 py-8 text-center text-sm text-muted-foreground">
-            {viewer.role === 'manager'
-              ? 'No tienes áreas asignadas todavía. Pídele a administración que te asigne las áreas que gestionas.'
-              : 'No hay áreas con usuarios asignados.'}
+            No hay áreas con usuarios asignados.
           </p>
         ) : (
           <div className="rounded-2xl border border-border bg-card px-6 shadow-sm">
