@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { createClient } from '@supabase/supabase-js'
+
+const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  auth: { autoRefreshToken: false, persistSession: false },
+})
 
 test('el admin ve la pantalla de auditoría', async ({ page }) => {
   await page.goto('/admin/auditoria')
@@ -51,9 +56,37 @@ test('desplegar un movimiento muestra su detalle', async ({ page }) => {
 })
 
 test('un movimiento anterior a la trazabilidad lo dice', async ({ page }) => {
-  // Julio 2026 es anterior a la migración 0041: ninguno de esos asientos tiene snapshot.
-  await page.goto('/admin/auditoria?from=2026-07-06&to=2026-07-10')
-  const fila = page.locator('li > button[aria-expanded="false"]').first()
-  await fila.click()
-  await expect(page.getByText('Sin detalle: anterior a la trazabilidad de cambios').first()).toBeVisible()
+  // Un asiento "sin detalle" es solo una fila de time_log_audit con lines_before y
+  // lines_after a NULL — no depende de log_id (nullable) ni de un time_logs real
+  // detrás. Se siembra aquí en vez de apuntar a datos históricos de julio: así el
+  // test no depende de filas ajenas y compartidas que un reseed podría invalidar
+  // en silencio. `subject_name` lleva un marcador único para localizar ESTA fila
+  // por contenido, no por posición.
+  const marca = `E2E Auditoria SinSnapshot ${Date.now()}`
+  const hoy = new Date().toISOString().slice(0, 10)
+  const { data: sembrado, error } = await db
+    .from('time_log_audit')
+    .insert({
+      action: 'editar',
+      actor_id: null,
+      actor_name: 'Actor E2E Sin Snapshot',
+      subject_name: marca,
+      entry_date: hoy,
+      total_hours: 4.5,
+      at: new Date().toISOString(),
+      lines_before: null,
+      lines_after: null,
+    })
+    .select('id')
+    .single()
+  if (error) throw error
+
+  try {
+    await page.goto('/admin/auditoria')
+    const fila = page.locator('li').filter({ hasText: marca })
+    await fila.getByRole('button', { expanded: false }).click()
+    await expect(fila.getByText('Sin detalle: anterior a la trazabilidad de cambios')).toBeVisible()
+  } finally {
+    await db.from('time_log_audit').delete().eq('id', sembrado!.id)
+  }
 })

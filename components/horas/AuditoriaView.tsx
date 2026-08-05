@@ -275,6 +275,15 @@ const MARK_STYLE: Record<DiffMark, string> = {
   '=': 'text-muted-foreground',
 }
 
+// Alternativa textual para lector de pantalla del signo `+`/`-`: el signo va
+// aria-hidden porque es la marca visual, pero sin esto quien usa lector de
+// pantalla oye el proyecto y una cifra de horas sin saber si se añadió o se
+// eliminó. `~` no lo necesita: se explica solo con el texto "antes → después".
+const MARK_SR_LABEL: Partial<Record<DiffMark, string>> = {
+  '+': 'Añadida',
+  '-': 'Eliminada',
+}
+
 function Fila({ entry }: { entry: AuditEntry }) {
   const [abierto, setAbierto] = useState(false)
   const hayDetalle = tieneDetalle(entry)
@@ -347,8 +356,12 @@ function LineaDiff({ fila }: { fila: DiffLine }) {
   return (
     <li className="grid grid-cols-[1rem_1fr_9rem] items-baseline gap-3 text-xs">
       {/* La marca distingue por forma además de por color: quien no separe verde de
-          rojo sigue leyendo el signo. */}
-      <span className={cn('font-mono font-semibold', MARK_STYLE[mark])} aria-hidden>{mark}</span>
+          rojo sigue leyendo el signo. El signo en sí va aria-hidden con una
+          alternativa sr-only al lado, para quien usa lector de pantalla. */}
+      <span className={cn('font-mono font-semibold', MARK_STYLE[mark])}>
+        <span aria-hidden>{mark}</span>
+        {MARK_SR_LABEL[mark] && <span className="sr-only">{MARK_SR_LABEL[mark]}</span>}
+      </span>
       <span className="min-w-0">
         <span className={cn('font-medium', mark === '=' ? 'text-muted-foreground' : 'text-foreground/85')}>{line.project}</span>
         {detalle && <span className="text-muted-foreground"> · {detalle}</span>}
