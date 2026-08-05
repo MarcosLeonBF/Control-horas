@@ -1,11 +1,9 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { formatHoras } from '@/lib/horas/format'
 import { getAuditEntries, AUDIT_MAX_ROWS } from '@/lib/horas/auditoria'
 import type { AuditDateBase } from '@/lib/horas/auditoria-types'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
 import NativeSelect from '@/components/ui/native-select'
+import AuditoriaView from '@/components/horas/AuditoriaView'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const localISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -16,12 +14,6 @@ const localISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad
 // YYYY-MM-DD, se descarta y cae al valor por defecto, igual que ya hacíamos con `base`.
 const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/
 const fechaValida = (s: string | undefined): s is string => !!s && FECHA_ISO.test(s)
-
-const ACTION_STYLE = {
-  crear: 'bg-emerald-50 text-emerald-700',
-  editar: 'bg-amber-50 text-amber-700',
-  anular: 'bg-rose-50 text-rose-700',
-} as const
 
 export default async function AuditoriaPage({
   searchParams,
@@ -78,39 +70,7 @@ export default async function AuditoriaPage({
         </p>
       )}
 
-      <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-(--muted-surface) hover:bg-(--muted-surface)">
-              <TableHead>Cuándo</TableHead>
-              <TableHead>Acción</TableHead>
-              <TableHead>Registro (fecha)</TableHead>
-              <TableHead>De</TableHead>
-              <TableHead>Por</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {entries.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">No hay movimientos en este rango.</TableCell></TableRow>
-            )}
-            {entries.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="py-3 text-foreground/70">
-                  {new Date(r.at).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
-                </TableCell>
-                <TableCell className="py-3">
-                  <Badge className={`capitalize ${ACTION_STYLE[r.action]}`}>{r.action}</Badge>
-                </TableCell>
-                <TableCell className="py-3 text-foreground/70">{r.entryDate ?? '—'}</TableCell>
-                <TableCell className="py-3 text-foreground/70">{r.subjectName}</TableCell>
-                <TableCell className="py-3 text-foreground/70">{r.actorName}</TableCell>
-                <TableCell className="py-3 text-right tabular-money">{r.totalHours != null ? formatHoras(r.totalHours) : '—'}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <AuditoriaView entries={entries} base={base} from={from} to={to} />
     </div>
   )
 }
