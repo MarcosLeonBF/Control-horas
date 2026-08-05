@@ -17,7 +17,7 @@
 - **Los tests de Playwright necesitan el dev server ya levantado en `http://localhost:3000`**, incluso los del proyecto `node-horas` que son funciones puras: `globalSetup` hace login por navegador antes de cualquier proyecto. Si falla ahí, el dev server no está arriba: pídeselo al usuario.
 - **Playwright no hace type-check** (transpila con esbuild). Un import inexistente llega a ejecución como `undefined` y revienta con `TypeError: X is not a function`. Los errores de tipos los da `npx tsc --noEmit`.
 - **Las migraciones se aplican en el Supabase remoto** vía MCP `apply_migration` (proyecto `msfylcgtlathccmxuheq`) o el SQL editor del dashboard. No hay stack local.
-- **Sin identidad visual nueva.** Ni paleta, ni tipografías, ni componentes nuevos. Se reutilizan `NativeSelect`, `Badge`, `cn` y las clases ya usadas en `ReportesView.tsx`.
+- **Sin identidad visual nueva.** Ni paleta, ni tipografías, ni primitivas nuevas en `components/ui/`. Se reutilizan `NativeSelect`, `Badge`, `cn` y las clases ya usadas en `ReportesView.tsx`. Los componentes de pantalla que este plan sí crea (`AuditoriaView` y sus auxiliares) no violan esta regla: lo prohibido es inventar lenguaje visual, no escribir la pantalla.
 - **La pantalla es solo para `role === 'admin'`.** No se abre a managers en este plan.
 - **Los 661 asientos ya existentes no tienen snapshot y no se pueden reconstruir.** La UI debe decirlo explícitamente, nunca pintar un diff vacío.
 
@@ -1213,47 +1213,35 @@ git commit -m "feat(auditoria): rango de fechas en servidor y fuera el tope de 2
 ### Task 4: Vista cliente — resumen, filtros, agrupación plegable y descarga
 
 **Files:**
+- Create: `components/horas/Stat.tsx`
 - Create: `components/horas/AuditoriaView.tsx`
+- Modify: `components/horas/ReportesView.tsx:18-19` y `:35-52` (pasa a importar lo extraído)
 - Modify: `app/(horas)/admin/auditoria/page.tsx` (la tabla pasa al componente)
 - Modify: `e2e/horas-auditoria.spec.ts`
 
 **Interfaces:**
 - Consumes: todo lo exportado por `lib/horas/auditoria-types.ts` (Task 2) y `getAuditEntries` (Task 3).
 - Produces (lo usa Task 5): el componente `AuditoriaView`, con la función interna `Fila` que Task 5 convierte en desplegable.
+- Produces: `components/horas/Stat.tsx` exporta `Stat` (componente) y `selectFiltroClass` (string de clases), consumidos por `ReportesView` y `AuditoriaView`.
 
-- [ ] **Step 1: Escribir el componente**
+- [ ] **Step 1: Extraer `Stat` y la clase de los selectores a un módulo compartido**
 
-Crea `components/horas/AuditoriaView.tsx`:
+Las dos pantallas usan el mismo bloque de KPI y el mismo estilo de `<select>` de filtro. En vez de duplicarlos, se extraen una vez.
+
+Crea `components/horas/Stat.tsx`:
 
 ```tsx
 'use client'
 
-import { useMemo, useState } from 'react'
-import { ChevronRight, Download, Filter, X } from 'lucide-react'
-import type { AuditAction, AuditDateBase, AuditEntry, AuditGroup, AuditGroupBy } from '@/lib/horas/auditoria-types'
-import {
-  AUDIT_ACTIONS, AUDIT_ACTION_LABELS, AUDIT_GROUP_LABELS, AUDIT_GROUP_ORDER,
-  agrupar, filtrar, opcionesDe, resumir,
-} from '@/lib/horas/auditoria-types'
-import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
-import { formatHoras, formatFechaISO } from '@/lib/horas/format'
-import NativeSelect from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 
-const selectClass =
+// Clase compartida por los <select> de filtro de /reportes y /admin/auditoria.
+export const selectFiltroClass =
   'h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
-// Rejilla compartida por la cabecera de columnas y cada fila, para que no se
-// desalineen al plegar y desplegar grupos.
-const ROW_GRID = 'grid w-full grid-cols-[1.25rem_8.5rem_6rem_6.5rem_1fr_1fr_4.5rem] items-center gap-3'
-
-const ACTION_STYLE: Record<AuditAction, string> = {
-  crear: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  editar: 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  anular: 'bg-rose-50 text-rose-700 ring-rose-600/20',
-}
-
-function Stat({ label, value, accent }: { label: string; value: string; accent?: 'brand' | 'wine' | 'muted' }) {
+// KPI con la barrita de acento a la izquierda. Lo comparten la fila de resumen de
+// /reportes y la de /admin/auditoria.
+export function Stat({ label, value, accent }: { label: string; value: string; accent?: 'brand' | 'wine' | 'muted' }) {
   return (
     <div className="relative">
       <div
@@ -1270,6 +1258,50 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
       </div>
     </div>
   )
+}
+```
+
+El cuerpo es **exactamente** el de `ReportesView.tsx:35-52` y la clase la de `:18-19`: es un movimiento, no un rediseño. Si algo se ve distinto en `/reportes` después de esto, se copió mal.
+
+Ahora en `components/horas/ReportesView.tsx`:
+
+1. Borra la constante `selectClass` (líneas 18-19) y la función `Stat` (líneas 35-52).
+2. Añade el import, junto a los demás de arriba:
+
+```tsx
+import { Stat, selectFiltroClass } from '@/components/horas/Stat'
+```
+
+3. Sustituye los cuatro usos de `selectClass` por `selectFiltroClass` (están en los `NativeSelect` de los filtros, alrededor de las líneas 289-304). Los usos de `<Stat …>` no cambian.
+
+- [ ] **Step 2: Escribir el componente**
+
+Crea `components/horas/AuditoriaView.tsx`:
+
+```tsx
+'use client'
+
+import { useMemo, useState } from 'react'
+import { ChevronRight, Download, Filter, X } from 'lucide-react'
+import type { AuditAction, AuditDateBase, AuditEntry, AuditGroup, AuditGroupBy } from '@/lib/horas/auditoria-types'
+import {
+  AUDIT_ACTIONS, AUDIT_ACTION_LABELS, AUDIT_GROUP_LABELS, AUDIT_GROUP_ORDER,
+  agrupar, filtrar, opcionesDe, resumir,
+} from '@/lib/horas/auditoria-types'
+import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
+import { formatHoras, formatFechaISO } from '@/lib/horas/format'
+import NativeSelect from '@/components/ui/native-select'
+import { Stat, selectFiltroClass } from '@/components/horas/Stat'
+import { cn } from '@/lib/utils'
+
+// Rejilla compartida por la cabecera de columnas y cada fila, para que no se
+// desalineen al plegar y desplegar grupos.
+const ROW_GRID = 'grid w-full grid-cols-[1.25rem_8.5rem_6rem_6.5rem_1fr_1fr_4.5rem] items-center gap-3'
+
+const ACTION_STYLE: Record<AuditAction, string> = {
+  crear: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  editar: 'bg-amber-50 text-amber-700 ring-amber-600/20',
+  anular: 'bg-rose-50 text-rose-700 ring-rose-600/20',
 }
 
 function AccionBadge({ action }: { action: AuditAction }) {
@@ -1380,11 +1412,11 @@ export default function AuditoriaView({
             )
           })}
         </div>
-        <NativeSelect aria-label="Filtrar por quien edita" value={fActor} onChange={(e) => setFActor(e.target.value)} className={selectClass}>
+        <NativeSelect aria-label="Filtrar por quien edita" value={fActor} onChange={(e) => setFActor(e.target.value)} className={selectFiltroClass}>
           <option value="">Cualquiera edita</option>
           {opciones.actores.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </NativeSelect>
-        <NativeSelect aria-label="Filtrar por usuario afectado" value={fSubject} onChange={(e) => setFSubject(e.target.value)} className={selectClass}>
+        <NativeSelect aria-label="Filtrar por usuario afectado" value={fSubject} onChange={(e) => setFSubject(e.target.value)} className={selectFiltroClass}>
           <option value="">Cualquier usuario afectado</option>
           {opciones.sujetos.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </NativeSelect>
@@ -1532,7 +1564,7 @@ function Fila({ entry }: { entry: AuditEntry }) {
 }
 ```
 
-- [ ] **Step 2: Conectar la vista a la página**
+- [ ] **Step 3: Conectar la vista a la página**
 
 En `app/(horas)/admin/auditoria/page.tsx`:
 
@@ -1555,15 +1587,24 @@ Borra también la constante `ACTION_STYLE` y todo el bloque `<div className="ove
 
 El `<header>` con el formulario y el aviso de `truncado` se quedan tal cual.
 
-- [ ] **Step 3: Verificar el gate del repo**
+- [ ] **Step 4: Verificar el gate del repo**
 
 Run: `npx tsc --noEmit`
-Expected: sin errores. Si sale "declarado pero nunca usado" para `formatHoras`, `Table`, `Badge` o `TableCell`, es que quedó algún import huérfano del paso 2: quítalo.
+Expected: sin errores. Si sale "declarado pero nunca usado" para `formatHoras`, `Table`, `Badge` o `TableCell`, es que quedó algún import huérfano del paso 3: quítalo.
 
 Run: `npm run build`
 Expected: build correcto.
 
-- [ ] **Step 4: Ampliar el E2E**
+- [ ] **Step 5: Comprobar que `/reportes` no se movió**
+
+La extracción del paso 1 tocó una pantalla que ya funcionaba, así que hay que confirmar que sigue igual.
+
+Run: `npx playwright test --project=chromium-horas-admin horas-reportes.spec.ts`
+Expected: PASS.
+
+Además, con el dev server levantado, abre `/reportes` y comprueba a ojo que la fila de KPIs (Total de horas, Horas cliente, Horas internas, Líneas) y los cuatro selectores de filtro se ven exactamente como antes.
+
+- [ ] **Step 6: Ampliar el E2E**
 
 Sustituye `e2e/horas-auditoria.spec.ts` por:
 
@@ -1607,16 +1648,21 @@ test('el rango de fechas viaja en la URL', async ({ page }) => {
 })
 ```
 
-- [ ] **Step 5: Correr el E2E**
+- [ ] **Step 7: Correr el E2E**
 
 Run: `npx playwright test --project=chromium-horas-admin horas-auditoria.spec.ts`
 Expected: PASS, los 4 tests.
 
 Si el test de anulaciones falla porque no hay ninguna en los últimos 30 días, no lo silencies: cambia ese test para navegar a un rango que sí las tenga (`/admin/auditoria?from=2026-07-01&to=2026-08-05`) — en producción hay 6 anulaciones desde el 2026-07-06.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
+
+Dos commits: primero el movimiento, luego la pantalla. Así, si la extracción rompiera algo en `/reportes`, se revierte sola sin llevarse la auditoría por delante.
 
 ```bash
+git add components/horas/Stat.tsx components/horas/ReportesView.tsx
+git commit -m "refactor(horas): Stat y la clase de filtros pasan a compartidos"
+
 git add components/horas/AuditoriaView.tsx "app/(horas)/admin/auditoria/page.tsx" e2e/horas-auditoria.spec.ts
 git commit -m "feat(auditoria): resumen, filtros, agrupacion plegable y descarga"
 ```
