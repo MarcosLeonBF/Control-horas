@@ -10,6 +10,13 @@ import NativeSelect from '@/components/ui/native-select'
 const pad = (n: number) => String(n).padStart(2, '0')
 const localISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
+// El <input type="date"> ya fuerza este formato, pero esta es una pantalla interna
+// donde el admin puede tocar la query string a mano: una fecha mal formada llegando a
+// inicioDiaMadridUTC revienta con un RangeError sin capturar (500). Si no cuadra con
+// YYYY-MM-DD, se descarta y cae al valor por defecto, igual que ya hacíamos con `base`.
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/
+const fechaValida = (s: string | undefined): s is string => !!s && FECHA_ISO.test(s)
+
 const ACTION_STYLE = {
   crear: 'bg-emerald-50 text-emerald-700',
   editar: 'bg-amber-50 text-amber-700',
@@ -29,9 +36,9 @@ export default async function AuditoriaPage({
   if (me?.role !== 'admin') redirect('/registrar')
 
   const hoy = new Date()
-  const to = sp.to || localISO(hoy)
+  const to = fechaValida(sp.to) ? sp.to : localISO(hoy)
   // Por defecto, los últimos 30 días: la ventana que se mira de verdad.
-  const from = sp.from || localISO(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 30))
+  const from = fechaValida(sp.from) ? sp.from : localISO(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 30))
   const base: AuditDateBase = sp.base === 'entry_date' ? 'entry_date' : 'at'
 
   const { entries, truncado } = await getAuditEntries(from, to, base)
@@ -57,7 +64,7 @@ export default async function AuditoriaPage({
           </label>
           <label className="flex flex-1 flex-col gap-1 sm:flex-none">
             <span className="text-xs text-muted-foreground">Hasta</span>
-            <input type="date" name="to" defaultValue={to} className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm sm:w-auto" />
+            <input type="date" name="to" defaultValue={to} max={localISO(hoy)} className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm sm:w-auto" />
           </label>
           <button type="submit" className="h-9 shrink-0 rounded-lg bg-(--wine) px-4 text-sm font-medium text-white transition-opacity hover:opacity-90">
             Aplicar

@@ -57,7 +57,15 @@ export async function getAuditEntries(
   // Se pide una fila de más que el tope: si aparece, es que el rango no cabe.
   const raw: RawAudit[] = []
   for (let desde = 0; desde <= AUDIT_MAX_ROWS; desde += PAGE_SIZE) {
-    const { data } = await pagina(desde, Math.min(desde + PAGE_SIZE - 1, AUDIT_MAX_ROWS))
+    const { data, error } = await pagina(desde, Math.min(desde + PAGE_SIZE - 1, AUDIT_MAX_ROWS))
+    if (error) {
+      // No lo tragamos como "sin filas": con hasta 6 peticiones por carga, un fallo a
+      // mitad del bucle dejaría un resultado parcial que se leería como completo. En
+      // una pantalla de auditoría, mentir sobre qué hay es peor que romper visible.
+      throw new Error(
+        `Auditoría: fallo consultando time_log_audit (rango ${from}..${to}, base ${base}, offset ${desde}): ${error.message}`,
+      )
+    }
     const chunk = (data ?? []) as unknown as RawAudit[]
     raw.push(...chunk)
     if (chunk.length < PAGE_SIZE) break
