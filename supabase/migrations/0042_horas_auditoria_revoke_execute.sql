@@ -1,0 +1,22 @@
+-- ============================================================
+-- 0042 HORAS: revoke real de EXECUTE sobre audit_snapshot_lineas
+-- ------------------------------------------------------------
+-- 0041 creó public.audit_snapshot_lineas() como SECURITY INVOKER y cerró el paso
+-- con "revoke all on function ... from public", con el comentario de que eso
+-- impedía llamarla suelta desde PostgREST. Eso es falso en este proyecto: Supabase
+-- concede EXECUTE a anon/authenticated/service_role mediante
+-- "alter default privileges in schema public grant ... to anon, authenticated,
+-- service_role" en el momento de crear cada función, con independencia de PUBLIC.
+-- "revoke ... from public" no toca esos grants explícitos, así que la función
+-- seguía siendo invocable vía POST /rest/v1/rpc/audit_snapshot_lineas pese al
+-- comentario de 0041.
+--
+-- El impacto real era acotado (SECURITY INVOKER: una llamada directa sigue
+-- pasando por la RLS de time_log_lines, no hay fuga de datos hoy), pero el
+-- comentario era incorrecto y dejaba abierto un endpoint no intencionado que un
+-- cambio futuro (p.ej. si alguna vez pasara a SECURITY DEFINER) podría convertir
+-- en un agujero real. 0041 ya está aplicada en producción y no se edita: este es
+-- el revoke que sí hace lo que decía el comentario.
+-- ============================================================
+
+revoke execute on function public.audit_snapshot_lineas(uuid) from anon, authenticated;
