@@ -89,3 +89,16 @@ export function minutosAHoras(min: number): number {
 export function horasAMinutos(horas: number): number {
   return Math.round(horas * 60)
 }
+
+// H:MM → horas. El campo de /registrar captura el tiempo como duración de reloj
+// (1 y 30 = una hora y media), que es como la gente escribe un rato de trabajo.
+export function hmAHoras(h: number, m: number): number {
+  return minutosAHoras(h * 60 + m)
+}
+
+// Horas → las dos casillas del campo. Pasa por minutos enteros para que el reparto
+// sea el mismo que hizo `hmAHoras`: 1,58 h son 95 minutos, o sea 1 y 35.
+export function horasAHM(horas: number): { h: number; m: number } {
+  const min = horasAMinutos(horas)
+  return { h: Math.floor(min / 60), m: min % 60 }
+}
