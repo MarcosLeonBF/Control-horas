@@ -9,14 +9,12 @@ import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/forma
 import { departamentoIcon } from '@/lib/horas/departamento-icon'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import NativeSelect from '@/components/ui/native-select'
+import { Stat, selectFiltroClass } from '@/components/horas/Stat'
 import { cn } from '@/lib/utils'
 
 // Rejilla compartida por la tabla principal y el nivel 1 del modal, para que las
 // columnas (#/etiqueta/barra/horas/%) queden alineadas en ambos sitios.
 const ROW_GRID = 'grid w-full grid-cols-[2.5rem_1fr_minmax(8rem,1.4fr)_5rem_3.5rem] items-center gap-3'
-
-const selectClass =
-  'h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
 function DownloadGroup({ label, onXlsx, onCsv }: { label: string; onXlsx: () => void; onCsv: () => void }) {
   return (
@@ -29,25 +27,6 @@ function DownloadGroup({ label, onXlsx, onCsv }: { label: string; onXlsx: () => 
         CSV
       </button>
     </span>
-  )
-}
-
-function Stat({ label, value, accent }: { label: string; value: string; accent?: 'brand' | 'wine' | 'muted' }) {
-  return (
-    <div className="relative">
-      <div
-        className={cn(
-          'absolute left-0 top-1 h-9 w-1 rounded-full',
-          accent === 'brand' && 'bg-(--brand)',
-          accent === 'wine' && 'bg-(--wine)',
-          accent === 'muted' && 'bg-foreground/15',
-        )}
-      />
-      <div className="pl-4">
-        <p className="text-[0.7rem] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-        <p className="tabular-money mt-1 font-display text-2xl font-semibold tracking-tight">{value}</p>
-      </div>
-    </div>
   )
 }
 
@@ -286,19 +265,19 @@ export default function ReportesView({
         <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
           <Filter className="size-4" /> Filtrar
         </span>
-        <NativeSelect aria-label="Filtrar por proyecto" value={fProject} onChange={(e) => setFProject(e.target.value)} className={selectClass}>
+        <NativeSelect aria-label="Filtrar por proyecto" value={fProject} onChange={(e) => setFProject(e.target.value)} className={selectFiltroClass}>
           <option value="">Todos los proyectos</option>
           {options.projects.map((p) => <option key={p} value={p}>{p}</option>)}
         </NativeSelect>
-        <NativeSelect aria-label="Filtrar por usuario" value={fUser} onChange={(e) => setFUser(e.target.value)} className={selectClass}>
+        <NativeSelect aria-label="Filtrar por usuario" value={fUser} onChange={(e) => setFUser(e.target.value)} className={selectFiltroClass}>
           <option value="">Todos los usuarios</option>
           {options.users.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
         </NativeSelect>
-        <NativeSelect aria-label="Filtrar por área" value={fArea} onChange={(e) => setFArea(e.target.value)} className={selectClass}>
+        <NativeSelect aria-label="Filtrar por área" value={fArea} onChange={(e) => setFArea(e.target.value)} className={selectFiltroClass}>
           <option value="">Todas las áreas</option>
           {options.areas.map((a) => <option key={a} value={a}>{a}</option>)}
         </NativeSelect>
-        <NativeSelect aria-label="Filtrar por posición" value={fPosition} onChange={(e) => setFPosition(e.target.value)} className={selectClass}>
+        <NativeSelect aria-label="Filtrar por posición" value={fPosition} onChange={(e) => setFPosition(e.target.value)} className={selectFiltroClass}>
           <option value="">Todas las posiciones</option>
           {options.positions.map((p) => <option key={p} value={p}>{p}</option>)}
         </NativeSelect>
