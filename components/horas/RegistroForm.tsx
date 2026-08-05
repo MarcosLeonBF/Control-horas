@@ -246,9 +246,12 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
                 aria-pressed={unidad === u}
                 onClick={() => setUnidades((p) => p.map((prev, idx) => (idx === i ? u : prev)))}
                 className={cn(
-                  'rounded-md px-1.5 py-0.5 text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  // Mismo tratamiento que las etiquetas de campo del formulario
+                  // (ver MobileField): versalita apretada, que es como esta app
+                  // rotula las cosas.
+                  'rounded-md px-1.5 py-0.5 text-[0.7rem] font-medium uppercase tracking-wide transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   unidad === u
-                    ? 'bg-foreground/10 font-medium text-foreground'
+                    ? 'bg-foreground/10 text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
