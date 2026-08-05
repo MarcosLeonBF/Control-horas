@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import { ChevronRight, Download, Filter, X } from 'lucide-react'
-import type { AuditAction, AuditDateBase, AuditEntry, AuditGroup, AuditGroupBy } from '@/lib/horas/auditoria-types'
+import type { AuditAction, AuditDateBase, AuditEntry, AuditGroup, AuditGroupBy, DiffLine, DiffMark } from '@/lib/horas/auditoria-types'
 import {
   AUDIT_ACTIONS, AUDIT_ACTION_LABELS, AUDIT_GROUP_LABELS, AUDIT_GROUP_ORDER,
-  agrupar, filtrar, opcionesDe, resumir,
+  agrupar, diffLineas, filtrar, opcionesDe, resumir, tieneDetalle, totalDe,
 } from '@/lib/horas/auditoria-types'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatFechaISO } from '@/lib/horas/format'
@@ -268,16 +268,94 @@ function CabeceraGrupo({ grupo, abierto, onToggle }: { grupo: AuditGroup; abiert
   )
 }
 
+const MARK_STYLE: Record<DiffMark, string> = {
+  '+': 'text-emerald-700',
+  '-': 'text-rose-700',
+  '~': 'text-amber-700',
+  '=': 'text-muted-foreground',
+}
+
 function Fila({ entry }: { entry: AuditEntry }) {
+  const [abierto, setAbierto] = useState(false)
+  const hayDetalle = tieneDetalle(entry)
+
   return (
-    <div className={cn(ROW_GRID, 'px-5 py-3 text-sm')}>
-      <span />
-      <span className="tabular-money text-foreground/70">{cuando(entry.at)}</span>
-      <span><AccionBadge action={entry.action} /></span>
-      <span className="tabular-money text-foreground/70">{entry.entryDate ? formatFechaISO(entry.entryDate) : '—'}</span>
-      <span className="truncate text-foreground/70" title={entry.subjectName}>{entry.subjectName}</span>
-      <span className="truncate text-foreground/70" title={entry.actorName}>{entry.actorName}</span>
-      <span className="text-right tabular-money">{entry.totalHours != null ? formatHoras(entry.totalHours) : '—'}</span>
+    <>
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        className={cn(
+          ROW_GRID,
+          'px-5 py-3 text-left text-sm transition-colors hover:bg-(--muted-surface)/60 focus:outline-none focus-visible:bg-(--muted-surface)/60',
+        )}
+      >
+        <ChevronRight className={cn('size-3.5 text-muted-foreground transition-transform', abierto && 'rotate-90')} aria-hidden />
+        <span className="tabular-money text-foreground/70">{cuando(entry.at)}</span>
+        <span><AccionBadge action={entry.action} /></span>
+        <span className="tabular-money text-foreground/70">{entry.entryDate ? formatFechaISO(entry.entryDate) : '—'}</span>
+        <span className="truncate text-foreground/70" title={entry.subjectName}>{entry.subjectName}</span>
+        <span className="truncate text-foreground/70" title={entry.actorName}>{entry.actorName}</span>
+        <span className="text-right tabular-money">{entry.totalHours != null ? formatHoras(entry.totalHours) : '—'}</span>
+      </button>
+      {abierto && (hayDetalle ? <Detalle entry={entry} /> : <SinDetalle />)}
+    </>
+  )
+}
+
+// Los asientos anteriores a la migración 0041 no guardaron snapshots y las líneas
+// viejas ya no existen: no hay nada que reconstruir. Se dice, en vez de pintar un
+// desglose vacío que se leería como "no cambió nada".
+function SinDetalle() {
+  return (
+    <p className="border-t border-border/40 bg-(--muted-surface)/40 px-5 py-4 pl-13 text-xs text-muted-foreground">
+      Sin detalle: anterior a la trazabilidad de cambios.
+    </p>
+  )
+}
+
+function Detalle({ entry }: { entry: AuditEntry }) {
+  const filas = diffLineas(entry.before, entry.after)
+  const antes = totalDe(entry.before)
+  const despues = totalDe(entry.after)
+
+  return (
+    <div className="border-t border-border/40 bg-(--muted-surface)/40 px-5 py-3 pl-13">
+      <p className="mb-2 text-xs text-muted-foreground">
+        {antes != null && despues != null ? (
+          <>Total <span className="tabular-money font-medium text-foreground/80">{formatHoras(antes)}</span> → <span className="tabular-money font-medium text-foreground/80">{formatHoras(despues)}</span></>
+        ) : despues != null ? (
+          <>Registro creado con <span className="tabular-money font-medium text-foreground/80">{formatHoras(despues)}</span></>
+        ) : (
+          <>Registro anulado con <span className="tabular-money font-medium text-foreground/80">{formatHoras(antes ?? 0)}</span></>
+        )}
+      </p>
+      {filas.length === 0 ? (
+        <p className="text-xs text-muted-foreground">El registro no tenía líneas.</p>
+      ) : (
+        <ul className="space-y-1">
+          {filas.map((f, i) => <LineaDiff key={`${f.mark}-${i}`} fila={f} />)}
+        </ul>
+      )}
     </div>
+  )
+}
+
+function LineaDiff({ fila }: { fila: DiffLine }) {
+  const { mark, line, hoursBefore, hoursAfter } = fila
+  const detalle = [line.etapa, line.description].filter((p) => p && p !== '—').join(' · ')
+  return (
+    <li className="grid grid-cols-[1rem_1fr_9rem] items-baseline gap-3 text-xs">
+      {/* La marca distingue por forma además de por color: quien no separe verde de
+          rojo sigue leyendo el signo. */}
+      <span className={cn('font-mono font-semibold', MARK_STYLE[mark])} aria-hidden>{mark}</span>
+      <span className="min-w-0">
+        <span className={cn('font-medium', mark === '=' ? 'text-muted-foreground' : 'text-foreground/85')}>{line.project}</span>
+        {detalle && <span className="text-muted-foreground"> · {detalle}</span>}
+      </span>
+      <span className={cn('text-right tabular-money', MARK_STYLE[mark])}>
+        {mark === '~' ? `${formatHoras(hoursBefore ?? 0)} → ${formatHoras(hoursAfter ?? 0)}` : formatHoras(hoursAfter ?? hoursBefore ?? 0)}
+      </span>
+    </li>
   )
 }

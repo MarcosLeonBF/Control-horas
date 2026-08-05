@@ -8,7 +8,10 @@ test('el admin ve la pantalla de auditoría', async ({ page }) => {
 
 test('el filtro de acción acota los movimientos', async ({ page }) => {
   await page.goto('/admin/auditoria')
-  const chip = page.getByRole('button', { name: 'Anulación' })
+  // exact: true, porque desde Task 5 cada fila también es un <button> cuyo nombre
+  // accesible arrastra el texto "Anulación" de su insignia — sin exact, el chip del
+  // filtro deja de ser único.
+  const chip = page.getByRole('button', { name: 'Anulación', exact: true })
   await chip.click()
   await expect(chip).toHaveAttribute('aria-pressed', 'true')
   // Con solo anulaciones marcadas, no debe quedar ninguna insignia de creación en la
@@ -36,4 +39,21 @@ test('el rango de fechas viaja en la URL', async ({ page }) => {
   await page.goto('/admin/auditoria?from=2026-07-01&to=2026-07-31')
   await expect(page.locator('input[name="from"]')).toHaveValue('2026-07-01')
   await expect(page.locator('input[name="to"]')).toHaveValue('2026-07-31')
+})
+
+test('desplegar un movimiento muestra su detalle', async ({ page }) => {
+  await page.goto('/admin/auditoria')
+  // La primera fila es el movimiento más reciente: posterior a la migración 0041,
+  // así que tiene snapshot y debe mostrar el total en vez del aviso de "sin detalle".
+  const fila = page.locator('li > button[aria-expanded="false"]').first()
+  await fila.click()
+  await expect(page.getByText(/Total .* →|Registro creado con|Registro anulado con/).first()).toBeVisible()
+})
+
+test('un movimiento anterior a la trazabilidad lo dice', async ({ page }) => {
+  // Julio 2026 es anterior a la migración 0041: ninguno de esos asientos tiene snapshot.
+  await page.goto('/admin/auditoria?from=2026-07-06&to=2026-07-10')
+  const fila = page.locator('li > button[aria-expanded="false"]').first()
+  await fila.click()
+  await expect(page.getByText('Sin detalle: anterior a la trazabilidad de cambios').first()).toBeVisible()
 })
