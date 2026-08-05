@@ -235,15 +235,23 @@ Nombre: `auditoria_{from}_{to}`.
 - Anular → `lines_after is null`, `lines_before` con las líneas.
 - Guardado multi-fecha → solo el ancla lleva `lines_before`.
 
+**De función pura** — el repo usa Playwright también como runner de tests
+unitarios: el proyecto `node-horas` de `playwright.config.ts` ejecuta specs sin
+navegador (así se prueban `aggregate` y `ordenarFilas` en
+`e2e/horas-reportes-mes.spec.ts`). La lógica de `auditoria-types.ts` se cubre
+ahí, en un spec nuevo: agrupación (incluidos los homónimos) y el diff en todos
+sus casos — línea añadida, eliminada, con horas cambiadas, sin cambios, motivo
+reescrito y snapshot ausente.
+
+> El spec nuevo debe darse de alta en **dos** sitios de `playwright.config.ts`:
+> el `testMatch` de `node-horas` y el `testIgnore` de `chromium-horas` — este
+> último captura `**/horas-*.spec.ts`, así que sin la exclusión el test correría
+> además en navegador. Es el mismo doble alta que ya tiene
+> `horas-reportes-mes.spec.ts`.
+
 **E2E** (`e2e/horas-auditoria.spec.ts`, ampliando el test actual): filtrar por
 acción, agrupar por actor y comprobar las cabeceras, desplegar un asiento y ver
-su diff (línea añadida, eliminada y con horas cambiadas), y desplegar un asiento
-viejo para ver el aviso de "sin detalle".
-
-El repo **no tiene runner de tests unitarios** —solo Playwright y los `.sql` de
-`supabase/tests/`—, así que la lógica pura de `auditoria-types.ts` se cubre por
-E2E contra datos sembrados. Montar un runner queda fuera de alcance; si más
-adelante se añade, el diff es el candidato natural a cubrir ahí.
+su diff, y desplegar un asiento viejo para ver el aviso de "sin detalle".
 
 **Gate:** `tsc` + `build`. El `npm run lint` sigue roto repo-wide desde Next 16.
 
