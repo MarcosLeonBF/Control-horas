@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test'
 import type { AuditEntry, AuditSnapshotLine } from '../lib/horas/auditoria-types'
 import {
-  addDiasISO, agrupar, claveLinea, diaMadrid, diffLineas, filtrar,
-  inicioDiaMadridUTC, opcionesDe, resumir, tieneDetalle, totalDe,
+  addDiasISO, agrupar, claveLinea, descripcionCambio, diaMadrid, diffLineas, filtrar,
+  inicioDiaMadridUTC, opcionesDe, resumir, resumirCambio, tieneDetalle, totalDe,
+  ultimoAsientoPorLog,
 } from '../lib/horas/auditoria-types'
 
 // Línea de snapshot mínima: los tests van cambiando lo que a cada uno le importa.
@@ -14,7 +15,7 @@ const linea = (p: Partial<AuditSnapshotLine> = {}): AuditSnapshotLine => ({
 const asiento = (p: Partial<AuditEntry> = {}): AuditEntry => ({
   id: 'a1', action: 'editar', actorId: 'u1', actorName: 'Marcos Ruiz',
   subjectName: 'Ana López', entryDate: '2026-08-03', totalHours: 8,
-  at: '2026-08-04T10:12:00.000Z', before: null, after: null, ...p,
+  at: '2026-08-04T10:12:00.000Z', cambio: null, ...p,
 })
 
 // --- Fechas ---------------------------------------------------------------
@@ -234,15 +235,92 @@ test('claveLinea distingue por proyecto, area, departamento, etapa y motivo', ()
   expect(claveLinea(linea())).not.toBe(claveLinea(linea({ etapa: 'Otra' })))
 })
 
-test('tieneDetalle es falso solo cuando faltan los dos snapshots', () => {
-  expect(tieneDetalle(asiento({ before: null, after: null }))).toBe(false)
-  expect(tieneDetalle(asiento({ before: null, after: [] }))).toBe(true)
-  expect(tieneDetalle(asiento({ before: [], after: null }))).toBe(true)
+test('tieneDetalle es falso solo cuando el asiento no trae resumen del cambio', () => {
+  expect(tieneDetalle(asiento({ cambio: null }))).toBe(false)
+  expect(tieneDetalle(asiento({ cambio: resumirCambio(null, []) }))).toBe(true)
+  expect(tieneDetalle(asiento({ cambio: { tipo: 'reconstruido', lineas: 2 } }))).toBe(true)
 })
 
 test('totalDe suma las horas del snapshot y respeta el null', () => {
   expect(totalDe([linea({ hours: 2 }), linea({ hours: 3.5, project: 'Otro' })])).toBe(5.5)
   expect(totalDe(null)).toBeNull()
+})
+
+// --- Resumen compacto del cambio ------------------------------------------
+
+test('resumirCambio cuenta anadidas, eliminadas y cambiadas, con los dos totales', () => {
+  const before = [linea({ project: 'Intacto' }), linea({ project: 'Cambia', hours: 1 }), linea({ project: 'Se va' })]
+  const after = [linea({ project: 'Intacto' }), linea({ project: 'Cambia', hours: 9 }), linea({ project: 'Llega' })]
+  expect(resumirCambio(before, after)).toEqual({
+    tipo: 'snapshot', anadidas: 1, eliminadas: 1, cambiadas: 1, totalAntes: 5, totalDespues: 13,
+  })
+})
+
+test('resumirCambio de un crear no inventa un total anterior', () => {
+  expect(resumirCambio(null, [linea({ hours: 3 })])).toEqual({
+    tipo: 'snapshot', anadidas: 1, eliminadas: 0, cambiadas: 0, totalAntes: null, totalDespues: 3,
+  })
+})
+
+test('resumirCambio de un anular no inventa un total posterior', () => {
+  expect(resumirCambio([linea({ hours: 3 })], null)).toEqual({
+    tipo: 'snapshot', anadidas: 0, eliminadas: 1, cambiadas: 0, totalAntes: 3, totalDespues: null,
+  })
+})
+
+test('descripcionCambio resume el diff con los dos totales', () => {
+  const before = [linea({ project: 'Cambia', hours: 1 }), linea({ project: 'Se va' })]
+  const after = [linea({ project: 'Cambia', hours: 9 })]
+  expect(descripcionCambio(resumirCambio(before, after))).toBe('1 eliminada, 1 cambiada · 3,00h → 9,00h')
+})
+
+test('descripcionCambio dice que un reconstruido es estado final, sin recuentos de diff', () => {
+  const texto = descripcionCambio({ tipo: 'reconstruido', lineas: 3 })
+  expect(texto).toBe('Estado final del registro: 3 líneas (reconstruido)')
+  expect(texto).not.toContain('añadida')
+  expect(texto).not.toContain('eliminada')
+})
+
+test('descripcionCambio sin resumen dice que no hay detalle', () => {
+  expect(descripcionCambio(null)).toBe('Sin detalle')
+})
+
+test('descripcionCambio de una edicion que no toco lineas no finge cambios', () => {
+  expect(descripcionCambio(resumirCambio([linea()], [linea()]))).toBe('sin cambios en las líneas · 2,00h → 2,00h')
+})
+
+// --- Regla del "último movimiento del registro" ----------------------------
+
+test('ultimoAsientoPorLog se queda con el mas reciente de cada registro', () => {
+  const ultimo = ultimoAsientoPorLog([
+    { id: 'a', logId: 'L1', at: '2026-07-01T10:00:00.000Z' },
+    { id: 'b', logId: 'L1', at: '2026-07-09T10:00:00.000Z' },
+    { id: 'c', logId: 'L2', at: '2026-07-05T10:00:00.000Z' },
+  ])
+  expect(ultimo.get('L1')).toBe('b')
+  expect(ultimo.get('L2')).toBe('c')
+})
+
+// Un guardado multi-fecha escribe varios asientos con el mismo now(): sin desempate,
+// "el último" saldría al azar y la reconstrucción se colgaría de la fila equivocada.
+test('ultimoAsientoPorLog desempata por id cuando el instante es identico', () => {
+  const filas = [
+    { id: 'aaa', logId: 'L1', at: '2026-07-09T10:00:00.000Z' },
+    { id: 'zzz', logId: 'L1', at: '2026-07-09T10:00:00.000Z' },
+  ]
+  expect(ultimoAsientoPorLog(filas).get('L1')).toBe('zzz')
+  expect(ultimoAsientoPorLog([...filas].reverse()).get('L1')).toBe('zzz')
+})
+
+// Postgres guarda microsegundos y Date.parse trunca a milisegundos: si solo se
+// comparasen los milisegundos, estas dos empatarían y desempataría el id, eligiendo
+// la anterior.
+test('ultimoAsientoPorLog distingue microsegundos dentro del mismo milisegundo', () => {
+  const ultimo = ultimoAsientoPorLog([
+    { id: 'zzz', logId: 'L1', at: '2026-07-09T10:00:00.123400+00:00' },
+    { id: 'aaa', logId: 'L1', at: '2026-07-09T10:00:00.123900+00:00' },
+  ])
+  expect(ultimo.get('L1')).toBe('aaa')
 })
 
 // --- Opciones y resumen ---------------------------------------------------

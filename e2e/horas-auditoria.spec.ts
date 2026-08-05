@@ -1,9 +1,12 @@
 import { test, expect } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import fs from 'node:fs'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
+
+const horas = JSON.parse(fs.readFileSync('e2e/.horas.json', 'utf8')) as { userId: string }
 
 test('el admin ve la pantalla de auditoría', async ({ page }) => {
   await page.goto('/admin/auditoria')
@@ -88,5 +91,102 @@ test('un movimiento anterior a la trazabilidad lo dice', async ({ page }) => {
     await expect(fila.getByText('Sin detalle: anterior a la trazabilidad de cambios')).toBeVisible()
   } finally {
     await db.from('time_log_audit').delete().eq('id', sembrado!.id)
+  }
+})
+
+test('un movimiento sin snapshot que es el ultimo de su registro muestra sus lineas', async ({ page }) => {
+  // Se siembra el caso de los asientos previos a 0041 que SÍ se pueden reconstruir: sin
+  // snapshots, pero apuntando a un registro vivo y sin movimientos posteriores. Las
+  // líneas que ese registro tiene hoy son exactamente las que dejó ese movimiento, así
+  // que la pantalla debe enseñarlas en vez de decir "sin detalle".
+  const marca = `E2E Auditoria Reconstruido ${Date.now()}`
+  const proyecto = `Proyecto Reconstruido ${Date.now()}`
+  const hoy = new Date().toISOString().slice(0, 10)
+  const { data: area } = await db.from('areas').select('id').eq('name', 'CRM').single()
+  const { data: etapa } = await db.from('etapas').select('id').limit(1).single()
+
+  const { data: log, error: errLog } = await db
+    .from('time_logs')
+    .insert({ user_id: horas.userId, entry_date: hoy, total_hours: 3, status: 'guardado' })
+    .select('id')
+    .single()
+  if (errLog) throw errLog
+
+  const { error: errLinea } = await db.from('time_log_lines').insert({
+    log_id: log!.id, project: proyecto, area_id: area!.id, department: 'Clientes',
+    etapa_id: etapa!.id, hours: 3, description: 'Línea reconstruida E2E',
+  })
+  if (errLinea) throw errLinea
+
+  const { error: errAudit } = await db.from('time_log_audit').insert({
+    log_id: log!.id, action: 'crear', actor_id: null, actor_name: 'Actor E2E Reconstruido',
+    subject_name: marca, entry_date: hoy, total_hours: 3,
+    at: new Date().toISOString(), lines_before: null, lines_after: null,
+  })
+  if (errAudit) throw errAudit
+
+  try {
+    await page.goto('/admin/auditoria')
+    const fila = page.locator('li').filter({ hasText: marca })
+    await fila.getByRole('button', { expanded: false }).click()
+    // Las líneas vivas, no el aviso de "sin detalle"…
+    await expect(fila.getByText(proyecto)).toBeVisible()
+    await expect(fila.getByText('Sin detalle: anterior a la trazabilidad de cambios')).toHaveCount(0)
+    // …y de dónde salen, para no hacerlas pasar por un snapshot guardado.
+    await expect(fila.getByText(/Reconstruido a partir de las líneas que el registro tiene hoy/)).toBeVisible()
+  } finally {
+    await db.from('time_log_audit').delete().eq('log_id', log!.id)
+    await db.from('time_logs').delete().eq('id', log!.id)
+  }
+})
+
+test('un movimiento sin snapshot con ediciones posteriores sigue sin detalle', async ({ page }) => {
+  // El reverso del test anterior: si el registro se movió DESPUÉS, sus líneas de hoy ya
+  // no son las que dejó este movimiento. Enseñarlas sería presentar un estado ajeno
+  // como si fuera un hecho, que es justo lo que esta pantalla existe para evitar.
+  const marca = `E2E Auditoria NoUltimo ${Date.now()}`
+  const proyecto = `Proyecto NoUltimo ${Date.now()}`
+  const hoy = new Date().toISOString().slice(0, 10)
+  const { data: area } = await db.from('areas').select('id').eq('name', 'CRM').single()
+  const { data: etapa } = await db.from('etapas').select('id').limit(1).single()
+
+  const { data: log, error: errLog } = await db
+    .from('time_logs')
+    .insert({ user_id: horas.userId, entry_date: hoy, total_hours: 3, status: 'guardado' })
+    .select('id')
+    .single()
+  if (errLog) throw errLog
+  const { error: errLinea } = await db.from('time_log_lines').insert({
+    log_id: log!.id, project: proyecto, area_id: area!.id, department: 'Clientes',
+    etapa_id: etapa!.id, hours: 3, description: 'Línea no reconstruible E2E',
+  })
+  if (errLinea) throw errLinea
+
+  const ahora = Date.now()
+  const { error: errAudit } = await db.from('time_log_audit').insert([
+    // El viejo, el que se mira: sin snapshots.
+    {
+      log_id: log!.id, action: 'crear', actor_id: null, actor_name: 'Actor E2E NoUltimo',
+      subject_name: marca, entry_date: hoy, total_hours: 3,
+      at: new Date(ahora - 60_000).toISOString(), lines_before: null, lines_after: null,
+    },
+    // Y una edición posterior, que es la que describe el estado actual.
+    {
+      log_id: log!.id, action: 'editar', actor_id: null, actor_name: 'Actor E2E NoUltimo',
+      subject_name: `${marca} posterior`, entry_date: hoy, total_hours: 3,
+      at: new Date(ahora).toISOString(), lines_before: null, lines_after: null,
+    },
+  ])
+  if (errAudit) throw errAudit
+
+  try {
+    await page.goto('/admin/auditoria')
+    // `hasNotText` deja fuera la fila del movimiento posterior, cuyo sujeto empieza igual.
+    const fila = page.locator('li').filter({ hasText: marca }).filter({ hasNotText: 'posterior' })
+    await fila.getByRole('button', { expanded: false }).click()
+    await expect(fila.getByText('Sin detalle: anterior a la trazabilidad de cambios')).toBeVisible()
+  } finally {
+    await db.from('time_log_audit').delete().eq('log_id', log!.id)
+    await db.from('time_logs').delete().eq('id', log!.id)
   }
 })

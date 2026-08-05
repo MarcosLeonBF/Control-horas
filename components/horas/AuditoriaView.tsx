@@ -1,12 +1,16 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { ChevronRight, Download, Filter, X } from 'lucide-react'
-import type { AuditAction, AuditDateBase, AuditEntry, AuditGroup, AuditGroupBy, DiffLine, DiffMark } from '@/lib/horas/auditoria-types'
+import type {
+  AuditAction, AuditDateBase, AuditDetalle, AuditEntry, AuditGroup, AuditGroupBy,
+  AuditSnapshotLine, DiffLine, DiffMark,
+} from '@/lib/horas/auditoria-types'
 import {
   AUDIT_ACTIONS, AUDIT_ACTION_LABELS, AUDIT_GROUP_LABELS, AUDIT_GROUP_ORDER,
-  agrupar, diffLineas, filtrar, opcionesDe, resumir, tieneDetalle, totalDe,
+  agrupar, descripcionCambio, diffLineas, filtrar, opcionesDe, resumir, tieneDetalle, totalDe,
 } from '@/lib/horas/auditoria-types'
+import { getAuditDetalle } from '@/app/(horas)/admin/auditoria/actions'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatFechaISO } from '@/lib/horas/format'
 import NativeSelect from '@/components/ui/native-select'
@@ -93,6 +97,9 @@ export default function AuditoriaView({
       'Usuario afectado': e.subjectName,
       'Quien edita': e.actorName,
       Total: e.totalHours ?? '',
+      // El spec pide las columnas de la tabla más un resumen del cambio: sin esto, la
+      // descarga se lleva el "quién y cuándo" pero deja fuera el "qué".
+      Cambio: descripcionCambio(e.cambio),
     }))
   }
   const exportBase = `auditoria_${from}_${to}`
@@ -284,15 +291,38 @@ const MARK_SR_LABEL: Partial<Record<DiffMark, string>> = {
   '-': 'Eliminada',
 }
 
+// Sangría del bloque desplegado, alineada con la primera columna de texto de la fila.
+const DETALLE_CAJA = 'border-t border-border/40 bg-(--muted-surface)/40 px-5 py-3 pl-13'
+
 function Fila({ entry }: { entry: AuditEntry }) {
   const [abierto, setAbierto] = useState(false)
+  // El detalle no viaja en el payload de la lista (pesaba más que todo lo demás junto):
+  // se pide al abrir y se queda cacheado en la fila. Un asiento es inmutable, así que
+  // lo cargado sigue valiendo mientras dure la pantalla.
+  const [detalle, setDetalle] = useState<AuditDetalle | null>(null)
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const hayDetalle = tieneDetalle(entry)
+
+  async function alternar() {
+    const abrir = !abierto
+    setAbierto(abrir)
+    if (!abrir || !hayDetalle || detalle || cargando) return
+    setCargando(true)
+    setError(null)
+    const res = await getAuditDetalle(entry.id)
+    setCargando(false)
+    if (res.ok) setDetalle(res.detalle)
+    // El error se queda en la fila: el resto de la tabla sigue usable, y volver a
+    // desplegar reintenta.
+    else setError(res.error)
+  }
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setAbierto((v) => !v)}
+        onClick={() => void alternar()}
         aria-expanded={abierto}
         className={cn(
           ROW_GRID,
@@ -307,29 +337,95 @@ function Fila({ entry }: { entry: AuditEntry }) {
         <span className="truncate text-foreground/70" title={entry.actorName}>{entry.actorName}</span>
         <span className="text-right tabular-money">{entry.totalHours != null ? formatHoras(entry.totalHours) : '—'}</span>
       </button>
-      {abierto && (hayDetalle ? <Detalle entry={entry} /> : <SinDetalle />)}
+      {abierto && (
+        !hayDetalle ? <SinDetalle />
+        : cargando ? <Cargando />
+        : error ? <ErrorDetalle mensaje={error} />
+        : detalle ? <Detalle detalle={detalle} />
+        : null
+      )}
     </>
   )
 }
 
-// Los asientos anteriores a la migración 0041 no guardaron snapshots y las líneas
-// viejas ya no existen: no hay nada que reconstruir. Se dice, en vez de pintar un
-// desglose vacío que se leería como "no cambió nada".
+// Los asientos anteriores a la migración 0041 no guardaron snapshots. Si además tienen
+// movimientos posteriores (o ya no apuntan a un registro), sus líneas de entonces no
+// se pueden reconstruir. Se dice, en vez de pintar un desglose vacío que se leería
+// como "no cambió nada".
 function SinDetalle() {
+  return <AvisoDetalle>Sin detalle: anterior a la trazabilidad de cambios.</AvisoDetalle>
+}
+
+function Cargando() {
+  return <AvisoDetalle>Cargando el detalle…</AvisoDetalle>
+}
+
+function ErrorDetalle({ mensaje }: { mensaje: string }) {
+  return <AvisoDetalle tono="error">No se pudo cargar el detalle: {mensaje}</AvisoDetalle>
+}
+
+// Los tres estados de una línea sola (sin detalle, cargando, error) ocupan el mismo
+// hueco que el desglose, para que abrir y cerrar no dé saltos de layout.
+function AvisoDetalle({ children, tono }: { children: ReactNode; tono?: 'error' }) {
   return (
-    <p className="border-t border-border/40 bg-(--muted-surface)/40 px-5 py-4 pl-13 text-xs text-muted-foreground">
-      Sin detalle: anterior a la trazabilidad de cambios.
+    <p className={cn(DETALLE_CAJA, 'py-4 text-xs', tono === 'error' ? 'text-rose-700' : 'text-muted-foreground')}>
+      {children}
     </p>
   )
 }
 
-function Detalle({ entry }: { entry: AuditEntry }) {
-  const filas = diffLineas(entry.before, entry.after)
-  const antes = totalDe(entry.before)
-  const despues = totalDe(entry.after)
+function Detalle({ detalle }: { detalle: AuditDetalle }) {
+  if (detalle.tipo === 'sin-detalle') return <SinDetalle />
+  if (detalle.tipo === 'reconstruido') return <DetalleReconstruido action={detalle.action} lineas={detalle.lineas} />
+  return <DetalleSnapshot before={detalle.before} after={detalle.after} />
+}
+
+// Detalle reconstruido: NO es un diff. De un asiento previo a 0041 solo se conoce el
+// estado que dejó (sus líneas vivas, porque es el último movimiento del registro),
+// nunca el anterior. Por eso se pinta como lista plana, sin marcas + − ~, y con la
+// procedencia escrita debajo.
+function DetalleReconstruido({ action, lineas }: { action: AuditAction; lineas: AuditSnapshotLine[] }) {
+  const total = formatHoras(totalDe(lineas) ?? 0)
+  const titulo =
+    action === 'crear' ? <>Registro creado con <span className="tabular-money font-medium text-foreground/80">{total}</span></>
+    : action === 'anular' ? <>Líneas anuladas (<span className="tabular-money font-medium text-foreground/80">{total}</span>)</>
+    : <>Así quedó el registro tras esta edición (<span className="tabular-money font-medium text-foreground/80">{total}</span>)</>
 
   return (
-    <div className="border-t border-border/40 bg-(--muted-surface)/40 px-5 py-3 pl-13">
+    <div className={DETALLE_CAJA}>
+      <p className="mb-2 text-xs text-muted-foreground">{titulo}</p>
+      <ul className="space-y-1">
+        {lineas.map((l, i) => <LineaPlana key={`${l.project}-${i}`} line={l} />)}
+      </ul>
+      <p className="mt-2.5 text-xs text-muted-foreground/80">
+        Reconstruido a partir de las líneas que el registro tiene hoy: este es su último
+        movimiento, así que son las que dejó. No hay comparación con el estado anterior —
+        de eso no quedó constancia.
+      </p>
+    </div>
+  )
+}
+
+function LineaPlana({ line }: { line: AuditSnapshotLine }) {
+  const detalle = [line.etapa, line.description].filter((p) => p && p !== '—').join(' · ')
+  return (
+    <li className="grid grid-cols-[1fr_9rem] items-baseline gap-3 text-xs">
+      <span className="min-w-0">
+        <span className="font-medium text-foreground/85">{line.project}</span>
+        {detalle && <span className="text-muted-foreground"> · {detalle}</span>}
+      </span>
+      <span className="text-right tabular-money text-foreground/70">{formatHoras(line.hours)}</span>
+    </li>
+  )
+}
+
+function DetalleSnapshot({ before, after }: { before: AuditSnapshotLine[] | null; after: AuditSnapshotLine[] | null }) {
+  const filas = diffLineas(before, after)
+  const antes = totalDe(before)
+  const despues = totalDe(after)
+
+  return (
+    <div className={DETALLE_CAJA}>
       <p className="mb-2 text-xs text-muted-foreground">
         {antes != null && despues != null ? (
           <>Total <span className="tabular-money font-medium text-foreground/80">{formatHoras(antes)}</span> → <span className="tabular-money font-medium text-foreground/80">{formatHoras(despues)}</span></>

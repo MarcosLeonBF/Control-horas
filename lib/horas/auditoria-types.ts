@@ -1,7 +1,7 @@
 // Tipos y lógica pura de /admin/auditoria: fechas, filtro, agrupación y diff de
 // snapshots. SIN imports de servidor, para poder probarlo con el proyecto
 // `node-horas` de Playwright (mismo reparto que lib/horas/reportes-types.ts).
-import { formatFechaISO, mesCorto } from '@/lib/horas/format'
+import { formatFechaISO, formatHoras, mesCorto } from '@/lib/horas/format'
 
 export type AuditAction = 'crear' | 'editar' | 'anular'
 
@@ -25,6 +25,25 @@ export interface AuditSnapshotLine {
   description: string
 }
 
+// Resumen compacto del cambio: lo único del "qué cambió" que viaja en el payload de
+// la lista. Los snapshots completos pesan ~609 bytes cada uno y una fila de edición
+// lleva dos: al tope de 5.000 filas serían megas de RSC que casi nadie despliega. El
+// detalle se pide fila a fila al abrirla (server action `getAuditDetalle`).
+//
+// Unión discriminada a propósito: un asiento reconstruido NO tiene diff —solo se
+// conoce el estado final— y darle los mismos campos que a un snapshot invitaría a
+// pintar "0 añadidas, 0 eliminadas" como si fuera un hecho medido.
+export type AuditResumenCambio =
+  | {
+      tipo: 'snapshot'
+      anadidas: number
+      eliminadas: number
+      cambiadas: number
+      totalAntes: number | null   // null en 'crear'
+      totalDespues: number | null // null en 'anular'
+    }
+  | { tipo: 'reconstruido'; lineas: number }
+
 export interface AuditEntry {
   id: string
   action: AuditAction
@@ -34,9 +53,17 @@ export interface AuditEntry {
   entryDate: string | null // día de trabajo afectado (ISO)
   totalHours: number | null
   at: string               // instante del movimiento (ISO con zona)
-  before: AuditSnapshotLine[] | null
-  after: AuditSnapshotLine[] | null
+  cambio: AuditResumenCambio | null // null = no hay detalle que enseñar
 }
+
+// Lo que devuelve la server action al desplegar una fila.
+export type AuditDetalle =
+  // Snapshots guardados por los RPC (migración 0041): sí hay comparación.
+  | { tipo: 'snapshot'; before: AuditSnapshotLine[] | null; after: AuditSnapshotLine[] | null }
+  // Asiento previo a 0041 que resulta ser el último movimiento de su registro: las
+  // líneas vivas SON lo que dejó. Se conoce el estado final, nunca el anterior.
+  | { tipo: 'reconstruido'; action: AuditAction; lineas: AuditSnapshotLine[] }
+  | { tipo: 'sin-detalle' }
 
 // Sobre qué fecha se acota el rango y se agrupa por Día/Mes: el instante del
 // movimiento, o el día de trabajo del registro afectado.
@@ -231,17 +258,100 @@ export function diffLineas(
   )
 }
 
-// Un asiento anterior a la migración 0041 no guardó snapshots: no hay diff que pintar
-// y la pantalla debe decirlo, en vez de mostrar un desglose vacío que se leería como
-// "no cambió nada". Un 'crear' nuevo siempre trae `after` y un 'anular' nuevo siempre
-// trae `before`, así que la regla no da falsos positivos.
+// Una fila sin resumen es una fila sin nada que enseñar al desplegarla: ni snapshots
+// (asiento previo a 0041) ni reconstrucción posible. La pantalla lo dice, en vez de
+// mostrar un desglose vacío que se leería como "no cambió nada".
 export function tieneDetalle(entry: AuditEntry): boolean {
-  return entry.before !== null || entry.after !== null
+  return entry.cambio !== null
 }
 
 export function totalDe(lines: AuditSnapshotLine[] | null): number | null {
   if (lines === null) return null
   return Math.round(lines.reduce((s, l) => s + l.hours, 0) * 100) / 100
+}
+
+// --- Resumen del cambio ---------------------------------------------------
+
+// Cuenta el diff sin arrastrar las líneas: es lo que sí cabe en el payload de la lista.
+export function resumirCambio(
+  before: AuditSnapshotLine[] | null,
+  after: AuditSnapshotLine[] | null,
+): AuditResumenCambio {
+  const filas = diffLineas(before, after)
+  return {
+    tipo: 'snapshot',
+    anadidas: filas.filter((f) => f.mark === '+').length,
+    eliminadas: filas.filter((f) => f.mark === '-').length,
+    cambiadas: filas.filter((f) => f.mark === '~').length,
+    totalAntes: totalDe(before),
+    totalDespues: totalDe(after),
+  }
+}
+
+// --- Reconstrucción de asientos viejos ------------------------------------
+
+// Un asiento previo a 0041 no guardó snapshots, pero si es el ÚLTIMO movimiento de su
+// registro entonces las líneas vivas de ese registro son exactamente lo que ese
+// movimiento dejó: se pueden enseñar sin inventar nada. Vale para 'crear' y 'editar'
+// (estado producido) y para 'anular' (anular no toca las líneas, y guardar_registro se
+// niega a editar un registro ya anulado). Si hay movimientos posteriores ya no vale:
+// sería enseñar un estado ajeno como si fuera este.
+export interface AuditAsientoLog {
+  id: string
+  logId: string
+  at: string
+}
+
+// El orden es (at desc, id desc), el mismo desempate que usa la consulta de la lista:
+// un guardado multi-fecha escribe varios asientos con el mismo now(), y sin desempate
+// "el último" saldría al azar.
+function esPosterior(a: AuditAsientoLog, b: AuditAsientoLog): boolean {
+  const ta = Date.parse(a.at)
+  const tb = Date.parse(b.at)
+  if (ta !== tb) return ta > tb
+  // Date.parse trunca a milisegundos y Postgres guarda microsegundos: si empatan, la
+  // cadena cruda todavía puede desempatar (ambas vienen de la misma consulta, mismo
+  // formato). Y si también empata, el id.
+  if (a.at !== b.at) return a.at > b.at
+  return a.id > b.id
+}
+
+// logId → id del asiento más reciente de ese registro.
+export function ultimoAsientoPorLog(rows: AuditAsientoLog[]): Map<string, string> {
+  const ultimo = new Map<string, AuditAsientoLog>()
+  for (const r of rows) {
+    const actual = ultimo.get(r.logId)
+    if (!actual || esPosterior(r, actual)) ultimo.set(r.logId, r)
+  }
+  return new Map([...ultimo].map(([logId, r]) => [logId, r.id]))
+}
+
+// --- Descarga -------------------------------------------------------------
+
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+
+// Columna "Cambio" de la descarga: el spec pide las columnas de la tabla más un
+// resumen del cambio. Texto plano, que es lo que se lee bien en una hoja de cálculo.
+export function descripcionCambio(cambio: AuditResumenCambio | null): string {
+  if (cambio === null) return 'Sin detalle'
+  if (cambio.tipo === 'reconstruido') {
+    // Sin recuentos de añadido/eliminado: de un asiento reconstruido solo se conoce el
+    // estado final, y decir "0 eliminadas" sería afirmar algo que no se midió.
+    return `Estado final del registro: ${plural(cambio.lineas, 'línea', 'líneas')} (reconstruido)`
+  }
+  const partes = [
+    cambio.anadidas > 0 ? plural(cambio.anadidas, 'añadida', 'añadidas') : null,
+    cambio.eliminadas > 0 ? plural(cambio.eliminadas, 'eliminada', 'eliminadas') : null,
+    cambio.cambiadas > 0 ? plural(cambio.cambiadas, 'cambiada', 'cambiadas') : null,
+  ].filter((p): p is string => p !== null)
+  const lineas = partes.length > 0 ? partes.join(', ') : 'sin cambios en las líneas'
+  const { totalAntes: antes, totalDespues: despues } = cambio
+  const total =
+    antes != null && despues != null ? `${formatHoras(antes)} → ${formatHoras(despues)}`
+    : despues != null ? `total ${formatHoras(despues)}`
+    : antes != null ? `total ${formatHoras(antes)}`
+    : ''
+  return total ? `${lineas} · ${total}` : lineas
 }
 
 // --- Opciones y resumen ---------------------------------------------------
