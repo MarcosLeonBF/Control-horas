@@ -382,8 +382,10 @@ function Detalle({ detalle }: { detalle: AuditDetalle }) {
 
 // Detalle reconstruido: NO es un diff. De un asiento previo a 0041 solo se conoce el
 // estado que dejó (sus líneas vivas, porque es el último movimiento del registro),
-// nunca el anterior. Por eso se pinta como lista plana, sin marcas + − ~, y con la
-// procedencia escrita debajo.
+// nunca el anterior. Por eso se pinta como lista plana, sin marcas + − ~: la ausencia
+// de marcas ES la señal de que aquí no hay comparación. La procedencia no se rotula en
+// pantalla a propósito (decisión del usuario, 2026-08-05): el título ya dice qué se
+// está mirando y el párrafo explicativo era ruido en una lista larga.
 function DetalleReconstruido({ action, lineas }: { action: AuditAction; lineas: AuditSnapshotLine[] }) {
   const total = formatHoras(totalDe(lineas) ?? 0)
   const titulo =
@@ -397,11 +399,6 @@ function DetalleReconstruido({ action, lineas }: { action: AuditAction; lineas: 
       <ul className="space-y-1">
         {lineas.map((l, i) => <LineaPlana key={`${l.project}-${i}`} line={l} />)}
       </ul>
-      <p className="mt-2.5 text-xs text-muted-foreground/80">
-        Reconstruido a partir de las líneas que el registro tiene hoy: este es su último
-        movimiento, así que son las que dejó. No hay comparación con el estado anterior —
-        de eso no quedó constancia.
-      </p>
     </div>
   )
 }

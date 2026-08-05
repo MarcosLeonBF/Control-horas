@@ -132,8 +132,10 @@ test('un movimiento sin snapshot que es el ultimo de su registro muestra sus lin
     // Las líneas vivas, no el aviso de "sin detalle"…
     await expect(fila.getByText(proyecto)).toBeVisible()
     await expect(fila.getByText('Sin detalle: anterior a la trazabilidad de cambios')).toHaveCount(0)
-    // …y de dónde salen, para no hacerlas pasar por un snapshot guardado.
-    await expect(fila.getByText(/Reconstruido a partir de las líneas que el registro tiene hoy/)).toBeVisible()
+    // …y sin marcas de diff. De un asiento reconstruido solo se conoce el estado que
+    // dejó, nunca el anterior: pintarlo por el camino del diff afirmaría una comparación
+    // que no existe. La etiqueta sr-only de las marcas es la prueba de qué camino se usó.
+    await expect(fila.getByText('Añadida', { exact: true })).toHaveCount(0)
   } finally {
     await db.from('time_log_audit').delete().eq('log_id', log!.id)
     await db.from('time_logs').delete().eq('id', log!.id)
