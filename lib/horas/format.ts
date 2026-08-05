@@ -75,3 +75,17 @@ export function mesesEnRango(from: string, to: string): string[] {
   for (let m = from.slice(0, 7); m <= fin; m = addMonths(m, 1)) meses.push(m)
   return meses
 }
+
+// Minutos → horas, redondeado a centésimas porque es lo que la BD guarda
+// (`time_log_lines.hours` es numeric(5,2)). Solo los múltiplos de 3 minutos caben
+// exactos: 10 min son 0,1666… y se guardan como 0,17. Decisión tomada a sabiendas
+// (spec 2026-08-05-registro-minutos-design), no un descuido de precisión.
+export function minutosAHoras(min: number): number {
+  return Math.round((min / 60) * 100) / 100
+}
+
+// Horas → minutos enteros. Redondea porque el valor guardado ya viene redondeado a
+// centésimas: 0,17 h son 10,2 minutos, y el campo debe volver a mostrar 10.
+export function horasAMinutos(horas: number): number {
+  return Math.round(horas * 60)
+}
