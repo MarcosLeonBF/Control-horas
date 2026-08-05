@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { guardarRegistro, type LineInput } from '@/app/(horas)/registrar/actions'
-import { formatHoras } from '@/lib/horas/format'
+import { formatHoras, horasAMinutos, minutosAHoras } from '@/lib/horas/format'
 import type { AreaRow, EtapaRow, DepartamentoRow } from '@/lib/horas/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import { TriangleAlert } from 'lucide-react'
 import ProjectCombobox from '@/components/horas/ProjectCombobox'
 import DepartamentoSelect from '@/components/horas/DepartamentoSelect'
 import NativeSelect from '@/components/ui/native-select'
+import { cn } from '@/lib/utils'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
@@ -26,6 +27,10 @@ const registroMinDate = () => {
 // llevan fijo en 'Clientes' (valor canónico histórico; la RPC también lo normaliza).
 // No usar departamentos[0]: el catálogo es editable y su primer nombre cambia.
 const CLIENTES_DEP = 'Clientes'
+// Unidad de captura del campo de tiempo. Es preferencia de pantalla, no un dato:
+// lo que se guarda son siempre horas.
+type Unidad = 'h' | 'min'
+const UNIDADES: Unidad[] = ['h', 'min']
 const emptyLine = (areaId: string, date: string): LineInput => ({ entry_date: date, project: '', area_id: areaId, department: CLIENTES_DEP, etapa_id: '', hours: 0, description: '' })
 
 // Validación previa al guardado, acotada a los campos uuid (area_id, etapa_id) que son
@@ -75,6 +80,14 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
   // Departamento inicial al entrar al proyecto "Departamento" (única pantalla donde se elige).
   const defaultDep = departamentos[0]?.name ?? CLIENTES_DEP
   const [lines, setLines] = useState<LineInput[]>(initial?.lines ?? [emptyLine(areas[0]?.id ?? '', today())])
+  // Unidad de captura de cada línea. Es estado de UI: NO viaja al servidor y no se
+  // guarda. `hours` sigue siendo la única fuente de verdad; la unidad solo decide cómo
+  // se proyecta ese número en el campo, así que alternar no convierte ni pierde nada.
+  // El array va en paralelo a `lines` (mismo índice) y se mantiene en los dos únicos
+  // sitios que cambian su longitud: quitar línea y añadir línea.
+  const [unidades, setUnidades] = useState<Unidad[]>(
+    () => Array<Unidad>(initial?.lines.length ?? 1).fill('h'),
+  )
   const [saving, setSaving] = useState(false)
 
   const total = lines.reduce((s, l) => s + (Number(l.hours) || 0), 0)
@@ -196,9 +209,61 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
         {lineClientEtapas.map((et) => <option key={et.id} value={et.id}>{et.name}</option>)}
       </NativeSelect>
     )
+    const unidad = unidades[i] ?? 'h'
+    // El campo muestra `hours` proyectado a la unidad activa; lo que se guarda son
+    // siempre horas. `|| ''` deja el campo vacío en 0, como hacía el Input anterior.
+    const valorMostrado = l.hours ? (unidad === 'h' ? l.hours : horasAMinutos(l.hours)) : ''
     const horas = (
-      <Input aria-label="Horas" type="number" step="0.5" min="0" value={l.hours || ''}
-        onChange={(e) => update(i, { hours: Number(e.target.value) })} />
+      <div>
+        {/* El número y la unidad comparten un único borde y un único anillo de foco:
+            se leen como un control, no como dos campos sueltos. */}
+        <div className="flex items-stretch rounded-lg border border-border bg-background focus-within:border-transparent focus-within:ring-2 focus-within:ring-ring">
+          <input
+            // El nombre accesible sigue a la unidad: si no, un lector de pantalla
+            // anunciaría "Horas" sobre un 10 que son minutos.
+            aria-label={unidad === 'h' ? 'Horas' : 'Minutos'}
+            type="number"
+            // `step` no es cosmético: en HTML5 los valores válidos son min + n × step.
+            // Con step="0.5" (lo que había antes) un 0,17 queda marcado como inválido,
+            // que es justo lo que produce cargar 10 minutos.
+            step={unidad === 'h' ? 'any' : '1'}
+            min={unidad === 'h' ? '0' : '1'}
+            value={valorMostrado}
+            onChange={(e) => {
+              const n = Number(e.target.value)
+              update(i, { hours: unidad === 'h' ? n : minutosAHoras(n) })
+            }}
+            className="w-full min-w-0 bg-transparent py-2 pl-2.5 pr-1 text-sm text-foreground focus:outline-none"
+          />
+          {/* Segmentado de dos estados en vez de un <select>: para dos opciones de una y
+              tres letras, la flecha y el ancho intrínseco del select nativo son más
+              mueble que control, y dejan la unidad flotando en medio del campo. */}
+          <div role="group" aria-label="Unidad" className="flex shrink-0 items-center gap-0.5 self-center pr-1">
+            {UNIDADES.map((u) => (
+              <button
+                key={u}
+                type="button"
+                aria-pressed={unidad === u}
+                onClick={() => setUnidades((p) => p.map((prev, idx) => (idx === i ? u : prev)))}
+                className={cn(
+                  'rounded-md px-1.5 py-0.5 text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  unidad === u
+                    ? 'bg-foreground/10 font-medium text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {u}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* En minutos, el valor que se va a guardar queda a la vista. Sin esto el
+            selector reintroduce el error silencioso que hizo descartar un interruptor
+            global de unidad. En horas no hay nada que tranquilizar: no se muestra. */}
+        {unidad === 'min' && l.hours > 0 && (
+          <p className="mt-1 text-xs text-muted-foreground">= {formatHoras(l.hours)}</p>
+        )}
+      </div>
     )
     // En "Departamento": desplegable con las descripciones del departamento. En el resto:
     // input de texto libre (obligatorio; el motor exige no vacía).
@@ -220,7 +285,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
   }
 
   const removeBtn = (i: number) => (
-    <Button type="button" variant="ghost" size="icon-sm" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
+    <Button type="button" variant="ghost" size="icon-sm" onClick={() => { setLines((p) => p.filter((_, idx) => idx !== i)); setUnidades((p) => p.filter((_, idx) => idx !== i)) }}
       disabled={lines.length === 1} aria-label="Eliminar línea" className="text-foreground/40 hover:text-(--status-excedido)">✕</Button>
   )
 
@@ -244,7 +309,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
               <th className="pb-1 pr-3 font-medium">Proyecto</th>
               {showDepartamento && <th className="pb-1 pr-3 font-medium">Departamento</th>}
               {showEtapa && <th className="pb-1 pr-3 font-medium">Etapa</th>}
-              <th className="pb-1 pr-3 font-medium">Horas</th>
+              <th className="pb-1 pr-3 font-medium">Tiempo</th>
               <th className="pb-1 pr-3 font-medium">Descripción</th>
               <th className="w-8 pb-1"></th>
             </tr>
@@ -258,7 +323,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
                   <td className="min-w-45 pr-3 align-top">{c.proyecto}</td>
                   {showDepartamento && <td className="min-w-32.5 pr-3 align-top">{c.isDep ? c.depto : c.emptyPlaceholder}</td>}
                   {showEtapa && <td className="min-w-35 pr-3 align-top">{c.isDep ? c.emptyPlaceholder : c.etapa}</td>}
-                  <td className="w-24 pr-3 align-top">{c.horas}</td>
+                  <td className="w-36 pr-3 align-top">{c.horas}</td>
                   <td className="min-w-50 pr-3 align-top">{c.desc}</td>
                   <td className="align-middle">{removeBtn(i)}</td>
                 </tr>
@@ -282,7 +347,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
                 <MobileField label="Fecha">{c.fecha}</MobileField>
                 <MobileField label="Proyecto">{c.proyecto}</MobileField>
                 {c.isDep ? <MobileField label="Departamento">{c.depto}</MobileField> : <MobileField label="Etapa">{c.etapa}</MobileField>}
-                <MobileField label="Horas">{c.horas}</MobileField>
+                <MobileField label="Tiempo">{c.horas}</MobileField>
                 <MobileField label="Descripción">{c.desc}</MobileField>
               </div>
             </div>
@@ -291,7 +356,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
       </div>
 
       <div className="mt-4 flex items-start justify-between border-t border-border pt-4">
-        <Button type="button" variant="link" size="sm" className="px-0" onClick={() => setLines((p) => [...p, emptyLine(areas[0]?.id ?? '', defaultDate)])}>
+        <Button type="button" variant="link" size="sm" className="px-0" onClick={() => { setLines((p) => [...p, emptyLine(areas[0]?.id ?? '', defaultDate)]); setUnidades((p) => [...p, 'h']) }}>
           + Añadir línea
         </Button>
         <div className="text-right">
