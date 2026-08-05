@@ -29,12 +29,37 @@ test('diaMadrid en invierno desplaza una sola hora', () => {
   expect(diaMadrid('2026-01-04T23:30:00.000Z')).toBe('2026-01-05')
 })
 
+// La víspera del atraso de reloj (25 de octubre) sigue en CEST (+2) hasta la 01:00
+// UTC de ese domingo: 22:30 UTC del 24 son, con offset +2, las 00:30 del 25 en
+// Madrid — cruza de día aunque en UTC todavía es el 24.
+test('diaMadrid la vispera del atraso de reloj sigue en offset de verano', () => {
+  expect(diaMadrid('2026-10-24T22:30:00.000Z')).toBe('2026-10-25')
+})
+
 test('inicioDiaMadridUTC en verano cae a las 22:00 del dia anterior', () => {
   expect(inicioDiaMadridUTC('2026-08-05')).toBe('2026-08-04T22:00:00.000Z')
 })
 
 test('inicioDiaMadridUTC en invierno cae a las 23:00 del dia anterior', () => {
   expect(inicioDiaMadridUTC('2026-01-05')).toBe('2026-01-04T23:00:00.000Z')
+})
+
+// El adelanto de reloj de 2026 es el domingo 29 de marzo: a las 01:00 UTC (02:00
+// CET) el reloj de Madrid salta a las 03:00 CEST. La medianoche local de ese mismo
+// día (00:00) queda ANTES de ese salto, así que todavía rige el offset viejo, CET
+// (+1) — igual que un día de invierno cualquiera. 00:00 local - 1h = 23:00 UTC del
+// día anterior.
+test('inicioDiaMadridUTC el dia del adelanto de reloj (29 marzo) usa aun el offset de invierno', () => {
+  expect(inicioDiaMadridUTC('2026-03-29')).toBe('2026-03-28T23:00:00.000Z')
+})
+
+// El retraso de reloj de 2026 es el domingo 25 de octubre: a las 01:00 UTC (03:00
+// CEST) el reloj de Madrid retrocede a las 02:00 CET. La medianoche local de ese
+// mismo día (00:00) queda ANTES de ese retroceso, así que todavía rige el offset
+// viejo, CEST (+2) — igual que un día de verano cualquiera. 00:00 local - 2h =
+// 22:00 UTC del día anterior.
+test('inicioDiaMadridUTC el dia del atraso de reloj (25 octubre) usa aun el offset de verano', () => {
+  expect(inicioDiaMadridUTC('2026-10-25')).toBe('2026-10-24T22:00:00.000Z')
 })
 
 test('addDiasISO suma y cruza el fin de mes', () => {
