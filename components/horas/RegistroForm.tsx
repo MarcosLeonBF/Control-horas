@@ -8,7 +8,8 @@ import type { AreaRow, EtapaRow, DepartamentoRow } from '@/lib/horas/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { TriangleAlert } from 'lucide-react'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
+import { TriangleAlert, CircleHelp } from 'lucide-react'
 import ProjectCombobox from '@/components/horas/ProjectCombobox'
 import DepartamentoSelect from '@/components/horas/DepartamentoSelect'
 import NativeSelect from '@/components/ui/native-select'
@@ -60,8 +61,34 @@ export function primerErrorLinea(lines: LineInput[]): string | null {
 const field =
   'w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
 
+// La cabecera de Tiempo explica el formato al pasar por encima. El circulito es la
+// señal de que hay algo que leer: apagado hasta que el puntero llega a la etiqueta, para
+// que no compita con los nombres de las columnas. La etiqueta entera es el disparador,
+// no solo el icono: 14px es un blanco pequeño para apuntar.
+function EtiquetaTiempo() {
+  return (
+    <TooltipProvider delay={150}>
+      <Tooltip>
+        <TooltipTrigger render={<span className="group inline-flex cursor-help items-center gap-1" />}>
+          Tiempo
+          <CircleHelp aria-hidden className="size-3.5 text-muted-foreground/50 transition-colors group-hover:text-foreground" />
+        </TooltipTrigger>
+        <TooltipContent className="block px-3 py-2.5">
+          <p className="font-medium">Escribe horas y minutos</p>
+          {/* Las cifras enseñan el formato; la glosa dice qué significan. */}
+          <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-background/70">
+            <dt className="tabular-nums text-background">3:30</dt><dd>tres horas y media</dd>
+            <dt className="tabular-nums text-background">3:15</dt><dd>tres y cuarto</dd>
+            <dt className="tabular-nums text-background">0:10</dt><dd>diez minutos</dd>
+          </dl>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
 // Campo etiquetado para la vista móvil (label arriba + control).
-function MobileField({ label, children }: { label: string; children: ReactNode }) {
+function MobileField({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <label className="block space-y-1">
       <span className="block text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
@@ -239,6 +266,10 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
     // lee "0:05h", que es el formato que el campo promete. No toca las horas guardadas
     // (el cero a la izquierda no cambia el número).
     const padMinutos = () => { if (t.m.length === 1) setTiempo({ m: t.m.padStart(2, '0') }) }
+    // La unidad sigue al dato: "0:10h" se lee como una décima de hora, así que cuando
+    // no hay horas la casilla dice "min". El campo en 0:00 (vacío o a cero) se queda en
+    // "h": ahí la unidad no describe nada, enseña el formato que hay que escribir.
+    const soloMinutos = (Number(t.h) || 0) === 0 && (Number(t.m) || 0) > 0
     const horas = (
       // Las dos casillas, los dos puntos y la "h" comparten borde y anillo de foco: el
       // campo entero se lee como un reloj, no como dos números sueltos. El ancho es el
@@ -266,7 +297,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
         />
         {/* La unidad, no un dato: en el gris de las etiquetas y fuera del árbol de accesibilidad
             (las casillas ya se anuncian "Horas" y "Minutos"). */}
-        <span aria-hidden className="text-sm text-muted-foreground">h</span>
+        <span aria-hidden className="text-sm text-muted-foreground">{soloMinutos ? 'min' : 'h'}</span>
       </div>
     )
     // En "Departamento": desplegable con las descripciones del departamento. En el resto:
@@ -313,7 +344,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
               <th className="pb-1 pr-3 font-medium">Proyecto</th>
               {showDepartamento && <th className="pb-1 pr-3 font-medium">Departamento</th>}
               {showEtapa && <th className="pb-1 pr-3 font-medium">Etapa</th>}
-              <th className="pb-1 pr-3 font-medium">Tiempo</th>
+              <th className="pb-1 pr-3 font-medium"><EtiquetaTiempo /></th>
               <th className="pb-1 pr-3 font-medium">Descripción</th>
               <th className="w-8 pb-1"></th>
             </tr>
@@ -351,7 +382,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
                 <MobileField label="Fecha">{c.fecha}</MobileField>
                 <MobileField label="Proyecto">{c.proyecto}</MobileField>
                 {c.isDep ? <MobileField label="Departamento">{c.depto}</MobileField> : <MobileField label="Etapa">{c.etapa}</MobileField>}
-                <MobileField label="Tiempo">{c.horas}</MobileField>
+                <MobileField label={<EtiquetaTiempo />}>{c.horas}</MobileField>
                 <MobileField label="Descripción">{c.desc}</MobileField>
               </div>
             </div>
