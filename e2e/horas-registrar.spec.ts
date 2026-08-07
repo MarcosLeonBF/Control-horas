@@ -11,10 +11,12 @@ test('registrar dos líneas guarda el día con su total', async ({ page }) => {
   await page.getByRole('button', { name: /añadir línea/i }).click()
   await page.getByLabel('Proyecto').nth(1).selectOption({ index: 1 })
   await page.getByLabel('Etapa').nth(1).selectOption({ index: 2 })
-  await page.getByLabel('Horas').nth(1).fill('1.5')
+  // Hora y media en el campo H:MM (el campo ya no admite decimales).
+  await page.getByLabel('Horas').nth(1).fill('1')
+  await page.getByLabel('Minutos').nth(1).fill('30')
   await page.getByLabel('Descripción').nth(1).fill('Trabajo E2E 2')
 
-  await expect(page.getByText(/total del día/i)).toContainText('3,5h')
+  await expect(page.getByText(/total del día/i)).toContainText('3,50h')
   await page.getByRole('button', { name: /guardar registro/i }).click()
   await expect(page).toHaveURL(/\/mis-registros/)
 })

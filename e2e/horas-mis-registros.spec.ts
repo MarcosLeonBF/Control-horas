@@ -29,5 +29,5 @@ test('editar un registro propio actualiza sus horas', async ({ page }) => {
   await page.getByLabel('Horas').first().fill('5')
   await page.getByRole('button', { name: /guardar registro/i }).click()
   await expect(page).toHaveURL(/\/mis-registros/)
-  await expect(page.getByText('5h').first()).toBeVisible()
+  await expect(page.getByText('5,00h').first()).toBeVisible()
 })

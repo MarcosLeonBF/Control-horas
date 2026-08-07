@@ -31,9 +31,13 @@ const CLIENTES_DEP = 'Clientes'
 // derivara de `hours`, un 0 daría 0 horas y el campo volvería a pintarse vacío.
 type TiempoBorrador = { h: string; m: string }
 
-// Sin spinners: en dos casillas estrechas ocupan más que las cifras.
+// Lo que admite una casilla del reloj: hasta dos cifras y nada más (vacío incluido).
+const DOS_CIFRAS = /^\d{0,2}$/
+
+// Sin spinners: en dos casillas estrechas ocupan más que las cifras. El ancho lo pone
+// cada casilla (las cifras mandan), no este base: así el campo mide lo que mide "0:00h".
 const casillaTiempo =
-  'w-full min-w-0 bg-transparent py-2 text-sm text-foreground tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+  'min-w-0 bg-transparent py-2 text-sm text-foreground tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
 const emptyLine = (areaId: string, date: string): LineInput => ({ entry_date: date, project: '', area_id: areaId, department: CLIENTES_DEP, etapa_id: '', hours: 0, description: '' })
 
 // Validación previa al guardado, acotada a los campos uuid (area_id, etapa_id) que son
@@ -221,31 +225,48 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
     // único que se guarda. Un campo vacío cuenta como 0: escribir solo minutos es el
     // caso corriente (0:15) y no debe obligar a teclear el cero de las horas.
     const setTiempo = (patch: Partial<TiempoBorrador>) => {
+      // Dos cifras por casilla, las que caben y las que tiene un reloj: la tercera
+      // tecla no entra. Antes un "300" por dedazo se aceptaba y quedaba a medio ver
+      // dentro de la casilla. Se valida solo lo que se acaba de teclear, no el estado
+      // entero, para que un valor guardado fuera de rango no bloquee la otra casilla.
+      if (patch.h !== undefined && !DOS_CIFRAS.test(patch.h)) return
+      if (patch.m !== undefined && !DOS_CIFRAS.test(patch.m)) return
       const next = { ...t, ...patch }
       setTiempos((p) => p.map((prev, idx) => (idx === i ? next : prev)))
       update(i, { hours: hmAHoras(Number(next.h) || 0, Number(next.m) || 0) })
     }
+    // Al salir de los minutos, un dígito suelto se completa a dos: se escribe "5" y se
+    // lee "0:05h", que es el formato que el campo promete. No toca las horas guardadas
+    // (el cero a la izquierda no cambia el número).
+    const padMinutos = () => { if (t.m.length === 1) setTiempo({ m: t.m.padStart(2, '0') }) }
     const horas = (
-      // Las dos casillas comparten borde y anillo de foco: se leen como un reloj, no
-      // como dos campos sueltos.
-      <div className="flex items-center rounded-lg border border-border bg-background focus-within:border-transparent focus-within:ring-2 focus-within:ring-ring">
+      // Las dos casillas, los dos puntos y la "h" comparten borde y anillo de foco: el
+      // campo entero se lee como un reloj, no como dos números sueltos. El ancho es el
+      // del contenido ("0:00h") porque el tiempo es un dato corto, no una frase.
+      // El padding horizontal va aquí y no en las casillas: con box-border, un pl-2.5
+      // dentro de un w-[2ch] se comería la cifra.
+      <div className="inline-flex w-fit items-center rounded-lg border border-border bg-background px-2.5 focus-within:border-transparent focus-within:ring-2 focus-within:ring-ring">
         <input
           aria-label="Horas"
           type="number" inputMode="numeric" min="0" step="1" placeholder="0"
           value={t.h}
           onChange={(e) => setTiempo({ h: e.target.value })}
-          className={`${casillaTiempo} pl-2.5 text-right`}
+          className={`${casillaTiempo} w-[2ch] text-right`}
         />
         <span aria-hidden className="px-0.5 text-sm text-muted-foreground">:</span>
         <input
           aria-label="Minutos"
-          // Tope en 59: es la semántica de la casilla, y así un 300 por dedazo se
-          // marca en vez de convertirse en cinco horas sin que nadie lo note.
+          // Tope en 59: es la semántica de la casilla. Un 75 se puede teclear y queda
+          // marcado, pero ya no puede convertirse en horas sin que nadie lo note.
           type="number" inputMode="numeric" min="0" max="59" step="1" placeholder="00"
           value={t.m}
           onChange={(e) => setTiempo({ m: e.target.value })}
-          className={`${casillaTiempo} pr-2.5`}
+          onBlur={padMinutos}
+          className={`${casillaTiempo} w-[2ch]`}
         />
+        {/* La unidad, no un dato: en el gris de las etiquetas y fuera del árbol de accesibilidad
+            (las casillas ya se anuncian "Horas" y "Minutos"). */}
+        <span aria-hidden className="text-sm text-muted-foreground">h</span>
       </div>
     )
     // En "Departamento": desplegable con las descripciones del departamento. En el resto:
@@ -306,7 +327,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
                   <td className="min-w-45 pr-3 align-top">{c.proyecto}</td>
                   {showDepartamento && <td className="min-w-32.5 pr-3 align-top">{c.isDep ? c.depto : c.emptyPlaceholder}</td>}
                   {showEtapa && <td className="min-w-35 pr-3 align-top">{c.isDep ? c.emptyPlaceholder : c.etapa}</td>}
-                  <td className="w-28 pr-3 align-top">{c.horas}</td>
+                  <td className="w-24 pr-3 align-top">{c.horas}</td>
                   <td className="min-w-50 pr-3 align-top">{c.desc}</td>
                   <td className="align-middle">{removeBtn(i)}</td>
                 </tr>

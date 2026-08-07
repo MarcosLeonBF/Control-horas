@@ -31,7 +31,7 @@ test('el admin amplía y anula horas de un proyecto', async ({ page }) => {
   const seccionAmpliaciones = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Ampliaciones', exact: true }) })
   const fila = seccionAmpliaciones.getByRole('row').filter({ hasText: motivo })
   await expect(fila).toBeVisible({ timeout: 10000 })
-  await expect(fila.getByText('+3h')).toBeVisible()
+  await expect(fila.getByText('+3,00h')).toBeVisible()
 
   // anular → la fila queda como "anulada"
   await fila.getByRole('button', { name: /anular/i }).click()
