@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
-import { TriangleAlert, CircleHelp } from 'lucide-react'
+import { TriangleAlert, CircleHelp, List } from 'lucide-react'
 import ProjectCombobox from '@/components/horas/ProjectCombobox'
 import DepartamentoSelect from '@/components/horas/DepartamentoSelect'
 import NativeSelect from '@/components/ui/native-select'
@@ -21,9 +21,10 @@ const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n
 // llevan fijo en 'Clientes' (valor canónico histórico; la RPC también lo normaliza).
 // No usar departamentos[0]: el catálogo es editable y su primer nombre cambia.
 const CLIENTES_DEP = 'Clientes'
-// Sugerencias del campo de descripción cuando la posición tiene libertad (0044). El
-// <datalist> se pinta una vez y lo comparten todas las líneas: es el mismo catálogo.
-const LISTA_DESCRIPCIONES = 'descripciones-departamento'
+// Valor de la opción "Otra" del desplegable de descripción (0044). No es una
+// descripción: es la señal de que esa línea pasa a escribirse a mano. Va entre guiones
+// bajos para no chocar con un nombre real del catálogo.
+const OTRA = '__otra__'
 // Lo que hay escrito en las dos casillas del campo de tiempo, como texto. Se guarda
 // aparte de `hours` para que teclear un "0" no se desvanezca: si el valor mostrado se
 // derivara de `hours`, un 0 daría 0 horas y el campo volvería a pintarse vacío.
@@ -100,7 +101,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
   // grupo del desplegable de "Departamento"; sin ellas, el campo se ve como siempre.
   descripcionesPosicion?: string[]
   // La posición del dueño puede escribir la descripción a mano en "Departamento" (0044).
-  // Añade a la lista, no la sustituye: el campo pasa a ser escribible con la lista sugerida.
+  // Añade a la lista, no la sustituye: aparece como una opción más del desplegable.
   descripcionLibre?: boolean
   canBackdate?: boolean // admin: puede registrar sin límite de fecha hacia atrás
   // Días hacia atrás que puede registrar este usuario: 7, o los que el admin le haya
@@ -137,6 +138,13 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
       const { h, m } = horasAHM(l.hours)
       return { h: String(h), m: String(m).padStart(2, '0') }
     }),
+  )
+  // Qué líneas están escribiendo la descripción a mano en "Departamento" (0044). Es
+  // estado de UI, como `tiempos`: va en paralelo a `lines` y se mantiene en los mismos
+  // dos sitios. Al editar un registro, una descripción que ya no está en el catálogo
+  // solo pudo escribirse a mano, así que la línea entra en ese modo.
+  const [descLibres, setDescLibres] = useState<boolean[]>(() =>
+    (initial?.lines ?? [null]).map((l) => !!l?.description && !permitidas.includes(l.description)),
   )
   const [saving, setSaving] = useState(false)
 
@@ -317,17 +325,34 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
     // "Generales" no distinguiría nada de nada. En el resto de proyectos: texto libre
     // (obligatorio; el motor exige no vacía).
     const opciones = (nombres: string[]) => nombres.map((name) => <option key={name} value={name}>{name}</option>)
+    // Una línea escribiendo a mano enseña la casilla de texto, con un botón para volver
+    // a la lista. El resto del tiempo el campo es el desplegable de siempre: la libertad
+    // es una opción MÁS del desplegable, no otro tipo de campo.
+    // El modo también se deduce del propio texto: una descripción que no está en el
+    // catálogo solo pudo escribirse a mano. Así, ir a un proyecto cliente y volver a
+    // "Departamento" no deja el desplegable en blanco con un texto que no puede mostrar.
+    const enModoLibre = descripcionLibre && (descLibres[i] || (!!l.description && !permitidas.includes(l.description)))
     const desc = isDep ? (
-      // Con libertad concedida a la posición (0044): campo escribible con el catálogo
-      // como sugerencias. Un <datalist> hace justo lo que se pidió —elegir de la lista
-      // O escribir la tuya— sin partir el campo en dos controles.
-      descripcionLibre ? (
-        <input aria-label="Descripción" type="text" list={LISTA_DESCRIPCIONES} value={l.description}
-          onChange={(e) => update(i, { description: e.target.value })} placeholder="Elige de la lista o escribe…" className={field} />
-      ) : deptDescripciones.length === 0 ? (
+      enModoLibre ? (
+        <div className="flex items-center gap-1">
+          <input aria-label="Descripción" type="text" value={l.description} autoFocus
+            onChange={(e) => update(i, { description: e.target.value })} placeholder="Escribe la descripción…" className={field} />
+          <Button type="button" variant="ghost" size="icon-sm" aria-label="Elegir de la lista"
+            className="shrink-0 text-foreground/55 hover:text-foreground"
+            onClick={() => { setDescLibres((p) => p.map((v, idx) => (idx === i ? false : v))); update(i, { description: '' }) }}>
+            <List />
+          </Button>
+        </div>
+      ) : deptDescripciones.length === 0 && !descripcionLibre ? (
         <NativeSelect aria-label="Descripción" value="" disabled fullWidth><option value="">— Sin descripciones (contacta al admin) —</option></NativeSelect>
       ) : (
-        <NativeSelect aria-label="Descripción" value={l.description} onChange={(e) => update(i, { description: e.target.value })} fullWidth>
+        <NativeSelect
+          aria-label="Descripción" value={l.description} fullWidth
+          onChange={(e) => {
+            if (e.target.value === OTRA) { setDescLibres((p) => p.map((v, idx) => (idx === i ? true : v))); update(i, { description: '' }) }
+            else update(i, { description: e.target.value })
+          }}
+        >
           <option value="">— Descripción —</option>
           {grupos.posicion.length === 0 ? (
             opciones(grupos.generales)
@@ -336,6 +361,15 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
               {grupos.generales.length > 0 && <optgroup label="Generales">{opciones(grupos.generales)}</optgroup>}
               <optgroup label="De tu posición">{opciones(grupos.posicion)}</optgroup>
             </>
+          )}
+          {/* La libertad de la posición (0044) entra como una opción más, al final y en
+              el carmín de la marca: es la única del desplegable que no elige un texto
+              sino que abre uno. El color en <option> lo respetan Chrome y Firefox; donde
+              no, la propia frase ya la distingue. */}
+          {descripcionLibre && (
+            <option value={OTRA} style={{ color: 'var(--brand-strong)', fontWeight: 500 }}>
+              ✎ Otra — escribir a mano
+            </option>
           )}
         </NativeSelect>
       )
@@ -348,19 +382,12 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
   }
 
   const removeBtn = (i: number) => (
-    <Button type="button" variant="ghost" size="icon-sm" onClick={() => { setLines((p) => p.filter((_, idx) => idx !== i)); setTiempos((p) => p.filter((_, idx) => idx !== i)) }}
+    <Button type="button" variant="ghost" size="icon-sm" onClick={() => { setLines((p) => p.filter((_, idx) => idx !== i)); setTiempos((p) => p.filter((_, idx) => idx !== i)); setDescLibres((p) => p.filter((_, idx) => idx !== i)) }}
       disabled={lines.length === 1} aria-label="Eliminar línea" className="text-foreground/40 hover:text-(--status-excedido)">✕</Button>
   )
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-      {/* Sugerencias del campo de descripción con libertad concedida. Una sola vez para
-          todas las líneas; sin libertad no se pinta porque nadie la referencia. */}
-      {descripcionLibre && (
-        <datalist id={LISTA_DESCRIPCIONES}>
-          {permitidas.map((name) => <option key={name} value={name} />)}
-        </datalist>
-      )}
       <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
         <label htmlFor="fecha" className="text-sm font-medium text-foreground">Fecha por defecto</label>
         <Input
@@ -426,7 +453,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
       </div>
 
       <div className="mt-4 flex items-start justify-between border-t border-border pt-4">
-        <Button type="button" variant="link" size="sm" className="px-0" onClick={() => { setLines((p) => [...p, emptyLine(areas[0]?.id ?? '', defaultDate)]); setTiempos((p) => [...p, { h: '', m: '' }]) }}>
+        <Button type="button" variant="link" size="sm" className="px-0" onClick={() => { setLines((p) => [...p, emptyLine(areas[0]?.id ?? '', defaultDate)]); setTiempos((p) => [...p, { h: '', m: '' }]); setDescLibres((p) => [...p, false]) }}>
           + Añadir línea
         </Button>
         <div className="text-right">
