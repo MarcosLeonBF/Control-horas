@@ -69,11 +69,15 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
   }
 
   const admin = createAdminClient()
-  const { error } = await admin.from('profiles').update({
+  const patch: Record<string, unknown> = {
     full_name: input.full_name.trim(), position_id: input.positionId || null, role: input.role, status: input.status,
     // Un admin ya puede crear usuarios por rol: el flag delegado se limpia para no dejarlo huérfano.
     can_create_users: input.role === 'admin' ? false : input.canCreateUsers,
-  }).eq('id', id)
+  }
+  // Mismo motivo con la ventana ampliada (0043): el admin registra sin límite de fecha,
+  // así que ascender a alguien a admin apaga su permiso en vez de dejarlo puesto y mudo.
+  if (input.role === 'admin') patch.registro_dias_atras = null
+  const { error } = await admin.from('profiles').update(patch).eq('id', id)
   if (error) return { ok: false, error: error.message }
 
   // Reemplaza las áreas de visibilidad (manager/admin). El operativo no tiene user_areas
@@ -84,6 +88,32 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
     const { error: ae } = await admin.from('user_areas').insert(areaIds.map((area_id) => ({ user_id: id, area_id })))
     if (ae) return { ok: false, error: `Datos guardados pero fallaron las áreas: ${ae.message}` }
   }
+  return { ok: true }
+}
+
+// Ventana de registro ampliada (migración 0043): cuántos días hacia atrás puede
+// registrar, editar y anular este usuario. null = la ventana normal de 7 días.
+// Vive en su propia acción, y no dentro de actualizarUsuario, porque se concede
+// desde su propio diálogo en la fila: conceder días no debería obligar a abrir el
+// editor completo ni a reescribir de paso el rol, el estado y las áreas.
+export async function actualizarDiasRegistro(
+  id: string, dias: number | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'No autenticado.' }
+  const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (me?.role !== 'admin') return { ok: false, error: 'Solo un administrador puede dar este permiso.' }
+
+  // El mismo rango que impone el CHECK de la base (0043): el formulario avisa antes,
+  // pero la acción es una puerta pública y valida por su cuenta.
+  if (dias !== null && (!Number.isInteger(dias) || dias < 1 || dias > 3650)) {
+    return { ok: false, error: 'Los días deben ser un número entero entre 1 y 3650.' }
+  }
+
+  const admin = createAdminClient()
+  const { error } = await admin.from('profiles').update({ registro_dias_atras: dias }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
   return { ok: true }
 }
 

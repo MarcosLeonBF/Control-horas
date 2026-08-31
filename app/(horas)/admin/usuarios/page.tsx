@@ -9,6 +9,7 @@ interface RawUsuario {
   id: string; full_name: string; email: string; position_id: string | null
   role: 'operativo' | 'manager' | 'admin'; status: 'activo' | 'inactivo'
   can_create_users: boolean
+  registro_dias_atras: number | null
   user_areas: { area_id: string }[]
 }
 
@@ -27,13 +28,18 @@ export default async function UsuariosPage() {
 
   // Panel de usuarios: lista vía service role (la página ya está gated a admin).
   const admin = createAdminClient()
-  const { data: raw } = await admin
+  // El error NO se descarta: al añadir registro_dias_atras antes de aplicar su
+  // migración, este select falló en silencio y el panel se pintó vacío, como si no
+  // hubiera usuarios. Una lista vacía y una consulta rota tienen que distinguirse.
+  const { data: raw, error: usuariosError } = await admin
     .from('profiles')
-    .select('id, full_name, email, position_id, role, status, can_create_users, user_areas(area_id)')
+    .select('id, full_name, email, position_id, role, status, can_create_users, registro_dias_atras, user_areas(area_id)')
     .order('full_name')
+  if (usuariosError) throw new Error(`No se pudo leer la lista de usuarios: ${usuariosError.message}`)
   const usuarios: UsuarioRow[] = ((raw ?? []) as RawUsuario[]).map((u) => ({
     id: u.id, full_name: u.full_name, email: u.email, positionId: u.position_id,
     role: u.role, status: u.status, canCreateUsers: u.can_create_users, areaIds: (u.user_areas ?? []).map((a) => a.area_id),
+    registroDiasAtras: u.registro_dias_atras,
   }))
 
   return (

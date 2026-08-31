@@ -68,3 +68,36 @@ export async function getMyPositionDepartamentoIds(userId: string): Promise<stri
   const { data } = await supabase.from('position_departamentos').select('departamento_id').eq('position_id', me.position_id)
   return (data ?? []).map((r) => r.departamento_id as string)
 }
+
+// ¿La posición del usuario puede escribir la descripción a mano en "Departamento"?
+// (migración 0044). Sin posición, no. Solo pista de UI: el motor comprueba lo mismo.
+export async function getMyPositionDescripcionLibre(userId: string): Promise<boolean> {
+  const supabase = await createClient()
+  const { data: me } = await supabase.from('profiles').select('position_id').eq('id', userId).single()
+  if (!me?.position_id) return false
+  const { data } = await supabase.from('positions').select('descripcion_libre').eq('id', me.position_id).single()
+  return data?.descripcion_libre === true
+}
+
+// Nombres de las descripciones ESPECÍFICAS de la posición del usuario (migración 0044).
+// Se suman a las generales en el desplegable del proyecto "Departamento"; las generales
+// vienen de getCatalogos y las ve todo el mundo. Vacío si no tiene posición.
+//
+// Solo activas: una descripción desactivada desaparece del desplegable aunque siga
+// asignada, igual que pasa con las generales.
+export async function getMyPositionDescripciones(userId: string): Promise<string[]> {
+  const supabase = await createClient()
+  const { data: me } = await supabase.from('profiles').select('position_id').eq('id', userId).single()
+  if (!me?.position_id) return []
+  const { data } = await supabase
+    .from('position_descripciones')
+    .select('descripciones(name, active, alcance)')
+    .eq('position_id', me.position_id)
+  // El embed to-one llega tipado como array pero en runtime es objeto (mismo cast que
+  // getMyPositionAreas). Se filtra por alcance por si una específica volvió a general:
+  // ahí ya la trae getCatalogos y contarla aquí la duplicaría.
+  return ((data ?? []) as unknown as { descripciones: { name: string; active: boolean; alcance: string } | null }[])
+    .map((r) => r.descripciones)
+    .filter((d): d is { name: string; active: boolean; alcance: string } => !!d && d.active && d.alcance === 'posicion')
+    .map((d) => d.name)
+}

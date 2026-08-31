@@ -144,6 +144,54 @@ export async function eliminarDescripcion(id: string): Promise<Result> {
   return { ok: true }
 }
 
+// Alcance de una descripción (migración 0044): 'general' la ve cualquiera al registrar en
+// "Departamento"; 'posicion' solo las posiciones asignadas.
+//
+// Al volver una descripción a general se borran sus vínculos: dejarlos ahí sería guardar
+// una asignación que ya no significa nada y que reaparecería sola si alguien la volviera
+// a marcar como específica.
+export async function setDescripcionAlcance(id: string, alcance: 'general' | 'posicion'): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: e } = await supabase
+    .from('descripciones')
+    .update({ alcance, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (e) return { ok: false, error: friendly(e) }
+  if (alcance === 'general') {
+    const { error: delErr } = await supabase.from('position_descripciones').delete().eq('descripcion_id', id)
+    if (delErr) return { ok: false, error: `Alcance guardado pero no se pudieron limpiar las posiciones: ${friendly(delErr)}` }
+  }
+  return { ok: true }
+}
+
+// Libertad de descripción en "Departamento" para una posición (0044): con ella puesta,
+// quien tenga esa posición puede escribir la descripción a mano además de elegirla del
+// catálogo. En los proyectos de cliente la descripción siempre fue libre; esto no los toca.
+export async function setPosicionDescripcionLibre(id: string, libre: boolean): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: e } = await supabase.from('positions').update({ descripcion_libre: libre }).eq('id', id)
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+// Reemplaza las posiciones que ven una descripción específica. Mismo patrón de
+// borrar-e-insertar que setPosicionAreas/Etapas/Departamentos.
+export async function setDescripcionPosiciones(id: string, positionIds: string[]): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: delErr } = await supabase.from('position_descripciones').delete().eq('descripcion_id', id)
+  if (delErr) return { ok: false, error: friendly(delErr) }
+  if (positionIds.length) {
+    const { error: insErr } = await supabase
+      .from('position_descripciones')
+      .insert(positionIds.map((position_id) => ({ position_id, descripcion_id: id })))
+    if (insErr) return { ok: false, error: friendly(insErr) }
+  }
+  return { ok: true }
+}
+
 // ── Posiciones ─────────────────────────────────────────────────────────────
 // El banco de horas es por posición (columnas del Excel). Cada posición se liga
 // a una o más áreas: un manager ve los bancos de las posiciones de sus áreas.

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getCatalogos, getMyPositionAreas, getMyPositionEtapaIds, getMyPositionDepartamentoIds } from '@/lib/horas/queries'
+import { getCatalogos, getMyPositionAreas, getMyPositionEtapaIds, getMyPositionDepartamentoIds, getMyPositionDescripciones, getMyPositionDescripcionLibre } from '@/lib/horas/queries'
 import { getCachedProyectosEstado } from '@/lib/graph/client'
 import { getBancosHoras } from '@/lib/horas/bancos'
 import RegistroForm from '@/components/horas/RegistroForm'
@@ -9,7 +9,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const { edit } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: me } = await supabase.from('profiles').select('role, position_id').eq('id', user!.id).single()
+  const { data: me } = await supabase.from('profiles').select('role, position_id, registro_dias_atras').eq('id', user!.id).single()
 
   // Modo edición: cargar el log ANTES que los catálogos, porque el catálogo (áreas/etapas/
   // departamentos) sale de la POSICIÓN DEL DUEÑO del registro, no de la del que edita. Solo
@@ -51,6 +51,10 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   const clientEtapas = etapas.filter((e) => positionEtapaIds.includes(e.id) && !departmentEtapaIds.has(e.id))
   const positionDepartamentoIds = await getMyPositionDepartamentoIds(catalogUserId)
   const allowedDepartamentos = departamentos.filter((d) => positionDepartamentoIds.includes(d.id))
+  // Descripciones específicas de la posición del DUEÑO (0044): se suman a las generales
+  // en el desplegable de "Departamento". Mismo criterio que áreas, etapas y departamentos.
+  const descripcionesPosicion = await getMyPositionDescripciones(catalogUserId)
+  const descripcionLibre = await getMyPositionDescripcionLibre(catalogUserId)
 
   // La lista de proyectos y estados sale de Clientes_Proyectos (registro maestro con TODOS
   // los proyectos). Excel caído → solo "Departamento", sin avisos.
@@ -87,7 +91,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl">{heading}</h1>
-      <RegistroForm projects={projects} finishedProjects={finishedProjects} pausedProjects={pausedProjects} exceededProjects={exceededProjects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} descripciones={descripciones} departamentos={allowedDepartamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} initial={initial} returnTo={returnTo} />
+      <RegistroForm projects={projects} finishedProjects={finishedProjects} pausedProjects={pausedProjects} exceededProjects={exceededProjects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} descripciones={descripciones} descripcionesPosicion={descripcionesPosicion} descripcionLibre={descripcionLibre} departamentos={allowedDepartamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} diasAtras={me?.registro_dias_atras ?? 7} initial={initial} returnTo={returnTo} />
     </div>
   )
 }

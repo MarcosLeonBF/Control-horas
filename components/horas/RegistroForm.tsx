@@ -13,20 +13,17 @@ import { TriangleAlert, CircleHelp } from 'lucide-react'
 import ProjectCombobox from '@/components/horas/ProjectCombobox'
 import DepartamentoSelect from '@/components/horas/DepartamentoSelect'
 import NativeSelect from '@/components/ui/native-select'
+import { agruparDescripciones, descripcionValidaEnDepartamento } from '@/lib/horas/descripciones'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
-// Piso mínimo de registro (espejo de guardar_registro, migración 0039):
-// normal 7 días; en julio 2026 se relaja al 01/07 (el más permisivo). Solo pista de UI.
-const registroMinDate = () => {
-  const base = daysAgo(7)
-  if (today() > '2026-07-31') return base
-  return base < '2026-07-01' ? base : '2026-07-01'
-}
 // El departamento solo aplica al proyecto "Departamento". El resto de líneas lo
 // llevan fijo en 'Clientes' (valor canónico histórico; la RPC también lo normaliza).
 // No usar departamentos[0]: el catálogo es editable y su primer nombre cambia.
 const CLIENTES_DEP = 'Clientes'
+// Sugerencias del campo de descripción cuando la posición tiene libertad (0044). El
+// <datalist> se pinta una vez y lo comparten todas las líneas: es el mismo catálogo.
+const LISTA_DESCRIPCIONES = 'descripciones-departamento'
 // Lo que hay escrito en las dos casillas del campo de tiempo, como texto. Se guarda
 // aparte de `hours` para que teclear un "0" no se desvanezca: si el valor mostrado se
 // derivara de `hours`, un 0 daría 0 horas y el campo volvería a pintarse vacío.
@@ -97,13 +94,28 @@ function MobileField({ label, children }: { label: ReactNode; children: ReactNod
   )
 }
 
-export default function RegistroForm({ projects, finishedProjects, pausedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, departamentos, internalAreaId, canBackdate = false, initial, returnTo = '/mis-registros' }: {
+export default function RegistroForm({ projects, finishedProjects, pausedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, descripcionesPosicion = [], descripcionLibre = false, departamentos, internalAreaId, canBackdate = false, diasAtras = 7, initial, returnTo = '/mis-registros' }: {
   projects: string[]; finishedProjects: string[]; pausedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: string[]; departamentos: DepartamentoRow[]; internalAreaId: string
-  canBackdate?: boolean // admin: puede registrar fuera del rango normal (7 días; en julio 2026, desde el 01/07)
+  // Descripciones específicas de la posición del dueño (0044). Se muestran en su propio
+  // grupo del desplegable de "Departamento"; sin ellas, el campo se ve como siempre.
+  descripcionesPosicion?: string[]
+  // La posición del dueño puede escribir la descripción a mano en "Departamento" (0044).
+  // Añade a la lista, no la sustituye: el campo pasa a ser escribible con la lista sugerida.
+  descripcionLibre?: boolean
+  canBackdate?: boolean // admin: puede registrar sin límite de fecha hacia atrás
+  // Días hacia atrás que puede registrar este usuario: 7, o los que el admin le haya
+  // concedido (profiles.registro_dias_atras, migración 0043). Solo pista de UI: el
+  // piso que manda lo calcula guardar_registro con el mismo criterio.
+  diasAtras?: number
   initial?: { id: string; lines: LineInput[] }
   returnTo?: string // a dónde volver al guardar (default: mis registros; /equipo al editar ajeno)
 }) {
   const router = useRouter()
+  const minDate = daysAgo(diasAtras)
+  // Generales y específicas de la posición, ya separadas y ordenadas para el desplegable.
+  // `permitidas` es la unión: lo que el motor aceptará en "Departamento".
+  const grupos = agruparDescripciones(descripciones, descripcionesPosicion)
+  const permitidas = [...grupos.generales, ...grupos.posicion]
   const finishedSet = new Set(finishedProjects)
   const pausedSet = new Set(pausedProjects)
   const exceededSet = new Set(exceededProjects)
@@ -182,7 +194,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
       // "Departamento", si la actual (texto libre) no está en la lista, se limpia. Fuera
       // de "Departamento" es texto libre.
       if (patch.project !== undefined && isDepartamento(next.project)) {
-        if (next.description && !descripciones.includes(next.description)) next.description = ''
+        if (next.description && !descripcionValidaEnDepartamento(next.description, permitidas, descripcionLibre)) next.description = ''
       }
 
       return next
@@ -216,10 +228,10 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
       ? [...clientEtapas, ...etapas.filter((e) => e.id === l.etapa_id)]
       : clientEtapas
     // Descripción: en "Departamento" es la lista general (compartida); en el resto, texto libre.
-    const deptDescripciones = isDep ? descripciones : []
+    const deptDescripciones = isDep ? permitidas : []
 
     const fecha = (
-      <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : registroMinDate()}
+      <Input aria-label="Fecha" type="date" value={l.entry_date} max={today()} min={canBackdate ? undefined : minDate}
         onChange={(e) => update(i, { entry_date: e.target.value })} />
     )
     const proyecto = (
@@ -300,15 +312,31 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
         <span aria-hidden className="text-sm text-muted-foreground">{soloMinutos ? 'min' : 'h'}</span>
       </div>
     )
-    // En "Departamento": desplegable con las descripciones del departamento. En el resto:
-    // input de texto libre (obligatorio; el motor exige no vacía).
+    // En "Departamento": desplegable del catálogo. Las específicas de la posición van en
+    // su propio grupo, y solo se separan si las hay: con una sola lista, un encabezado
+    // "Generales" no distinguiría nada de nada. En el resto de proyectos: texto libre
+    // (obligatorio; el motor exige no vacía).
+    const opciones = (nombres: string[]) => nombres.map((name) => <option key={name} value={name}>{name}</option>)
     const desc = isDep ? (
-      deptDescripciones.length === 0 ? (
+      // Con libertad concedida a la posición (0044): campo escribible con el catálogo
+      // como sugerencias. Un <datalist> hace justo lo que se pidió —elegir de la lista
+      // O escribir la tuya— sin partir el campo en dos controles.
+      descripcionLibre ? (
+        <input aria-label="Descripción" type="text" list={LISTA_DESCRIPCIONES} value={l.description}
+          onChange={(e) => update(i, { description: e.target.value })} placeholder="Elige de la lista o escribe…" className={field} />
+      ) : deptDescripciones.length === 0 ? (
         <NativeSelect aria-label="Descripción" value="" disabled fullWidth><option value="">— Sin descripciones (contacta al admin) —</option></NativeSelect>
       ) : (
         <NativeSelect aria-label="Descripción" value={l.description} onChange={(e) => update(i, { description: e.target.value })} fullWidth>
           <option value="">— Descripción —</option>
-          {deptDescripciones.map((name) => <option key={name} value={name}>{name}</option>)}
+          {grupos.posicion.length === 0 ? (
+            opciones(grupos.generales)
+          ) : (
+            <>
+              {grupos.generales.length > 0 && <optgroup label="Generales">{opciones(grupos.generales)}</optgroup>}
+              <optgroup label="De tu posición">{opciones(grupos.posicion)}</optgroup>
+            </>
+          )}
         </NativeSelect>
       )
     ) : (
@@ -326,13 +354,20 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      {/* Sugerencias del campo de descripción con libertad concedida. Una sola vez para
+          todas las líneas; sin libertad no se pinta porque nadie la referencia. */}
+      {descripcionLibre && (
+        <datalist id={LISTA_DESCRIPCIONES}>
+          {permitidas.map((name) => <option key={name} value={name} />)}
+        </datalist>
+      )}
       <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
         <label htmlFor="fecha" className="text-sm font-medium text-foreground">Fecha por defecto</label>
         <Input
-          id="fecha" type="date" value={defaultDate} max={today()} min={canBackdate ? undefined : registroMinDate()}
+          id="fecha" type="date" value={defaultDate} max={today()} min={canBackdate ? undefined : minDate}
           onChange={(e) => changeDefaultDate(e.target.value)} className="w-auto"
         />
-        {!canBackdate && <span className="text-xs text-muted-foreground">{today() <= '2026-07-31' ? 'En julio podés registrar desde el 1' : 'Hasta 7 días atrás'}</span>}
+        {!canBackdate && <span className="text-xs text-muted-foreground">Hasta {diasAtras} días atrás</span>}
       </div>
 
       {/* Escritorio: tabla */}
