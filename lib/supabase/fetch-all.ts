@@ -11,7 +11,16 @@ export async function fetchAllRows<T>(
 ): Promise<T[]> {
   const todas: T[] = []
   for (let desde = 0; ; desde += PAGE_SIZE) {
-    const { data } = await page(desde, desde + PAGE_SIZE - 1)
+    const { data, error } = await page(desde, desde + PAGE_SIZE - 1)
+    // El error NO se descarta, y aquí importa más que en ningún sitio: con `data` a null
+    // el trozo sale vacío, "vacío" se lee como "ya no hay más filas" y la función
+    // devolvería datos PARCIALES haciéndolos pasar por completos. Justo el fallo que
+    // esta función existe para evitar, solo que por otra puerta. Y lo que se cuenta con
+    // estos datos son horas facturables: mejor un error visible que un total corto.
+    if (error) {
+      const mensaje = (error as { message?: string })?.message ?? String(error)
+      throw new Error(`Lectura paginada incompleta a partir de la fila ${desde}: ${mensaje}`)
+    }
     const chunk = (data ?? []) as T[]
     todas.push(...chunk)
     // Una página incompleta significa que ya no quedan más filas.
