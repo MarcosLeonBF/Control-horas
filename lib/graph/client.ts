@@ -3,6 +3,21 @@ import type { BancoHorasProyecto } from '@/lib/types'
 
 export const BANCO_HORAS_TAG = 'banco-horas'
 
+// Ninguna llamada a Azure/Graph tenía límite de tiempo, y un fetch sin timeout no
+// falla: se queda esperando. En una página renderizada en el servidor eso retiene la
+// función entera. Como cada despliegue vacía la caché de unstable_cache, /registrar
+// volvía a Graph en cada carga, y una respuesta que no llegaba dejaba la página colgada
+// SIN código de estado hasta agotar las funciones disponibles: la app entera se cae por
+// una hoja de Excel que tarda.
+//
+// Al vencer, fetch rechaza con TimeoutError y los try/catch que ya existían degradan
+// como estaba previsto: sin Excel, /registrar ofrece solo el proyecto "Departamento".
+const GRAPH_TIMEOUT_MS = 8000
+
+function fetchGraph(url: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) })
+}
+
 // Codifica la URL del archivo en el formato que espera el endpoint /shares de Graph API
 function encodeShareUrl(url: string): string {
   return 'u!' + Buffer.from(url).toString('base64url')
@@ -26,7 +41,7 @@ function excelDateToISO(cell: unknown): string {
 
 // Paso 1: obtiene el token de acceso con client credentials
 async function getToken(): Promise<string> {
-  const res = await fetch(
+  const res = await fetchGraph(
     `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/token`,
     {
       method: 'POST',
@@ -53,7 +68,7 @@ async function getToken(): Promise<string> {
 async function resolveDriveItem(token: string, fileUrl: string) {
   const encoded = encodeShareUrl(fileUrl)
 
-  const res = await fetch(
+  const res = await fetchGraph(
     `https://graph.microsoft.com/v1.0/shares/${encoded}/driveItem`,
     { headers: { Authorization: `Bearer ${token}` } }
   )
@@ -82,8 +97,8 @@ async function readBancoHorasTable(
   const base = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/workbook/tables/BancoHoras`
   const headers = { Authorization: `Bearer ${token}` }
   const [headerRes, rowsRes] = await Promise.all([
-    fetch(`${base}/headerRowRange`, { headers }),
-    fetch(`${base}/rows`, { headers }),
+    fetchGraph(`${base}/headerRowRange`, { headers }),
+    fetchGraph(`${base}/rows`, { headers }),
   ])
 
   if (!headerRes.ok || !rowsRes.ok) {
@@ -190,7 +205,7 @@ async function readClientesProyectosSheet(
 ): Promise<ProyectoEstado[]> {
   const sheet = process.env.SHAREPOINT_ESTADOS_SHEET ?? 'Clientes_Proyectos'
   const url = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets/${encodeURIComponent(sheet)}/usedRange(valuesOnly=true)`
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  const res = await fetchGraph(url, { headers: { Authorization: `Bearer ${token}` } })
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
@@ -254,7 +269,7 @@ async function readTarifaProvisionalSheet(
   sheet: string,
 ): Promise<HorasProvisionales> {
   const url = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets/${encodeURIComponent(sheet)}/usedRange(valuesOnly=true)`
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  const res = await fetchGraph(url, { headers: { Authorization: `Bearer ${token}` } })
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
     throw new Error(`Error leyendo hoja ${sheet}: ${err?.error?.message ?? res.status}`)
