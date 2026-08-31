@@ -20,6 +20,15 @@ export const GROUP_LABELS: Record<GroupBy, string> = {
 // 'month' va entre 'position' y 'date': de escala gruesa a fina.
 export const GROUP_ORDER: GroupBy[] = ['project', 'user', 'area', 'department', 'etapa', 'position', 'month', 'date']
 
+// Mes y Día son las dimensiones cuyas filas tienen un orden propio: su clave es una
+// fecha ISO y su etiqueta ('05/07/2026', 'Jul 2026') es solo el dibujo de esa fecha.
+// De ahí salen dos reglas —el orden por defecto es cronológico, y ordenar por la
+// columna de la etiqueta tiene que comparar la clave, no el texto—, más que la tabla
+// no numere las filas. Vive aquí para que las tres digan lo mismo.
+export function esDimensionTiempo(groupBy: GroupBy): boolean {
+  return groupBy === 'month' || groupBy === 'date'
+}
+
 // Una línea de registro aplanada (con nombres ya resueltos), lista para agrupar.
 export interface ReporteLine {
   date: string
@@ -97,7 +106,7 @@ export function aggregate(lines: ReporteLine[], groupBy: GroupBy): AggRow[] {
   const rows = [...by.entries()].map(([key, { label, hours }]) => ({ key, label, hours: Math.round(hours * 100) / 100 }))
   // Dimensiones de tiempo: orden cronológico descendente (la clave es ISO, así que lo
   // más reciente queda arriba). Resto de dimensiones: por horas descendente.
-  return groupBy === 'date' || groupBy === 'month'
+  return esDimensionTiempo(groupBy)
     ? rows.sort((a, b) => b.key.localeCompare(a.key))
     : rows.sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label))
 }
@@ -134,10 +143,30 @@ export type OrdenTabla = { col: 'label' | 'hours'; dir: 'asc' | 'desc' } | null
 // Ordena una copia, nunca el array que recibe. `etiqueta` llega como callback porque la
 // tabla no muestra siempre `row.label`: en la dimensión Usuario añade el email a los
 // homónimos, y el orden tiene que seguir a lo que se ve.
-export function ordenarFilas(rows: AggRow[], orden: OrdenTabla, etiqueta: (row: AggRow) => string): AggRow[] {
+//
+// Salvo en Mes y Día, donde seguir a lo que se ve es justo el error: '05/07/2026' y
+// '30/06/2026' comparados como texto ordenan por el número del día y van saltando de
+// mes en mes. Ahí manda la clave ISO. Por eso el parámetro es la dimensión y no un
+// booleano: quien ordena siempre sabe por qué está agrupando, y así no hay un flag
+// que se pueda olvidar de pasar.
+export function ordenarFilas(
+  rows: AggRow[], orden: OrdenTabla, etiqueta: (row: AggRow) => string, groupBy: GroupBy,
+): AggRow[] {
   if (!orden) return rows
   const factor = orden.dir === 'asc' ? 1 : -1
+  const porTexto = esDimensionTiempo(groupBy)
+    ? (a: AggRow, b: AggRow) => a.key.localeCompare(b.key)
+    : (a: AggRow, b: AggRow) => etiqueta(a).localeCompare(etiqueta(b))
   return [...rows].sort((a, b) =>
-    orden.col === 'hours' ? factor * (a.hours - b.hours) : factor * etiqueta(a).localeCompare(etiqueta(b)),
+    orden.col === 'hours' ? factor * (a.hours - b.hours) : factor * porTexto(a, b),
   )
+}
+
+// Dirección del PRIMER clic en una cabecera; el segundo siempre invierte. Como en una
+// hoja de cálculo: texto A→Z, números de mayor a menor. Mes y Día son la excepción:
+// su etiqueta es una fecha y la tabla ya entra con lo más reciente arriba, así que
+// empezar por lo más antiguo sería un salto en vez de una ordenación.
+export function ordenInicial(col: 'label' | 'hours', groupBy: GroupBy): 'asc' | 'desc' {
+  if (col === 'hours') return 'desc'
+  return esDimensionTiempo(groupBy) ? 'desc' : 'asc'
 }

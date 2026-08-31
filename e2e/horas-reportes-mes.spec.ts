@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { mesesEnRango } from '../lib/horas/format'
 import type { ReporteLine } from '../lib/horas/reportes-types'
-import { aggregate, conMesesVacios, detalleDeLinea, ordenarFilas } from '../lib/horas/reportes-types'
+import { aggregate, conMesesVacios, detalleDeLinea, ordenInicial, ordenarFilas } from '../lib/horas/reportes-types'
 
 // Línea mínima: para agrupar por mes solo importan `date` y `hours`.
 const linea = (date: string, hours: number): ReporteLine => ({
@@ -100,25 +100,77 @@ const FILAS = [
 const porLabel = (r: { label: string }) => r.label
 
 test('ordenarFilas sin orden devuelve las filas tal cual', () => {
-  expect(ordenarFilas(FILAS, null, porLabel)).toEqual(FILAS)
+  expect(ordenarFilas(FILAS, null, porLabel, 'project')).toEqual(FILAS)
 })
 
 test('ordenarFilas por horas descendente', () => {
-  expect(ordenarFilas(FILAS, { col: 'hours', dir: 'desc' }, porLabel).map((r) => r.hours)).toEqual([20, 12, 5])
+  expect(ordenarFilas(FILAS, { col: 'hours', dir: 'desc' }, porLabel, 'project').map((r) => r.hours)).toEqual([20, 12, 5])
 })
 
 test('ordenarFilas por horas ascendente', () => {
-  expect(ordenarFilas(FILAS, { col: 'hours', dir: 'asc' }, porLabel).map((r) => r.hours)).toEqual([5, 12, 20])
+  expect(ordenarFilas(FILAS, { col: 'hours', dir: 'asc' }, porLabel, 'project').map((r) => r.hours)).toEqual([5, 12, 20])
 })
 
 test('ordenarFilas alfabetico usa la etiqueta que recibe, no row.label', () => {
   // La tabla muestra el nombre con email en los homónimos: el orden debe seguir a eso.
   const visible = (r: { key: string }) => ({ a: 'Zeta', b: 'Alfa', c: 'Mike' })[r.key] ?? ''
-  expect(ordenarFilas(FILAS, { col: 'label', dir: 'asc' }, visible).map((r) => r.key)).toEqual(['b', 'c', 'a'])
+  expect(ordenarFilas(FILAS, { col: 'label', dir: 'asc' }, visible, 'user').map((r) => r.key)).toEqual(['b', 'c', 'a'])
 })
 
 test('ordenarFilas no muta el array que recibe', () => {
   const original = [...FILAS]
-  ordenarFilas(FILAS, { col: 'hours', dir: 'asc' }, porLabel)
+  ordenarFilas(FILAS, { col: 'hours', dir: 'asc' }, porLabel, 'project')
   expect(FILAS).toEqual(original)
+})
+
+// En Día y Mes la etiqueta es la fecha ya escrita para leerla (DD/MM/AAAA, "Jul 2026").
+// Ordenar ESE texto ordena por el número del día y va saltando de mes en mes; el orden
+// tiene que salir de la clave ISO, que es el valor del que la etiqueta es un dibujo.
+const DIAS = [
+  { key: '2026-07-05', label: '05/07/2026', hours: 1 },
+  { key: '2026-08-02', label: '02/08/2026', hours: 2 },
+  { key: '2026-06-30', label: '30/06/2026', hours: 3 },
+]
+
+test('ordenarFilas por etiqueta en una dimension de tiempo ordena cronologico', () => {
+  expect(ordenarFilas(DIAS, { col: 'label', dir: 'asc' }, porLabel, 'date').map((r) => r.key))
+    .toEqual(['2026-06-30', '2026-07-05', '2026-08-02'])
+})
+
+test('ordenarFilas por etiqueta en tiempo descendente pone lo mas reciente arriba', () => {
+  expect(ordenarFilas(DIAS, { col: 'label', dir: 'desc' }, porLabel, 'date').map((r) => r.key))
+    .toEqual(['2026-08-02', '2026-07-05', '2026-06-30'])
+})
+
+// La marca de tiempo no puede colarse en las demás dimensiones: ahí la clave es un id
+// o un nombre, y el orden lo sigue mandando lo que se ve.
+test('ordenarFilas fuera del tiempo sigue ordenando por la etiqueta visible', () => {
+  const visible = (r: { key: string }) => ({ a: 'Zeta', b: 'Alfa', c: 'Mike' })[r.key] ?? ''
+  expect(ordenarFilas(FILAS, { col: 'label', dir: 'asc' }, visible, 'position').map((r) => r.key))
+    .toEqual(['b', 'c', 'a'])
+})
+
+// Ordenar por horas no cambia en las dimensiones de tiempo.
+test('ordenarFilas por horas en tiempo sigue ordenando por horas', () => {
+  expect(ordenarFilas(DIAS, { col: 'hours', dir: 'desc' }, porLabel, 'date').map((r) => r.hours))
+    .toEqual([3, 2, 1])
+})
+
+// Dirección del PRIMER clic en una cabecera (el segundo siempre invierte).
+test('ordenInicial de la columna de horas es de mayor a menor', () => {
+  expect(ordenInicial('hours', 'project')).toBe('desc')
+})
+
+test('ordenInicial de una etiqueta de texto es A→Z', () => {
+  expect(ordenInicial('label', 'project')).toBe('asc')
+})
+
+// En Día y Mes la tabla ya entra con lo más reciente arriba: que el primer clic
+// mandara al año pasado sería un salto, no una ordenación.
+test('ordenInicial en Dia empieza por lo mas reciente', () => {
+  expect(ordenInicial('label', 'date')).toBe('desc')
+})
+
+test('ordenInicial en Mes empieza por lo mas reciente', () => {
+  expect(ordenInicial('label', 'month')).toBe('desc')
 })

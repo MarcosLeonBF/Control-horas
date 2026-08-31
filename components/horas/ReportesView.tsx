@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, ChevronUp, Download, Filter, X } from 'lucide-react'
 import type { ReporteLine, ReporteFilterOptions, GroupBy, AggRow, OrdenTabla } from '@/lib/horas/reportes-types'
-import { GROUP_LABELS, GROUP_ORDER, aggregate, conMesesVacios, detalleDeLinea, groupKeyOf, ordenarFilas } from '@/lib/horas/reportes-types'
+import { GROUP_LABELS, GROUP_ORDER, aggregate, conMesesVacios, detalleDeLinea, esDimensionTiempo, groupKeyOf, ordenInicial, ordenarFilas } from '@/lib/horas/reportes-types'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
 import { departamentoIcon } from '@/lib/horas/departamento-icon'
@@ -122,7 +122,7 @@ export default function ReportesView({
     // Solo Mes rellena huecos. Rellenar días vacíos metería cada fin de semana y cada
     // festivo como fila: ruido, no información.
     const conHuecos = groupBy === 'month' ? conMesesVacios(base, from, to) : base
-    return ordenarFilas(conHuecos, orden, (r) => labelDe(groupBy, r))
+    return ordenarFilas(conHuecos, orden, (r) => labelDe(groupBy, r), groupBy)
   }, [filtered, groupBy, from, to, orden, labelDe])
 
   const totals = useMemo(() => {
@@ -142,18 +142,18 @@ export default function ReportesView({
   // La tabla es un ranking, pero las dimensiones de tiempo van en orden cronológico:
   // ahí el ordinal afirmaría un puesto que no existe ("Jul 2026 es el nº 1" cuando
   // julio solo es el más reciente).
-  const esTiempo = groupBy === 'month' || groupBy === 'date'
+  const esTiempo = esDimensionTiempo(groupBy)
   // El ordinal solo se muestra cuando la tabla es el ranking que el número dice ser:
   // orden por defecto y dimensión no temporal.
   const mostrarOrdinal = !esTiempo && orden === null
 
   function ordenarPor(col: 'label' | 'hours') {
-    // Primer clic según el tipo de dato, como en una hoja de cálculo: texto A→Z,
-    // números de mayor a menor. El segundo invierte.
+    // El primer clic lo decide ordenInicial (depende del tipo de dato y de si la
+    // dimensión es temporal). El segundo invierte.
     setOrden((prev) =>
       prev?.col === col
         ? { col, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-        : { col, dir: col === 'label' ? 'asc' : 'desc' },
+        : { col, dir: ordenInicial(col, groupBy) },
     )
   }
 
