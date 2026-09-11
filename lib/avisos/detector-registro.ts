@@ -27,6 +27,16 @@ export async function alGuardarRegistro(args: { esAlta: boolean; logId: string; 
     if (!dueno || esPersonaDePrueba(dueno.persona.email)) return
     const manager = managerDe(dueno, perfiles)
 
+    // Cada aviso por separado: si uno falla, no se lleva por delante los demás días,
+    // los otros avisos ni la evaluación de bancos del final.
+    const emitir = async (etiqueta: string, envio: () => Promise<unknown>) => {
+      try {
+        await envio()
+      } catch (e) {
+        console.error(`[avisos] ${etiqueta}:`, e instanceof Error ? e.message : e)
+      }
+    }
+
     const dias = [...new Set(args.lineas.map((l) => l.entry_date))]
     // El día entero (puede haber varios registros el mismo día), no solo este guardado.
     const { data: delDia, error: e2 } = await db.from('time_log_lines')
@@ -46,18 +56,18 @@ export async function alGuardarRegistro(args: { esAlta: boolean; logId: string; 
       const este = deEste.get(dia)
       if (args.esAlta && este) {
         const proyectos = [...este.porProyecto].map(([proyecto, horas]) => ({ proyecto, horas }))
-        await emitirAviso('registro.enviado', {
+        await emitir(`registro.enviado ${duenoId} ${dia}`, () => emitirAviso('registro.enviado', {
           persona: dueno.persona, manager_directo: manager, dia,
           horas_registro: este.total, horas_dia: total.total,
           proyectos, proyectos_texto: textoProyectos(proyectos),
-        })
+        }))
       }
       for (const m of motivosLlamativo(total)) {
-        await emitirAviso('registro.llamativo', {
+        await emitir(`registro.llamativo ${duenoId} ${dia} ${m.regla}`, () => emitirAviso('registro.llamativo', {
           persona: dueno.persona, manager_directo: manager, dia,
           regla: m.regla, valor: m.valor, limite: m.limite, proyecto: m.proyecto,
           horas_dia: total.total, descripcion: descripcionLlamativo(m, dia),
-        }, { clave: claveLlamativo(duenoId, dia, m) })
+        }, { clave: claveLlamativo(duenoId, dia, m) }))
       }
     }
 
