@@ -53,6 +53,7 @@ export interface EdicionUsuario {
   full_name: string; positionId: string
   role: 'operativo' | 'manager' | 'admin'; status: 'activo' | 'inactivo'; areaIds: string[]
   canCreateUsers: boolean
+  managerId: string | null // manager directo: a quién escala el recordatorio de días sin registrar
 }
 
 // Panel de usuarios (PDF §8/§19): editar datos + estado activo/inactivo. Solo admin.
@@ -63,6 +64,7 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
   const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (me?.role !== 'admin') return { ok: false, error: 'Solo un administrador puede editar usuarios.' }
   if (!input.full_name.trim()) return { ok: false, error: 'El nombre es obligatorio.' }
+  if (input.managerId && input.managerId === id) return { ok: false, error: 'Nadie puede ser su propio manager directo.' }
   // Evitar que el admin se bloquee a sí mismo.
   if (id === user.id && (input.role !== 'admin' || input.status !== 'activo')) {
     return { ok: false, error: 'No puedes quitarte el rol de admin ni desactivarte a ti mismo.' }
@@ -73,6 +75,7 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
     full_name: input.full_name.trim(), position_id: input.positionId || null, role: input.role, status: input.status,
     // Un admin ya puede crear usuarios por rol: el flag delegado se limpia para no dejarlo huérfano.
     can_create_users: input.role === 'admin' ? false : input.canCreateUsers,
+    manager_id: input.managerId || null,
   }
   // Mismo motivo con la ventana ampliada (0043): el admin registra sin límite de fecha,
   // así que ascender a alguien a admin apaga su permiso en vez de dejarlo puesto y mudo.

@@ -10,6 +10,7 @@ interface RawUsuario {
   role: 'operativo' | 'manager' | 'admin'; status: 'activo' | 'inactivo'
   can_create_users: boolean
   registro_dias_atras: number | null
+  manager_id: string | null
   user_areas: { area_id: string }[]
 }
 
@@ -33,20 +34,25 @@ export default async function UsuariosPage() {
   // hubiera usuarios. Una lista vacía y una consulta rota tienen que distinguirse.
   const { data: raw, error: usuariosError } = await admin
     .from('profiles')
-    .select('id, full_name, email, position_id, role, status, can_create_users, registro_dias_atras, user_areas(area_id)')
+    .select('id, full_name, email, position_id, role, status, can_create_users, registro_dias_atras, manager_id, user_areas(area_id)')
     .order('full_name')
   if (usuariosError) throw new Error(`No se pudo leer la lista de usuarios: ${usuariosError.message}`)
   const usuarios: UsuarioRow[] = ((raw ?? []) as RawUsuario[]).map((u) => ({
     id: u.id, full_name: u.full_name, email: u.email, positionId: u.position_id,
     role: u.role, status: u.status, canCreateUsers: u.can_create_users, areaIds: (u.user_areas ?? []).map((a) => a.area_id),
-    registroDiasAtras: u.registro_dias_atras,
+    registroDiasAtras: u.registro_dias_atras, managerId: u.manager_id,
   }))
+
+  // Candidatos a manager directo: managers y admins activos.
+  const managers: PosicionOpt[] = usuarios
+    .filter((u) => (u.role === 'manager' || u.role === 'admin') && u.status === 'activo')
+    .map((u) => ({ id: u.id, name: u.full_name }))
 
   return (
     <div className="space-y-10">
       <section className="space-y-4">
         <h1 className="font-display text-2xl">Usuarios</h1>
-        <UsuariosPanel usuarios={usuarios} areas={areas} posiciones={posiciones} readOnly={!esAdmin} />
+        <UsuariosPanel usuarios={usuarios} areas={areas} posiciones={posiciones} managers={managers} readOnly={!esAdmin} />
       </section>
 
       <section className="space-y-4">
