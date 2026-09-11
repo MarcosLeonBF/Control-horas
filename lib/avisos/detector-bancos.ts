@@ -46,21 +46,34 @@ export async function evaluarBancos(proyectos?: string[]): Promise<void> {
     for (const n of niveles) {
       const anterior = previos.get(n.clave) ?? null
       const t = transicion(anterior, n.nivel)
-      if (t.guardar) aGuardar.push({ clave: n.clave, nivel: n.nivel })
-      if (!t.avisar || anterior === null) continue
-
-      perfiles ??= await perfilesPorId(db)
-      const manager = managerPorNombre(n.managerExcel, perfiles)
-      if (manager && !manager.id) console.warn(`[avisos] manager del Excel sin usuario único: "${manager.nombre}" (${n.proyecto})`)
-      const datos: DatosBanco = {
-        proyecto: n.proyecto, alcance: n.alcance, posicion: n.posicion, nivel: n.nivel, nivel_anterior: anterior,
-        horas: n.horas, porcentaje_consumido: n.porcentajeConsumido, estado_proyecto: n.estadoProyecto ?? null,
-        manager_proyecto: manager, enlace: enlaceBanco(n.proyecto),
+      if (!t.guardar) continue
+      // Línea base y rearme: se anotan sin avisar.
+      if (!t.avisar || anterior === null) {
+        aGuardar.push({ clave: n.clave, nivel: n.nivel })
+        continue
       }
-      // Clave por transición y día: si dos guardados evalúan a la vez, sale un solo aviso.
-      const base = `${n.clave}:${anterior}>${n.nivel}:${hoy}`
-      await emitirAviso('banco.nivel', datos, { clave: `${base}:nivel` })
-      if (t.alTope) await emitirAviso('banco.al_tope', datos, { clave: `${base}:tope` })
+      try {
+        perfiles ??= await perfilesPorId(db)
+        const manager = managerPorNombre(n.managerExcel, perfiles)
+        if (manager && !manager.id) console.warn(`[avisos] manager del Excel sin usuario único: "${manager.nombre}" (${n.proyecto})`)
+        const datos: DatosBanco = {
+          proyecto: n.proyecto, alcance: n.alcance, posicion: n.posicion, nivel: n.nivel, nivel_anterior: anterior,
+          horas: n.horas, porcentaje_consumido: n.porcentajeConsumido, estado_proyecto: n.estadoProyecto ?? null,
+          manager_proyecto: manager, enlace: enlaceBanco(n.proyecto),
+        }
+        // Clave por transición y día: si dos guardados evalúan a la vez, sale un solo aviso.
+        const base = `${n.clave}:${anterior}>${n.nivel}:${hoy}`
+        await emitirAviso('banco.nivel', datos, { clave: `${base}:nivel` })
+        // al_tope es solo del total del proyecto: el contrato fija alcance "proyecto" y
+        // posicion null, y una sola posición no debe disparar el aviso de "100% del proyecto".
+        if (t.alTope && n.alcance === 'proyecto') await emitirAviso('banco.al_tope', datos, { clave: `${base}:tope` })
+        // Solo se anota si el aviso salió: si falla, la próxima pasada lo reintenta.
+        aGuardar.push({ clave: n.clave, nivel: n.nivel })
+      } catch (e) {
+        // Un banco que falla no debe perder la línea base ni los avisos ya emitidos de
+        // los demás bancos de esta pasada: se aísla aquí y no se propaga.
+        console.error(`[avisos] evaluarBancos ${n.clave}:`, e instanceof Error ? e.message : e)
+      }
     }
     await guardarEstados(db, aGuardar)
   } catch (e) {
