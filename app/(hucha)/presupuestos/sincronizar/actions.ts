@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchHuchaExcel } from '@/lib/hucha/excel'
 import { aplicarSync, type SyncReport } from '@/lib/hucha/sync'
+import { trasResponder } from '@/lib/avisos/tras-responder'
+import { alSincronizarHucha } from '@/lib/avisos/detector-hucha'
 
 export async function sincronizarHucha(): Promise<{ ok: true; report: SyncReport } | { ok: false; error: string }> {
   const supabase = await createClient()
@@ -15,6 +17,8 @@ export async function sincronizarHucha(): Promise<{ ok: true; report: SyncReport
   try {
     const data = await fetchHuchaExcel()
     const report = await aplicarSync(data, createAdminClient())
+    // Proyectos nuevos con HUCHA (y el nivel de todas) después de responder.
+    trasResponder(() => alSincronizarHucha(report.creados))
     revalidatePath('/presupuestos')
     return { ok: true, report }
   } catch (e) {

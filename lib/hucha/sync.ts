@@ -10,6 +10,7 @@ export interface SyncReport {
   managersAsignados: number
   managersNoEncontrados: { proyecto: string; manager: string }[]
   saltadosSinHucha: number
+  creados: { id: string; nombre: string; hucha: number }[] // proyectos nuevos (para el aviso hucha.proyecto_nuevo)
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,7 +18,7 @@ export async function aplicarSync(data: HuchaExcelData, db: SupabaseClient<any>)
   const report: SyncReport = {
     proyectosCreados: 0, proyectosActualizados: 0,
     proyectosArchivados: 0, proyectosReactivados: 0,
-    managersAsignados: 0, managersNoEncontrados: [], saltadosSinHucha: 0,
+    managersAsignados: 0, managersNoEncontrados: [], saltadosSinHucha: 0, creados: [],
   }
 
   // Cargar perfiles una vez para matchear manager por nombre (case-insensitive).
@@ -58,6 +59,7 @@ export async function aplicarSync(data: HuchaExcelData, db: SupabaseClient<any>)
       const { data: created, error } = await db.from('projects').insert({ name: proyecto }).select('id').single()
       if (error) throw new Error(`crear proyecto "${proyecto}": ${error.message}`)
       projectId = created.id; report.proyectosCreados++
+      report.creados.push({ id: created.id, nombre: proyecto, hucha })
     }
 
     // Banco (el trigger lo crea) y base del Excel.

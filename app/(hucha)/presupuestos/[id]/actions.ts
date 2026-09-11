@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { trasResponder } from '@/lib/avisos/tras-responder'
+import { evaluarHucha, alAmpliarHucha, type MovimientoAmpliacion } from '@/lib/avisos/detector-hucha'
 
 export async function registrarConsumo(
   formData: FormData
@@ -25,6 +27,8 @@ export async function registrarConsumo(
   })
   if (error) return { ok: false, error: error.message }
 
+  trasResponder(() => evaluarHucha([projectId]))
+
   revalidatePath(`/presupuestos/${projectId}`)
   revalidatePath('/presupuestos')
   return { ok: true }
@@ -37,7 +41,7 @@ export async function ampliarPresupuesto(
   if (!Number.isFinite(input.monto) || input.monto <= 0) return { ok: false, error: 'El monto debe ser mayor a 0.' }
   if (!input.motivo.trim()) return { ok: false, error: 'El motivo es obligatorio.' }
   const supabase = await createClient()
-  const { error } = await supabase.rpc('registrar_movimiento_hucha', {
+  const { data: mov, error } = await supabase.rpc('registrar_movimiento_hucha', {
     p_project_id: projectId,
     p_type: 'ampliacion',
     p_amount: input.monto,
@@ -46,6 +50,8 @@ export async function ampliarPresupuesto(
     p_entry_date: input.fecha || undefined,
   })
   if (error) return { ok: false, error: error.message }
+  const movimiento = mov as MovimientoAmpliacion
+  trasResponder(() => alAmpliarHucha(projectId, movimiento))
   revalidatePath(`/presupuestos/${projectId}`)
   revalidatePath('/presupuestos')
   return { ok: true }
@@ -62,6 +68,7 @@ export async function anularMovimiento(
     p_corrects_movement_id: movementId,
   })
   if (error) return { ok: false, error: error.message }
+  trasResponder(() => evaluarHucha([projectId]))
   revalidatePath(`/presupuestos/${projectId}`)
   revalidatePath('/presupuestos')
   return { ok: true }
