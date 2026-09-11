@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { trasResponder } from '@/lib/avisos/tras-responder'
+import { evaluarBancos } from '@/lib/avisos/detector-bancos'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -17,6 +19,8 @@ export async function ampliarHoras(
     p_entry_date: input.entry_date,
   })
   if (error) return { ok: false, error: error.message }
+  // Una ampliación mejora el banco: se rearma para avisar otra vez si vuelve a caer.
+  trasResponder(() => evaluarBancos([project]))
   revalidatePath(`/bancos/${encodeURIComponent(project)}`)
   revalidatePath('/bancos')
   return { ok: true }
@@ -26,6 +30,8 @@ export async function anularAmpliacionHoras(id: string, project: string): Promis
   const supabase = await createClient()
   const { error } = await supabase.rpc('anular_ampliacion_horas', { p_id: id })
   if (error) return { ok: false, error: error.message }
+  // Quitar horas puede empeorar el banco: se evalúa (y avisa si toca).
+  trasResponder(() => evaluarBancos([project]))
   revalidatePath(`/bancos/${encodeURIComponent(project)}`)
   revalidatePath('/bancos')
   return { ok: true }
