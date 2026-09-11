@@ -1,0 +1,73 @@
+// Consultas que los flujos de Julián piden por calendario: el resumen de capacidad
+// (quincenal) y los días sin registrar (la escalera de recordatorios la aplica su flujo).
+import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
+import { addDiasISO } from '@/lib/horas/auditoria-types'
+import { nivelesActuales } from '@/lib/avisos/detector-bancos'
+import { rankingCapacidad, type NivelBanco } from '@/lib/avisos/capacidad'
+import { perfilesPorId, managerDe, managerPorNombre, type Perfil } from '@/lib/avisos/personas'
+import { diasSinRegistrar, ultimoAntesDe, dentroDePlazo, TOPE_DIAS } from '@/lib/avisos/calendario'
+import { enlaceBanco, esPersonaDePrueba } from '@/lib/avisos/entorno'
+import type { ManagerAviso, PersonaAviso } from '@/lib/avisos/contrato'
+
+export async function resumenCapacidad(top: number) {
+  const db = createAdminClient()
+  const [niveles, perfiles] = await Promise.all([nivelesActuales(db), perfilesPorId(db)])
+  const { conMasHoras, masLibres } = rankingCapacidad(niveles.filter((n) => n.alcance === 'proyecto'), top)
+  const item = (n: NivelBanco) => ({
+    proyecto: n.proyecto, horas: n.horas, porcentaje_consumido: n.porcentajeConsumido,
+    manager_proyecto: managerPorNombre(n.managerExcel, perfiles), enlace: enlaceBanco(n.proyecto),
+  })
+  return { generado: new Date().toISOString(), top, con_mas_horas: conMasHoras.map(item), mas_libres: masLibres.map(item) }
+}
+
+export interface PersonaPendiente {
+  persona: PersonaAviso
+  manager_directo: ManagerAviso | null
+  dias: number
+  desde: string
+  ultimo_registro: string | null // dentro de la ventana consultada (3 × tope días naturales)
+  dentro_de_plazo: boolean
+}
+
+// Registran los operativos y managers activos (los admin no), sin los usuarios de los E2E.
+function debeRegistrar(p: Perfil): boolean {
+  return p.activo && (p.persona.rol === 'operativo' || p.persona.rol === 'manager') && !esPersonaDePrueba(p.persona.email)
+}
+
+export async function diasSinRegistrarDe(fecha: string): Promise<{ fecha: string; personas: PersonaPendiente[] }> {
+  const db = createAdminClient()
+  // 3 × tope en días naturales cubre los 30 laborables con fines de semana y festivos.
+  const ventana = addDiasISO(fecha, -TOPE_DIAS * 3)
+  const [perfiles, logs, fest] = await Promise.all([
+    perfilesPorId(db),
+    fetchAllRows<{ user_id: string; entry_date: string }>((desde, hasta) =>
+      db.from('time_logs').select('user_id, entry_date').neq('status', 'anulado')
+        .gte('entry_date', ventana).lt('entry_date', fecha).range(desde, hasta)),
+    db.from('festivos').select('fecha'),
+  ])
+  if (fest.error) throw new Error(`festivos: ${fest.error.message}`)
+  const festivos = new Set((fest.data ?? []).map((f) => String(f.fecha)))
+  // Cualquier registro no anulado cuenta, Departamento incluido (así cuentan las vacaciones).
+  const registradosPor = new Map<string, Set<string>>()
+  for (const l of logs) {
+    const s = registradosPor.get(l.user_id) ?? new Set<string>()
+    s.add(l.entry_date)
+    registradosPor.set(l.user_id, s)
+  }
+
+  const personas: PersonaPendiente[] = []
+  for (const p of perfiles.values()) {
+    if (!debeRegistrar(p)) continue
+    const registrados = registradosPor.get(p.persona.id) ?? new Set<string>()
+    const { dias, desde } = diasSinRegistrar({ fecha, registrados, festivos, alta: p.alta })
+    if (dias < 1 || !desde) continue
+    personas.push({
+      persona: p.persona, manager_directo: managerDe(p, perfiles), dias, desde,
+      ultimo_registro: ultimoAntesDe(registrados, fecha),
+      dentro_de_plazo: dentroDePlazo(desde, fecha, p.diasAtras ?? 7),
+    })
+  }
+  personas.sort((a, b) => b.dias - a.dias || a.persona.nombre.localeCompare(b.persona.nombre))
+  return { fecha, personas }
+}
