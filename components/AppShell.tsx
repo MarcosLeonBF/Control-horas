@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   Clock, FileText, Users, Wallet, BarChart3, PiggyBank, LayoutDashboard,
-  RefreshCw, UserCog, History, CalendarRange, Tags, LogOut, ChevronsLeft, ChevronsRight, Menu, X, User,
+  RefreshCw, UserCog, History, CalendarRange, Tags, LogOut, ChevronsLeft, ChevronsRight, Menu, X, User, Bell,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -20,7 +20,7 @@ function buildSections(role: string, canCreateUsers: boolean): Section[] {
   const isAdmin = role === 'admin'
   const raw: Section[] = [
     {
-      title: 'Control de Horas',
+      title: 'Control de Rentabilidad',
       items: [
         { href: '/registrar', label: 'Registrar', icon: Clock, show: true },
         { href: '/mis-registros', label: 'Mis registros', icon: FileText, show: true },
@@ -44,6 +44,7 @@ function buildSections(role: string, canCreateUsers: boolean): Section[] {
         { href: '/admin/usuarios', label: 'Usuarios', icon: UserCog, show: isAdmin || canCreateUsers },
         { href: '/admin/catalogos', label: 'Catálogos', icon: Tags, show: isAdmin },
         { href: '/admin/auditoria', label: 'Auditoría', icon: History, show: isAdmin },
+        { href: '/admin/avisos', label: 'Avisos', icon: Bell, show: isAdmin },
       ],
     },
   ]
