@@ -129,8 +129,9 @@ function firmaValida(cabecera, cuerpoCrudo, secreto) {
 
 ### `registro.enviado`
 
-Cada vez que alguien da de alta su registro diario (el pulso). Uno por persona y día. Las
-ediciones posteriores no envían pulso.
+Cada vez que alguien da de alta un registro (el pulso): uno por cada alta y día. Si alguien
+registra dos veces el mismo día llegan dos, cada uno con sus horas en `horas_registro` y el
+total acumulado del día en `horas_dia`. Las ediciones no envían pulso.
 
 | Campo | Qué es |
 |---|---|
@@ -248,6 +249,9 @@ nivel (pasa a `bajo`, `consumido` o `excedido`). Solo proyectos activos. Si el b
 Cuando el **total** de un proyecto llega al 100% (`consumido`) o lo supera (`excedido`)
 viniendo de un nivel más bajo. Pensado para avisar al manager y ofrecer más horas. Mismos
 campos que `banco.nivel` con `alcance: "proyecto"`.
+
+Llega **junto con** el `banco.nivel` de ese mismo cambio (con los mismos datos). Si en un
+flujo solo te interesa el tope, escucha este tipo y no el otro.
 
 Si el proyecto pasa de `consumido` a `excedido` llega un `banco.nivel`, pero no un segundo
 `banco.al_tope`. Si se amplía y más adelante vuelve a llegar al tope, se avisa otra vez.

@@ -1,6 +1,7 @@
 'use server'
 import { createClient } from '@/lib/supabase/server'
-import { checkHorasAlertas } from '@/lib/horas/alertas'
+import { trasResponder } from '@/lib/avisos/tras-responder'
+import { alGuardarRegistro } from '@/lib/avisos/detector-registro'
 
 export interface LineInput {
   entry_date: string; project: string; area_id: string; department: string; etapa_id: string; hours: number; description: string
@@ -20,7 +21,8 @@ export async function guardarRegistro(
     p_anchor_log_id: logId, p_lines: lines,
   })
   if (error) return { ok: false, error: error.message }
-  // Alertas de banco al 80/100/exceso (no rompen el guardado).
-  await checkHorasAlertas(lines.map((l) => l.project))
-  return { ok: true, id: data as string }
+  const id = data as string
+  // Avisos (pulso, llamativo y bancos) después de responder: el guardado nunca espera a la red.
+  trasResponder(() => alGuardarRegistro({ esAlta: logId === null, logId: id, lineas: lines }))
+  return { ok: true, id }
 }
