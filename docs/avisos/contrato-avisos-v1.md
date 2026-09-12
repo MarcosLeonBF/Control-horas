@@ -73,7 +73,9 @@ Todos los avisos llegan con el mismo sobre:
   lo hacen solos al recibir el webhook.
 - Si no responde o da error, se reintenta a los 5 min, 30 min, 2 h y 12 h (máximo 5
   intentos). Los reintentos salen cuando hay actividad en la plataforma o en la revisión
-  diaria de las 8:00, así que pueden tardar algo más.
+  diaria, así que pueden tardar algo más.
+- La revisión diaria corre a las 06:00 UTC (las 8:00 en Madrid en verano y las 7:00 en
+  invierno) y puede llegar hasta una hora más tarde.
 - Por los reintentos, **un aviso puede llegar repetido**. Usa `id` para descartarlo.
 - Solo la plataforma en producción envía avisos reales. Los de prueba llevan `"prueba": true`.
 
@@ -167,8 +169,9 @@ total acumulado del día en `horas_dia`. Las ediciones no envían pulso.
 
 ### `registro.llamativo`
 
-Cuando un día se sale de lo normal. Un aviso por persona, día y regla (no se repite aunque
-la persona vuelva a editar ese día).
+Cuando un día se sale de lo normal. Un aviso por persona, día, regla y proyecto (en
+`proyecto_largo`, uno por cada proyecto que llegue al límite). No se repite aunque la
+persona vuelva a editar ese día.
 
 | Regla | Cuándo salta |
 |---|---|
@@ -243,6 +246,9 @@ nivel (pasa a `bajo`, `consumido` o `excedido`). Solo proyectos activos. Si el b
   }
 }
 ```
+
+El día 1 de cada mes, a las 00:00 UTC, se cierra el mes anterior y el reparto 75/25 puede
+empeorar varios bancos a la vez: ese día es normal que llegue una tanda de avisos.
 
 ### `banco.al_tope`
 
@@ -319,7 +325,7 @@ Cuando se amplía el presupuesto de una HUCHA.
 }
 ```
 
-`referencia` puede ser `null`.
+`referencia` puede ser `null`. `nivel` también, cuando la HUCHA no tiene presupuesto.
 
 ### `hucha.nivel`
 
@@ -360,6 +366,10 @@ activos.
 - `con_mas_horas`: los proyectos con más horas disponibles.
 - `mas_libres`: los proyectos con menos porcentaje consumido.
 
+`porcentaje_consumido` es `null` cuando el proyecto no tiene base efectiva: no le quedan
+horas asignadas después del corte del cierre de mes (reparto 75/25). Esos proyectos no
+salen en `mas_libres`.
+
 ```json
 {
   "generado": "2026-09-16T07:00:02.118Z",
@@ -383,7 +393,8 @@ activos.
 GET https://<dominio>/api/avisos/v1/dias-sin-registrar?fecha=2026-09-16
 ```
 
-Pensado para una ejecución diaria. `fecha` es opcional (por defecto, hoy en hora de Madrid).
+Pensado para una ejecución diaria. `fecha` es opcional (por defecto, hoy en hora de Madrid);
+si llega con un formato que no sea `YYYY-MM-DD`, la respuesta es `400`.
 Cuenta hacia atrás desde el día anterior a `fecha` los días laborables (de lunes a viernes,
 sin festivos) seguidos en los que la persona no ha registrado nada. Solo aparecen las personas
 con al menos un día pendiente. Un registro en Departamento (por ejemplo, vacaciones) cuenta
@@ -393,7 +404,7 @@ como día registrado.
 |---|---|
 | `dias` | Días laborables seguidos sin registrar |
 | `desde` | El día pendiente más antiguo |
-| `ultimo_registro` | Último día que registró (`null` si nunca) |
+| `ultimo_registro` | Último día que registró dentro de los últimos 90 días (`null` si no hay ninguno en ese periodo) |
 | `dentro_de_plazo` | `true` si todavía puede registrar el día más antiguo por su cuenta (la plataforma deja registrar 7 días hacia atrás salvo ampliación) |
 | `manager_directo` | Su manager directo o `null` |
 
