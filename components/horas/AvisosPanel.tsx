@@ -43,8 +43,8 @@ function respuesta(e: EnvioRow): string {
   return [codigo, e.ultimo_error ?? ''].filter(Boolean).join(' · ') || '—'
 }
 
-export default function AvisosPanel({ url, tiposActivos, envios, consultas }: {
-  url: string; tiposActivos: string[]; envios: EnvioRow[]; consultas: string[]
+export default function AvisosPanel({ url, tiposActivos, envios, consultas, faltaSecreto }: {
+  url: string; tiposActivos: string[]; envios: EnvioRow[]; consultas: string[]; faltaSecreto: boolean
 }) {
   const router = useRouter()
   const [valor, setValor] = useState(url)
@@ -82,6 +82,12 @@ export default function AvisosPanel({ url, tiposActivos, envios, consultas }: {
     <div className="space-y-8">
       <section className="space-y-3">
         <h2 className="font-display text-lg">Webhook</h2>
+        {/* Sin la clave de firma el despacho no reserva nada: se avisa aquí para que no parezca que el webhook falla. */}
+        {faltaSecreto && (
+          <p className="max-w-2xl rounded-lg bg-(--status-excedido)/12 px-3 py-2 text-sm text-(--status-excedido)">
+            Falta la variable <code>AVISOS_FIRMA_SECRETO</code> en el servidor: mientras falte, no sale ningún aviso.
+          </p>
+        )}
         <p className="max-w-2xl text-sm text-muted-foreground">
           Una sola URL para todos los avisos; cada uno trae su tipo en el campo <code>tipo</code>. Vacía, no sale ningún aviso.
         </p>

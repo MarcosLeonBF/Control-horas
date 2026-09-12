@@ -14,7 +14,8 @@ export async function GET(req: Request) {
   await evaluarBancos() // nunca lanzan
   await evaluarHucha()
   try {
-    return Response.json({ ok: true, despacho: await despacharPendientes(100) })
+    // Plazo por debajo de maxDuration: lo que no dé tiempo vuelve a la cola sin gastar intento.
+    return Response.json({ ok: true, despacho: await despacharPendientes(100, 45_000) })
   } catch (e) {
     console.error('[avisos] cron despacho:', e instanceof Error ? e.message : e)
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Error interno' }, { status: 500 })

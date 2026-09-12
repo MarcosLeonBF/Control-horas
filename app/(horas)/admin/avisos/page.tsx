@@ -37,6 +37,7 @@ export default async function AvisosPage() {
         tiposActivos={(cfg.data.tipos_activos as string[] | null) ?? []}
         envios={(envios.data ?? []) as EnvioRow[]}
         consultas={[`${base}/api/avisos/v1/resumen-capacidad`, `${base}/api/avisos/v1/dias-sin-registrar`]}
+        faltaSecreto={!process.env.AVISOS_FIRMA_SECRETO}
       />
     </div>
   )

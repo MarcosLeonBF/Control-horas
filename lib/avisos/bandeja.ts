@@ -83,19 +83,45 @@ async function entregar(db: SupabaseClient, fila: FilaSaliente, cfg: Config): Pr
   }
 }
 
+// Devuelve a la cola filas reservadas que no se llegaron a entregar. avisos_reclamar les
+// sumó un intento al reservarlas y ese intento no ocurrió: se descuenta.
+async function devolverReservadas(db: SupabaseClient, filas: FilaSaliente[]): Promise<void> {
+  await Promise.all(filas.map(async (fila) => {
+    const { error } = await db.from('avisos_salientes')
+      .update({ estado: 'pendiente', intentos: fila.intentos - 1, reclamado_at: null })
+      .eq('id', fila.id)
+    if (error) console.error(`[avisos] no se pudo devolver ${fila.id} a la cola:`, error.message)
+  }))
+}
+
 // Entrega los pendientes vencidos (y los 'enviando' atascados). Solo en producción: la
 // cola vive en la base de producción y un servidor local no debe tocarla.
-export async function despacharPendientes(limite = 25): Promise<{ enviados: number; fallidos: number }> {
+// `plazoMs` acota la tanda: el intento se cuenta al reservar, así que si la función se
+// corta a mitad, lo reservado se queda 'enviando' con un intento que nunca ocurrió (y el
+// rescate de 10 min gasta otro). Pasado el plazo, lo que falta vuelve a 'pendiente'.
+export async function despacharPendientes(limite = 25, plazoMs = 20_000): Promise<{ enviados: number; fallidos: number }> {
   if (!esProduccion()) return { enviados: 0, fallidos: 0 }
+  // Sin clave no hay firma y sin firma no sale nada: ni se reserva, para no gastar
+  // intentos. Las filas siguen pendientes hasta que la clave exista.
+  if (!process.env.AVISOS_FIRMA_SECRETO) {
+    console.error('[avisos] falta AVISOS_FIRMA_SECRETO: no se despacha nada')
+    return { enviados: 0, fallidos: 0 }
+  }
+  const inicio = Date.now()
   const db = createAdminClient()
+  // La config antes de reservar: si su lectura falla, no queda nada reservado a medias.
+  const cfg = await leerConfig(db)
   const { data, error } = await db.rpc('avisos_reclamar', { p_limite: limite })
   if (error) throw new Error(`avisos_reclamar: ${error.message}`)
   const filas = (data ?? []) as FilaSaliente[]
   if (!filas.length) return { enviados: 0, fallidos: 0 }
-  const cfg = await leerConfig(db)
   let enviados = 0
   let fallidos = 0
-  for (const fila of filas) {
+  for (const [i, fila] of filas.entries()) {
+    if (Date.now() - inicio > plazoMs) {
+      await devolverReservadas(db, filas.slice(i))
+      break
+    }
     const r = await entregar(db, fila, cfg)
     if (r === 'enviado') enviados++
     if (r === 'fallido') fallidos++
@@ -109,6 +135,10 @@ export async function enviarPrueba(tipo: TipoAviso): Promise<{ ok: boolean; mens
   const db = createAdminClient()
   const cfg = await leerConfig(db)
   if (!cfg.url) return { ok: false, mensaje: 'Primero guarda la URL del webhook.' }
+  // Sin clave la prueba acabaría como un fallo sin respuesta: se dice claro y sin crear la fila.
+  if (!process.env.AVISOS_FIRMA_SECRETO) {
+    return { ok: false, mensaje: 'Falta AVISOS_FIRMA_SECRETO en el servidor: sin firma no sale ningún aviso.' }
+  }
   const id = await emitirAviso(tipo, ejemplos(appUrl())[tipo], { prueba: true })
   if (!id) return { ok: false, mensaje: 'No se pudo crear el aviso de prueba.' }
   const { data: fila, error } = await db.from('avisos_salientes')
