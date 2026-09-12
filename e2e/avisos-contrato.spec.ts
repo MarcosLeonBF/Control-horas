@@ -37,6 +37,8 @@ test('appUrl: APP_URL sin barra final, o el dominio de producción de Vercel', (
 
 test('las personas que siembran los E2E no cuentan', () => {
   expect(esPersonaDePrueba('e2e-operativo@horas.test')).toBe(true)
+  expect(esPersonaDePrueba('e2e-manager@hucha.test')).toBe(true)
   expect(esPersonaDePrueba('laura.gomez@bastidafarina.com')).toBe(false)
+  expect(esPersonaDePrueba('alguien@test.com')).toBe(false)
   expect(esPersonaDePrueba(null)).toBe(false)
 })

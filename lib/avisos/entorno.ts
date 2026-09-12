@@ -19,7 +19,9 @@ export function enlaceHucha(projectId: string): string {
   return `${appUrl()}/presupuestos/${projectId}`
 }
 
-// Los usuarios que siembran los E2E (e2e-*@horas.test) nunca generan ni reciben avisos.
+// Los usuarios que siembran los E2E nunca generan ni reciben avisos. Cualquier dominio
+// .test (reservado para pruebas), no solo @horas.test: la siembra de HUCHA usa
+// e2e-manager@hucha.test y la de sincronización e2e-sync-mgr-*@hucha.test.
 export function esPersonaDePrueba(email: string | null | undefined): boolean {
-  return (email ?? '').trim().toLowerCase().endsWith('@horas.test')
+  return /@[^@\s]+\.test$/i.test((email ?? '').trim())
 }

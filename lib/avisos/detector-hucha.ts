@@ -4,7 +4,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { emitirAviso } from '@/lib/avisos/bandeja'
-import { esProduccion, enlaceHucha } from '@/lib/avisos/entorno'
+import { esProduccion, esPersonaDePrueba, enlaceHucha } from '@/lib/avisos/entorno'
 import { transicion, comoNivel, centesimas, type Nivel } from '@/lib/avisos/reglas'
 import { leerEstados, guardarEstados } from '@/lib/avisos/estado'
 import type { ManagerAviso, SaldoHucha } from '@/lib/avisos/contrato'
@@ -38,18 +38,25 @@ interface Hucha {
 const SELECT_HUCHA =
   'id, name, hucha_banks(currency, assigned_total, consumed_total, remaining, status), project_assignments(profiles(id, full_name, email))'
 
-// Proyectos activos con su banco y sus managers (project_assignments).
+// Los E2E siembran en la única base (la de producción) los proyectos «Cliente E2E
+// Asignado» y «Cliente E2E NoAsignado» y managers @hucha.test: ni esos proyectos ni esas
+// personas pueden acabar en un aviso real.
+const PROYECTO_E2E = /\be2e\b/i
+
+// Proyectos activos con su banco y sus managers (project_assignments), sin los de los E2E.
 async function leerHuchas(db: SupabaseClient, ids?: string[]): Promise<Hucha[]> {
   let q = db.from('projects').select(SELECT_HUCHA).eq('status', 'activo')
   if (ids) q = q.in('id', ids)
   const { data, error } = await q
   if (error) throw new Error(`projects/hucha_banks: ${error.message}`)
   return ((data ?? []) as unknown as HuchaRaw[]).flatMap((p) => {
+    if (PROYECTO_E2E.test(p.name)) return []
     const b = Array.isArray(p.hucha_banks) ? p.hucha_banks[0] : p.hucha_banks
     if (!b) return []
     const managers = (p.project_assignments ?? [])
       .map((a) => a.profiles)
       .filter((pr): pr is { id: string; full_name: string | null; email: string | null } => pr !== null)
+      .filter((pr) => !esPersonaDePrueba(pr.email))
       .map((pr) => ({ id: pr.id, nombre: pr.full_name ?? '', email: pr.email }))
     return [{
       id: p.id, nombre: p.name, moneda: b.currency ?? 'EUR',
