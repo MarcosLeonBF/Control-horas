@@ -18,6 +18,7 @@ export async function GET(req: Request) {
     return Response.json({ ok: true, despacho: await despacharPendientes(100, 45_000) })
   } catch (e) {
     console.error('[avisos] cron despacho:', e instanceof Error ? e.message : e)
-    return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Error interno' }, { status: 500 })
+    // El detalle se queda en el log: hacia fuera no se enseñan mensajes internos.
+    return Response.json({ ok: false, error: 'Error interno' }, { status: 500 })
   }
 }

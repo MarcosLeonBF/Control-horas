@@ -1,4 +1,4 @@
-// Personas y managers para los avisos: perfil con su posición, manager directo (0045) y
+// Personas y managers para los avisos: perfil con su posición, manager directo (0046) y
 // manager del proyecto (el Excel trae un nombre suelto: se casa por nombre, como HUCHA).
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { diaMadrid } from '@/lib/horas/auditoria-types'

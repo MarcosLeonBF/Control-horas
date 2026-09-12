@@ -19,6 +19,7 @@ export async function GET(req: Request) {
     return Response.json(await diasSinRegistrarDe(fecha), { headers: { 'Cache-Control': 'no-store' } })
   } catch (e) {
     console.error('[avisos] dias-sin-registrar:', e instanceof Error ? e.message : e)
-    return Response.json({ error: e instanceof Error ? e.message : 'Error interno' }, { status: 500 })
+    // El detalle se queda en el log: hacia fuera no se enseñan mensajes internos (tablas, Graph…).
+    return Response.json({ error: 'Error interno' }, { status: 500 })
   }
 }
