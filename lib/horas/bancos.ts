@@ -26,13 +26,25 @@ const key = (project: string, position: string) => `${project}\0${position}`
 type HistoricaRow = { project: string; month: string; hours: number; user_id: string }
 
 // Catálogo de posiciones + qué posiciones quedan dentro del alcance.
-async function loadPositionContext(scope: BancosScope) {
+async function loadPositionContext(scope: BancosScope, estricto = false) {
   const db = createAdminClient()
-  const [{ data: positions }, { data: posAreas }, { data: profiles }] = await Promise.all([
+  const [
+    { data: positions, error: errPositions },
+    { data: posAreas, error: errPosAreas },
+    { data: profiles, error: errProfiles },
+  ] = await Promise.all([
     db.from('positions').select('id, name'),
     db.from('position_areas').select('position_id, area_id'),
     db.from('profiles').select('id, position_id, full_name'),
   ])
+  // En estricto (avisos), una lectura fallida no puede pasar por "sin posiciones": el
+  // consumo quedaría sin atribuir, todos los bancos parecerían disponibles (rearme) y la
+  // siguiente pasada buena volvería a avisar de todos los que ya estaban mal.
+  if (estricto) {
+    if (errPositions) throw new Error(`positions: ${errPositions.message}`)
+    if (errPosAreas) throw new Error(`position_areas: ${errPosAreas.message}`)
+    if (errProfiles) throw new Error(`profiles: ${errProfiles.message}`)
+  }
 
   const posNameById = new Map<string, string>()
   for (const p of (positions ?? []) as { id: string; name: string }[]) posNameById.set(p.id, p.name)
@@ -65,15 +77,24 @@ async function loadPositionContext(scope: BancosScope) {
 
 const visible = (allowed: Set<string> | null, position: string) => allowed === null || allowed.has(position)
 
-export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[]> {
+// `estricto` (lo usan los avisos): /bancos prefiere degradar y enseñar lo que hay cuando
+// falla una lectura, pero un banco calculado con datos a medias no es "incompleto", es
+// falso: sin el Excel todas las posiciones quedan con 0 asignadas y todo proyecto activo
+// sale excedido. Un aviso sale hacia fuera y no se deshace, así que en estricto cualquier
+// lectura fallida (o un Excel vacío, que en la realidad nunca lo está) lanza. Sin
+// estricto el comportamiento es el de siempre.
+export async function getBancosHoras(scope: BancosScope, opciones: { estricto?: boolean } = {}): Promise<BancoHorasRow[]> {
+  const estricto = opciones.estricto === true
+
   let excel: BancoHorasProyecto[] = []
-  try { excel = await getCachedBancoHoras() } catch { excel = [] }
+  try { excel = await getCachedBancoHoras() } catch (e) { if (estricto) throw e; excel = [] }
+  if (estricto && excel.length === 0) throw new Error('BancoHoras vino vacío: se trata como una lectura fallida')
 
   let horasProv: HorasProvisionales = new Map()
-  try { horasProv = await getCachedHorasProvisionales() } catch { horasProv = new Map() }
+  try { horasProv = await getCachedHorasProvisionales() } catch (e) { if (estricto) throw e; horasProv = new Map() }
 
   let horasProvSetup: HorasProvisionales = new Map()
-  try { horasProvSetup = await getCachedHorasProvisionalesSetup() } catch { horasProvSetup = new Map() }
+  try { horasProvSetup = await getCachedHorasProvisionalesSetup() } catch (e) { if (estricto) throw e; horasProvSetup = new Map() }
 
   const db = createAdminClient()
   // Ambas consultas traen la tabla entera y superan (o superarán) las 1.000 filas que
@@ -92,13 +113,19 @@ export async function getBancosHoras(scope: BancosScope): Promise<BancoHorasRow[
     ),
   ])
 
-  const { allowed, userPosition } = await loadPositionContext(scope)
+  const { allowed, userPosition } = await loadPositionContext(scope, estricto)
 
   // Registro maestro de proyectos + metadatos (Clientes_Proyectos).
   const metaByProject = new Map<string, ProyectoEstado>()
   try {
-    for (const e of await getCachedProyectosEstado()) metaByProject.set(e.project.trim(), e)
-  } catch { /* sin metadatos: banco solo con lo real */ }
+    const estados = await getCachedProyectosEstado()
+    // Sin estados ningún proyecto consta como activo: para los avisos es una lectura fallida.
+    if (estricto && estados.length === 0) throw new Error('Clientes_Proyectos vino vacío: se trata como una lectura fallida')
+    for (const e of estados) metaByProject.set(e.project.trim(), e)
+  } catch (e) {
+    if (estricto) throw e
+    /* sin metadatos: banco solo con lo real */
+  }
 
   // Consumo por (proyecto, posición): total, por mes, y posiciones con consumo por proyecto.
   const consumed = new Map<string, number>()

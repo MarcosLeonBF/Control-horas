@@ -25,8 +25,10 @@ async function ampliacionesActivas(db: SupabaseClient): Promise<Map<string, numb
 }
 
 // Niveles actuales de los bancos de proyectos activos. También los usa el resumen de capacidad.
+// Modo estricto: con el Excel o los perfiles a medias lanza en vez de calcular bancos
+// falsos; evaluarBancos lo captura y no avisa ni anota nada, y el resumen responde 500.
 export async function nivelesActuales(db: SupabaseClient = createAdminClient()): Promise<NivelBanco[]> {
-  const [rows, amps] = await Promise.all([getBancosHoras({ role: 'admin' }), ampliacionesActivas(db)])
+  const [rows, amps] = await Promise.all([getBancosHoras({ role: 'admin' }, { estricto: true }), ampliacionesActivas(db)])
   return nivelesDeBancos(rows, amps)
 }
 
