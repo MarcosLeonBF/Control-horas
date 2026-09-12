@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import {
-  resumirPorDia, motivosLlamativo, claveLlamativo, comoNivel, transicion,
+  resumirPorDia, motivosLlamativo, claveLlamativo, comoNivel, transicion, avisosDeBanco,
   siguienteIntento, MAX_INTENTOS, textoProyectos, descripcionLlamativo,
 } from '../lib/avisos/reglas'
 import { diasSinRegistrar, ultimoAntesDe, dentroDePlazo } from '../lib/avisos/calendario'
@@ -62,6 +62,17 @@ test('transicion: línea base, empeora, cruza al tope, mejora e igual', () => {
   expect(transicion('consumido', 'excedido')).toEqual({ guardar: true, avisar: true, alTope: false })
   expect(transicion('excedido', 'disponible')).toEqual({ guardar: true, avisar: false, alTope: false })
   expect(transicion('bajo', 'bajo')).toEqual({ guardar: false, avisar: false, alTope: false })
+})
+
+test('avisosDeBanco: el tope solo sale para el total del proyecto', () => {
+  expect(avisosDeBanco(transicion('bajo', 'consumido'), 'posicion')).toEqual(['banco.nivel'])
+  expect(avisosDeBanco(transicion('bajo', 'consumido'), 'proyecto')).toEqual(['banco.nivel', 'banco.al_tope'])
+  expect(avisosDeBanco(transicion('consumido', 'excedido'), 'proyecto')).toEqual(['banco.nivel'])
+})
+
+test('avisosDeBanco: la línea base y el rearme no avisan', () => {
+  expect(avisosDeBanco(transicion(null, 'excedido'), 'proyecto')).toEqual([])
+  expect(avisosDeBanco(transicion('excedido', 'disponible'), 'proyecto')).toEqual([])
 })
 
 test('siguienteIntento: 5 min, 30 min, 2 h, 12 h y luego nada', () => {

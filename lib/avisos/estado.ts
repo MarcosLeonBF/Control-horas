@@ -4,13 +4,18 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { comoNivel, type Nivel } from '@/lib/avisos/reglas'
 
-export async function leerEstados(db: SupabaseClient, prefijo: 'banco:' | 'hucha:'): Promise<Map<string, Nivel>> {
-  const filas = await fetchAllRows<{ clave: string; nivel: string }>((desde, hasta) =>
-    db.from('avisos_estado').select('clave, nivel').like('clave', `${prefijo}%`).range(desde, hasta))
-  const out = new Map<string, Nivel>()
+// `desde` es el updated_at de la fila, que solo cambia cuando cambia el nivel: identifica
+// la transición. Los detectores lo meten en la clave de dedupe para que dos evaluaciones
+// a la vez compartan clave y, tras un rearme, la siguiente caída traiga una clave nueva.
+export async function leerEstados(
+  db: SupabaseClient, prefijo: 'banco:' | 'hucha:',
+): Promise<Map<string, { nivel: Nivel; desde: string }>> {
+  const filas = await fetchAllRows<{ clave: string; nivel: string; updated_at: string }>((desde, hasta) =>
+    db.from('avisos_estado').select('clave, nivel, updated_at').like('clave', `${prefijo}%`).range(desde, hasta))
+  const out = new Map<string, { nivel: Nivel; desde: string }>()
   for (const f of filas) {
     const n = comoNivel(f.nivel)
-    if (n) out.set(f.clave, n)
+    if (n) out.set(f.clave, { nivel: n, desde: f.updated_at })
   }
   return out
 }

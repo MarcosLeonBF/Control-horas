@@ -3,7 +3,6 @@
 // (compute_hucha_status): aquí solo se compara con el último anotado.
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { diaMadrid } from '@/lib/horas/auditoria-types'
 import { emitirAviso } from '@/lib/avisos/bandeja'
 import { esProduccion, enlaceHucha } from '@/lib/avisos/entorno'
 import { transicion, comoNivel, centesimas, type Nivel } from '@/lib/avisos/reglas'
@@ -71,30 +70,33 @@ export async function evaluarHucha(ids?: string[]): Promise<void> {
     const db = createAdminClient()
     const huchas = await leerHuchas(db, ids)
     const previos = await leerEstados(db, 'hucha:')
-    const hoy = diaMadrid(new Date().toISOString())
     const aGuardar: { clave: string; nivel: Nivel }[] = []
     for (const h of huchas) {
       if (!h.nivel) continue // sin_presupuesto: no avisa
       const clave = `hucha:${h.id}`
-      const anterior = previos.get(clave) ?? null
+      const previo = previos.get(clave)
+      const anterior = previo?.nivel ?? null
       const t = transicion(anterior, h.nivel)
       if (!t.guardar) continue
-      // Línea base y rearme: se anotan sin avisar.
-      if (!t.avisar || anterior === null) {
+      // Línea base y rearme: se anotan sin avisar. Sin fila previa `t.avisar` ya es false;
+      // `!previo` está para que TypeScript sepa que abajo la hay.
+      if (!t.avisar || !previo) {
         aGuardar.push({ clave, nivel: h.nivel })
         continue
       }
       try {
+        // Clave por transición y por la fila previa (su updated_at), como en los bancos: un
+        // rearme reescribe la fila y la siguiente caída, aunque sea el mismo día, avisa.
         await emitirAviso('hucha.nivel', {
-          proyecto: h.nombre, proyecto_id: h.id, nivel: h.nivel, nivel_anterior: anterior,
+          proyecto: h.nombre, proyecto_id: h.id, nivel: h.nivel, nivel_anterior: previo.nivel,
           moneda: h.moneda, saldo: h.saldo, managers: h.managers, enlace: enlaceHucha(h.id),
-        }, { clave: `${clave}:${anterior}>${h.nivel}:${hoy}` })
+        }, { clave: `${clave}:${previo.nivel}>${h.nivel}:${previo.desde}` })
         // Solo se anota si el aviso salió: si falla, la próxima pasada lo reintenta.
         aGuardar.push({ clave, nivel: h.nivel })
       } catch (e) {
         // Una HUCHA que falla no debe perder la línea base ni los avisos ya emitidos de
-        // las demás de esta pasada: se aísla aquí y no se propaga. La clave de dedupe por
-        // día evita un duplicado si la siguiente pasada la reintenta el mismo día.
+        // las demás de esta pasada: se aísla aquí y no se propaga. La clave de dedupe (la
+        // misma mientras no cambie la fila previa) evita un duplicado si otra pasada la reintenta.
         console.error(`[avisos] evaluarHucha ${clave}:`, e instanceof Error ? e.message : e)
       }
     }

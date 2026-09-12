@@ -87,6 +87,13 @@ export function transicion(anterior: Nivel | null, actual: Nivel): Transicion {
   return { guardar: false, avisar: false, alTope: false }
 }
 
+// Qué avisos salen de una transición de banco. El tope es solo para el total del proyecto:
+// que se agote una posición no es «vender más horas al cliente».
+export function avisosDeBanco(t: Transicion, alcance: 'posicion' | 'proyecto'): ('banco.nivel' | 'banco.al_tope')[] {
+  if (!t.avisar) return []
+  return t.alTope && alcance === 'proyecto' ? ['banco.nivel', 'banco.al_tope'] : ['banco.nivel']
+}
+
 // --- Reintentos --------------------------------------------------------------
 
 export const MAX_INTENTOS = 5
