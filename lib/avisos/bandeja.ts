@@ -139,15 +139,17 @@ export async function enviarPrueba(tipo: TipoAviso): Promise<{ ok: boolean; mens
   if (!process.env.AVISOS_FIRMA_SECRETO) {
     return { ok: false, mensaje: 'Falta AVISOS_FIRMA_SECRETO en el servidor: sin firma no sale ningún aviso.' }
   }
-  const id = await emitirAviso(tipo, ejemplos(appUrl())[tipo], { prueba: true })
-  if (!id) return { ok: false, mensaje: 'No se pudo crear el aviso de prueba.' }
-  const { data: fila, error } = await db.from('avisos_salientes')
-    .update({ estado: 'enviando', intentos: 1, reclamado_at: new Date().toISOString() })
-    .eq('id', id).eq('estado', 'pendiente')
-    .select(COLUMNAS_FILA).single()
-  if (error || !fila) return { ok: false, mensaje: `No se pudo reservar el aviso de prueba: ${error?.message ?? 'sin fila'}` }
-  const r = await entregar(db, fila as FilaSaliente, cfg)
-  const { data: fin } = await db.from('avisos_salientes').select('ultimo_codigo, ultimo_error').eq('id', id).single()
+  // Se crea ya reservada ('enviando', con su intento): si entrara 'pendiente' y se
+  // reservara después, un despacho a la vez podría llevársela en medio y el admin vería
+  // «No se pudo reservar» aunque la prueba sí salió.
+  const { data, error } = await db.from('avisos_salientes').insert({
+    tipo, datos: ejemplos(appUrl())[tipo], prueba: true,
+    estado: 'enviando', intentos: 1, reclamado_at: new Date().toISOString(),
+  }).select(COLUMNAS_FILA).single()
+  if (error || !data) return { ok: false, mensaje: `No se pudo crear el aviso de prueba: ${error?.message ?? 'sin fila'}` }
+  const fila = data as FilaSaliente
+  const r = await entregar(db, fila, cfg)
+  const { data: fin } = await db.from('avisos_salientes').select('ultimo_codigo, ultimo_error').eq('id', fila.id).single()
   if (r === 'enviado') return { ok: true, mensaje: `Enviado (HTTP ${fin?.ultimo_codigo ?? '2xx'}).` }
   const codigo = fin?.ultimo_codigo ? `HTTP ${fin.ultimo_codigo}` : 'sin respuesta'
   return { ok: false, mensaje: `Falló (${codigo}): ${fin?.ultimo_error ?? r}` }
