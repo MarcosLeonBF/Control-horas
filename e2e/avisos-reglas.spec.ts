@@ -29,14 +29,14 @@ test('llamativo: más de 10 h en el día', () => {
   expect(motivosLlamativo(dia(11, { A: 4, B: 4, Departamento: 3 }))).toEqual([
     { regla: 'dia_largo', valor: 11, limite: 10, proyecto: null },
   ])
-  expect(motivosLlamativo(dia(10, { A: 5, B: 5 }))).toEqual([])
+  expect(motivosLlamativo(dia(10, { A: 4, B: 4, Departamento: 2 }))).toEqual([])
 })
 
-test('llamativo: 6 h o más a un proyecto, sin contar Departamento', () => {
-  expect(motivosLlamativo(dia(8, { A: 6, Departamento: 2 }))).toEqual([
-    { regla: 'proyecto_largo', valor: 6, limite: 6, proyecto: 'A' },
+test('llamativo: 5 h o más a un proyecto, sin contar Departamento', () => {
+  expect(motivosLlamativo(dia(8, { A: 5, Departamento: 3 }))).toEqual([
+    { regla: 'proyecto_largo', valor: 5, limite: 5, proyecto: 'A' },
   ])
-  expect(motivosLlamativo(dia(8, { A: 5.99, Departamento: 2.01 }))).toEqual([])
+  expect(motivosLlamativo(dia(8, { A: 4.99, Departamento: 3.01 }))).toEqual([])
   expect(motivosLlamativo(dia(7, { Departamento: 7 }))).toEqual([])
 })
 

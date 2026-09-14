@@ -3,7 +3,7 @@
 import { formatFechaISO } from '@/lib/horas/format'
 
 export const LIMITE_DIA_HORAS = 10
-export const LIMITE_PROYECTO_HORAS = 6
+export const LIMITE_PROYECTO_HORAS = 5
 
 export function centesimas(n: number): number {
   return Math.round(n * 100) / 100
