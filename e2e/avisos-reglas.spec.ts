@@ -4,7 +4,7 @@ import {
   resumirPorDia, motivosLlamativo, claveLlamativo, comoNivel, transicion, avisosDeBanco,
   siguienteIntento, MAX_INTENTOS, textoProyectos, descripcionLlamativo,
 } from '../lib/avisos/reglas'
-import { diasSinRegistrar, ultimoAntesDe, dentroDePlazo } from '../lib/avisos/calendario'
+import { diasSinRegistrar, ultimoAntesDe, dentroDePlazo, fechaDeConsulta } from '../lib/avisos/calendario'
 import { nivelesDeBancos, rankingCapacidad, porcentajeConsumido } from '../lib/avisos/capacidad'
 import { firmar, construirEnvio } from '../lib/avisos/firma'
 import type { BancoHorasRow } from '../lib/horas/bancos-status'
@@ -131,6 +131,14 @@ test('ultimoAntesDe y dentroDePlazo', () => {
   expect(ultimoAntesDe([], '2026-09-16')).toBeNull()
   expect(dentroDePlazo('2026-09-09', '2026-09-16', 7)).toBe(true)
   expect(dentroDePlazo('2026-09-08', '2026-09-16', 7)).toBe(false)
+})
+
+test('fechaDeConsulta: hoy por defecto, y 400 con formato raro o fecha futura', () => {
+  expect(fechaDeConsulta(null, '2026-09-14')).toEqual({ fecha: '2026-09-14' })
+  expect(fechaDeConsulta('2026-09-14', '2026-09-14')).toEqual({ fecha: '2026-09-14' })
+  expect(fechaDeConsulta('2026-09-01', '2026-09-14')).toEqual({ fecha: '2026-09-01' })
+  expect(fechaDeConsulta('2026-09-15', '2026-09-14')).toEqual({ error: 'El parámetro fecha no puede ser posterior a hoy.' })
+  expect(fechaDeConsulta('14/09/2026', '2026-09-14')).toEqual({ error: 'El parámetro fecha tiene que ser YYYY-MM-DD.' })
 })
 
 // --- capacidad -------------------------------------------------------------

@@ -48,3 +48,12 @@ export function ultimoAntesDe(fechas: Iterable<string>, fecha: string): string |
 export function dentroDePlazo(desde: string, hoy: string, diasAtras: number): boolean {
   return desde >= addDiasISO(hoy, -diasAtras)
 }
+
+// El parámetro `fecha` de la consulta. Sin fecha, hoy. Una fecha futura daría por perdidos
+// días que todavía no han terminado (o ni han empezado), así que se rechaza.
+export function fechaDeConsulta(pedida: string | null, hoy: string): { fecha: string } | { error: string } {
+  if (pedida === null) return { fecha: hoy }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(pedida)) return { error: 'El parámetro fecha tiene que ser YYYY-MM-DD.' }
+  if (pedida > hoy) return { error: 'El parámetro fecha no puede ser posterior a hoy.' }
+  return { fecha: pedida }
+}
