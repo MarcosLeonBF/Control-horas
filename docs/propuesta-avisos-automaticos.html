@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Propuesta de avisos automáticos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Geist:wght@400..600&family=Geist+Mono:wght@400..500&display=swap">
+<style>
+  :root {
+    --carmin: #BD0842;
+    --carmin-oscuro: #A0073A;
+    --carmin-tinte: #FBF1F4;
+    --tinta: #1E1A1B;
+    --gris: #6B6560;
+    --linea: #E6E0DD;
+    --papel: #FFFFFF;
+    --fondo: #EEEAE7;
+    --tinte: #F7F4F3;
+    --bajo: #B5760A;
+    --bajo-tinte: #FBF3E4;
+    --consumido: #6B6560;
+    --consumido-tinte: #F1EEEC;
+    --excedido: #A0073A;
+    --excedido-tinte: #FAEAEF;
+    --display: "Fraunces", Georgia, "Times New Roman", serif;
+    --texto: "Geist", "Helvetica Neue", Arial, sans-serif;
+    --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { font-size: 15px; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--tinta);
+    font-family: var(--texto);
+    line-height: 1.55;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .hoja {
+    max-width: 52rem;
+    margin: 2.5rem auto;
+    padding: 3.5rem 4rem 3rem;
+    background: var(--papel);
+    box-shadow: 0 1px 2px rgba(30, 26, 27, .06), 0 14px 36px -14px rgba(30, 26, 27, .14);
+  }
+
+  /* Cabecera */
+  .cabecera { display: grid; gap: 2rem; padding-bottom: 1.6rem; border-bottom: 1px solid var(--linea); }
+  .membrete { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .logo { height: 32px; width: auto; display: block; }
+  .documento { font: 500 .7rem/1 var(--mono); color: var(--gris); letter-spacing: .04em; }
+  .antetitulo {
+    margin: 0 0 .85rem;
+    font: 600 .7rem/1 var(--texto);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--carmin);
+  }
+  h1 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 2.4rem;
+    line-height: 1.08;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+  }
+  .entradilla { margin: .9rem 0 0; max-width: 56ch; font-size: 1.07rem; color: var(--gris); }
+  .ficha {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, max-content));
+    gap: .9rem 2.5rem;
+    margin: 0;
+  }
+  .ficha div { display: grid; gap: .25rem; }
+  .ficha dt { font: 600 .64rem/1 var(--texto); letter-spacing: .12em; text-transform: uppercase; color: var(--gris); }
+  .ficha dd { margin: 0; font-size: .92rem; font-weight: 500; }
+
+  /* Secciones */
+  .seccion {
+    display: grid;
+    grid-template-columns: 2.1rem minmax(0, 1fr);
+    column-gap: .6rem;
+    padding-top: 2.2rem;
+  }
+  .num {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.28rem;
+    line-height: 1.25;
+    color: var(--carmin);
+    font-variant-numeric: lining-nums;
+  }
+  .cuerpo { min-width: 0; }
+  h2 {
+    margin: 0 0 .85rem;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.28rem;
+    line-height: 1.25;
+    letter-spacing: -.005em;
+    text-wrap: balance;
+  }
+  p { margin: 0 0 .8rem; max-width: 64ch; }
+  strong { font-weight: 600; }
+
+  /* Reparto */
+  .reparto { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem 2.2rem; margin-top: .2rem; }
+  .reparto h3 {
+    margin: 0 0 .7rem;
+    padding-bottom: .55rem;
+    border-bottom: 1px solid var(--tinta);
+    font: 600 .7rem/1 var(--texto);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .reparto .plataforma h3 { color: var(--carmin); border-color: var(--carmin); }
+  .lista { margin: 0; padding: 0; list-style: none; display: grid; gap: .5rem; }
+  .lista li { position: relative; padding-left: 1rem; max-width: 64ch; }
+  .lista li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .74em;
+    width: .45rem;
+    height: 1px;
+    background: var(--carmin);
+  }
+
+  /* Diagrama */
+  .flujo {
+    display: grid;
+    gap: .8rem;
+    margin: 1.2rem 0 .55rem;
+    padding: 1.1rem 1.2rem;
+    background: var(--tinte);
+    border-radius: 6px;
+  }
+  .fila {
+    display: grid;
+    grid-template-columns: 7.2rem minmax(0, 1fr) 1.6rem minmax(0, 1fr) 1.6rem minmax(0, 1fr);
+    align-items: center;
+  }
+  .etiqueta { font: 600 .64rem/1.3 var(--texto); letter-spacing: .12em; text-transform: uppercase; color: var(--gris); padding-right: .6rem; }
+  .nodo {
+    display: grid;
+    gap: .12rem;
+    padding: .55rem .7rem;
+    background: var(--papel);
+    border: 1px solid var(--linea);
+    border-radius: 4px;
+  }
+  .nodo b { font-weight: 600; font-size: .88rem; }
+  .nodo span { font-size: .76rem; line-height: 1.35; color: var(--gris); }
+  .nodo.propio { border-color: var(--carmin); }
+  .nodo.propio b { color: var(--carmin-oscuro); }
+  .flecha { text-align: center; color: var(--gris); font-size: .95rem; }
+  .leyenda { font-size: .8rem; color: var(--gris); margin: 0; }
+
+  /* Tablas */
+  .tabla { overflow-x: auto; margin: 1rem 0 .8rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .87rem; line-height: 1.45; }
+  th {
+    padding: 0 .8rem .55rem 0;
+    border-bottom: 1px solid var(--tinta);
+    text-align: left;
+    vertical-align: bottom;
+    font: 600 .64rem/1.2 var(--texto);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--gris);
+  }
+  td { padding: .62rem .8rem .62rem 0; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  td:first-child { font-weight: 600; }
+  th:last-child, td:last-child { padding-right: 0; }
+  tr { break-inside: avoid; }
+  .cifra { text-align: right; white-space: nowrap; font-family: var(--mono); font-size: .84rem; font-variant-numeric: tabular-nums; }
+  th.cifra { font-family: var(--texto); font-size: .64rem; }
+  tfoot td { border-bottom: 0; border-top: 1.5px solid var(--tinta); font-weight: 600; }
+  tfoot .cifra { color: var(--carmin-oscuro); font-weight: 500; font-size: .9rem; }
+
+  .tipo { display: block; font: 500 .74rem/1.4 var(--mono); color: var(--gris); }
+  .tipo.inmediato { color: var(--carmin-oscuro); }
+  .nivel {
+    display: inline-block;
+    padding: .2rem .45rem;
+    border-radius: 999px;
+    font: 600 .7rem/1 var(--texto);
+    white-space: nowrap;
+  }
+  .nivel.bajo { color: var(--bajo); background: var(--bajo-tinte); }
+  .nivel.consumido { color: var(--consumido); background: var(--consumido-tinte); }
+  .nivel.excedido { color: var(--excedido); background: var(--excedido-tinte); }
+
+  .fn {
+    display: inline-block;
+    min-width: 1.1rem;
+    font-family: var(--display);
+    font-weight: 600;
+    color: var(--carmin);
+  }
+  .decisiones td:last-child { border-left: 1px dashed var(--linea); }
+
+  .notas { display: grid; gap: .5rem; margin-top: .3rem; }
+  .notas p, .nota { margin: 0; font-size: .84rem; color: var(--gris); max-width: 72ch; }
+
+  /* Datos que faltan */
+  .faltan { display: grid; gap: .85rem; margin: .4rem 0 0; }
+  .faltan div {
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    gap: 1.3rem;
+    padding-top: .85rem;
+    border-top: 1px solid var(--linea);
+  }
+  .faltan dt { font-weight: 600; line-height: 1.4; }
+  .faltan dd { margin: 0; max-width: 60ch; }
+
+  /* Etapas */
+  .etapas { display: grid; margin-top: .3rem; border: 1px solid var(--linea); border-radius: 6px; overflow: hidden; }
+  .etapa { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: 1.3rem; padding: 1rem 1.2rem; }
+  .etapa + .etapa { border-top: 1px solid var(--linea); }
+  .etapa.actual { background: var(--carmin-tinte); }
+  .etapa h3 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.05rem; }
+  .etapa .horas { display: block; margin-top: .3rem; font: 500 .78rem/1.3 var(--mono); color: var(--carmin-oscuro); }
+  .etapa p { margin: 0; }
+
+  pre {
+    margin: .8rem 0;
+    padding: 1rem 1.15rem;
+    overflow-x: auto;
+    background: var(--tinte);
+    border-radius: 6px;
+    font: 400 .78rem/1.6 var(--mono);
+    color: var(--tinta);
+  }
+
+  .pie {
+    margin-top: 2.6rem;
+    padding-top: .9rem;
+    border-top: 1px solid var(--linea);
+    font-size: .78rem;
+    color: var(--gris);
+  }
+
+  @media (max-width: 720px) {
+    .hoja { margin: 0; padding: 2rem 1.25rem; box-shadow: none; }
+    h1 { font-size: 1.9rem; }
+    .reparto { grid-template-columns: 1fr; }
+    .fila { grid-template-columns: 1fr; gap: .35rem; }
+    .flecha { transform: rotate(90deg); }
+    .faltan div, .etapa { grid-template-columns: 1fr; gap: .3rem; }
+  }
+
+  @page { size: A4; }
+  @media print {
+    html { font-size: 12.4px; }
+    body { background: var(--papel); }
+    .hoja { max-width: none; margin: 0; padding: 0; box-shadow: none; }
+    h2, .num { break-after: avoid; }
+    .flujo, .etapas, .faltan div, pre, .reparto { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<main class="hoja">
+
+  <header class="cabecera">
+    <div class="membrete">
+      <img class="logo" src="../public/logo-negro.png" alt="Bastida &amp; Farina" width="400" height="140">
+      <span class="documento">Documento de trabajo · v1</span>
+    </div>
+    <div>
+      <p class="antetitulo">Control de Rentabilidad · Propuesta</p>
+      <h1>Avisos automáticos con Zapier y n8n</h1>
+      <p class="entradilla">Cómo conectar la plataforma con vuestros flujos de automatización para avisar de registros, bancos de horas, HUCHA y días sin registrar.</p>
+    </div>
+    <dl class="ficha">
+      <div><dt>Fecha</dt><dd>10/09/2026</dd></div>
+      <div><dt>Para</dt><dd>Reunión del lunes 14/09</dd></div>
+      <div><dt>Estado</dt><dd>Borrador para comentar</dd></div>
+      <div><dt>Estimación</dt><dd>15 a 20 h</dd></div>
+    </dl>
+  </header>
+
+  <section class="seccion" aria-labelledby="s1">
+    <span class="num">1</span>
+    <div class="cuerpo">
+      <h2 id="s1">Qué buscamos</h2>
+      <p>Queremos que la plataforma avise por Slack de lo que pasa en el día a día: quién ha enviado su registro, qué proyecto se está quedando sin horas, qué presupuesto se ha ampliado o quién lleva varios días sin registrar.</p>
+      <p>En la última conversación salió la idea de que esos avisos pasen por vuestros flujos de Zapier o n8n, y nos parece el planteamiento correcto. La plataforma detecta cada situación y manda los datos completos. A partir de ahí, vuestro flujo decide el canal, el mensaje y a quién le llega, de modo que cambiar un canal o el texto de un aviso no requiere tocar la plataforma.</p>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="s2">
+    <span class="num">2</span>
+    <div class="cuerpo">
+      <h2 id="s2">Quién se encarga de qué</h2>
+      <div class="reparto">
+        <div class="plataforma">
+          <h3>La plataforma</h3>
+          <ul class="lista">
+            <li>Detectar cuándo ocurre cada situación, con las reglas que acordemos en la reunión.</li>
+            <li>Enviar los datos completos, con las mismas cifras que se ven en Bancos de horas.</li>
+            <li>Firmar cada envío para que podáis comprobar que viene de la plataforma.</li>
+            <li>Reintentar los envíos que fallen y guardar un historial de todo lo enviado.</li>
+            <li>Mantener al día el documento técnico con cada aviso y sus campos.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Vuestros flujos</h3>
+          <ul class="lista">
+            <li>Recibir los avisos y decidir qué se hace con cada uno.</li>
+            <li>Crear los canales de Slack y redactar los mensajes.</li>
+            <li>Decidir a quién le llega cada aviso: a un canal, por mensaje directo o ambas cosas.</li>
+            <li>Fijar la frecuencia de lo programado, como el resumen quincenal o los recordatorios.</li>
+            <li>Definir qué pasa a partir del cuarto día sin registrar.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="nota" style="margin-top: 1rem;">Para los mensajes directos, cada persona tiene que usar en Slack el mismo email que en la plataforma. Es la forma de que vuestro flujo la encuentre.</p>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="s3">
+    <span class="num">3</span>
+    <div class="cuerpo">
+      <h2 id="s3">Cómo funciona</h2>
+      <p>Proponemos dos mecanismos, cada uno para un tipo de aviso.</p>
+      <p><strong>Avisos inmediatos.</strong> Cuando pasa algo concreto (alguien envía su registro, un banco se agota, se amplía una HUCHA), la plataforma manda en ese mismo momento un mensaje a una dirección web que nos facilitáis desde Zapier o n8n. En estas herramientas es lo que se conoce como webhook.</p>
+      <p><strong>Consultas programadas.</strong> Lo que depende del calendario, como el resumen quincenal o el recordatorio diario, funciona al revés: vuestro flujo pregunta a la plataforma a la hora que elijáis, identificándose con una clave privada, y recibe la lista del día. Así podéis mover horarios o frecuencias sin cambios por nuestra parte.</p>
+
+      <div class="flujo" role="img" aria-label="Aviso inmediato: la plataforma detecta el hecho y envía los datos a vuestro flujo, que lo publica en Slack. Consulta programada: vuestro flujo pide la lista a la plataforma a la hora elegida y reparte los avisos en Slack.">
+        <div class="fila">
+          <span class="etiqueta">Aviso inmediato</span>
+          <div class="nodo propio"><b>Plataforma</b><span>Detecta el hecho y envía los datos</span></div>
+          <span class="flecha" aria-hidden="true">→</span>
+          <div class="nodo"><b>Vuestro flujo</b><span>Zapier o n8n recibe el aviso</span></div>
+          <span class="flecha" aria-hidden="true">→</span>
+          <div class="nodo"><b>Slack</b><span>Canal o mensaje directo</span></div>
+        </div>
+        <div class="fila">
+          <span class="etiqueta">Consulta programada</span>
+          <div class="nodo"><b>Vuestro flujo</b><span>Pregunta a la hora que elijáis</span></div>
+          <span class="flecha" aria-hidden="true">→</span>
+          <div class="nodo propio"><b>Plataforma</b><span>Responde con la lista del día</span></div>
+          <span class="flecha" aria-hidden="true">→</span>
+          <div class="nodo"><b>Slack</b><span>Vuestro flujo reparte los avisos</span></div>
+        </div>
+      </div>
+      <p class="leyenda">Con borde de color, la parte que hace la plataforma. El resto corre por vuestros flujos.</p>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="s4">
+    <span class="num">4</span>
+    <div class="cuerpo">
+      <h2 id="s4">Avisos previstos</h2>
+      <div class="tabla">
+        <table>
+          <colgroup><col style="width: 19%"><col style="width: 33%"><col style="width: 16%"><col style="width: 32%"></colgroup>
+          <thead>
+            <tr><th>Aviso</th><th>Cuándo se envía</th><th>Tipo</th><th>Qué incluye</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Registro enviado</td>
+              <td>Cada vez que alguien envía su registro diario. Es el pulso del equipo.</td>
+              <td><span class="tipo inmediato">Inmediato</span></td>
+              <td>Persona, fecha, total de horas y reparto por proyecto.</td>
+            </tr>
+            <tr>
+              <td>Registro llamativo</td>
+              <td>Cuando un registro se sale de lo normal: por ejemplo, más de 10 h en un día o muchas horas a un solo proyecto.</td>
+              <td><span class="tipo inmediato">Inmediato</span></td>
+              <td>Lo mismo que el anterior y el motivo del aviso.</td>
+            </tr>
+            <tr>
+              <td>Banco de horas</td>
+              <td>Cuando un proyecto, o una posición dentro del proyecto, pasa a <span class="nivel bajo">Bajo</span>, <span class="nivel consumido">Consumido</span> o <span class="nivel excedido">Excedido</span>.</td>
+              <td><span class="tipo inmediato">Inmediato</span><span class="tipo">y revisión diaria</span></td>
+              <td>Proyecto, posición, horas asignadas, consumidas y disponibles, y el nivel alcanzado.</td>
+            </tr>
+            <tr>
+              <td>Proyecto al tope</td>
+              <td>Cuando el banco del proyecto llega al 100%.</td>
+              <td><span class="tipo inmediato">Inmediato</span><span class="tipo">y revisión diaria</span></td>
+              <td>Lo anterior, más el manager del proyecto y el enlace a su ficha, para poder ofrecerle más horas.</td>
+            </tr>
+            <tr>
+              <td>HUCHA</td>
+              <td>Cuando entra un proyecto nuevo con presupuesto, cuando se amplía y cuando se agota.</td>
+              <td><span class="tipo inmediato">Inmediato</span></td>
+              <td>Proyecto, importe del movimiento, saldo disponible y manager.</td>
+            </tr>
+            <tr>
+              <td>Resumen quincenal</td>
+              <td>Cada quince días naturales.</td>
+              <td><span class="tipo">Consulta programada</span></td>
+              <td>Proyectos con más horas disponibles y proyectos con menos consumo en proporción a lo contratado.</td>
+            </tr>
+            <tr>
+              <td>Días sin registrar</td>
+              <td>Cada día laborable.</td>
+              <td><span class="tipo">Consulta programada</span></td>
+              <td>Persona, días seguidos sin registrar, su email y el de su manager directo.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="notas">
+        <p>La revisión diaria del banco hace falta porque hay cambios que no dependen de que alguien registre. El cierre de mes, con el reparto 75/25 del sobrante, o una actualización del Excel pueden cambiar el estado de un banco sin que nadie toque nada.</p>
+        <p>El proyecto nuevo de HUCHA se detecta al sincronizar el Excel de presupuestos, que hoy se hace a mano desde la plataforma.</p>
+        <p>Para los días sin registrar se mantiene la escalera propuesta: el primer día, aviso a la persona; el segundo, otra vez a la persona y con un tono más serio; el tercero, también a su manager. La consulta devuelve los días acumulados de cada persona y vuestro flujo aplica la escalera, así que podéis ajustarla sin tocar la plataforma.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="s5">
+    <span class="num">5</span>
+    <div class="cuerpo">
+      <h2 id="s5">Datos que todavía no tiene la plataforma</h2>
+      <p>Algunos avisos necesitan información que hoy no existe en la plataforma. Conviene resolverlo antes de ponerlos en marcha.</p>
+      <dl class="faltan">
+        <div>
+          <dt>Manager directo de cada persona</dt>
+          <dd>Ahora mismo las personas se relacionan con los managers a través de las áreas, y en la práctica cada operativo comparte área con los siete managers activos. Un aviso «a su manager» les llegaría a los siete. Proponemos añadir un campo de manager directo en la ficha de cada usuario.</dd>
+        </div>
+        <div>
+          <dt>Manager de cada proyecto</dt>
+          <dd>Llega desde el Excel como un nombre. Lo vincularíamos con su usuario por el nombre, como ya se hace en HUCHA, y los que no coincidan saldrían en un listado para corregirlos.</dd>
+        </div>
+        <div>
+          <dt>Calendario laboral</dt>
+          <dd>La plataforma no sabe qué días son laborables, cuáles son festivos ni quién está de vacaciones. Para empezar proponemos lo más sencillo: de lunes a viernes, una lista de festivos y, para vacaciones y ausencias, registrarlas como una línea en Departamento para que ese día cuente como hecho.</dd>
+        </div>
+        <div>
+          <dt>Qué es un día pendiente</dt>
+          <dd>En los últimos 30 días, 114 de las 236 jornadas registradas quedaron por debajo de 8 horas. Con el criterio de «menos de 8 horas», el recordatorio saltaría en casi la mitad de las jornadas. Proponemos contar como pendiente solo el día sin ningún registro.</dd>
+        </div>
+        <div>
+          <dt>Plazo para registrar</dt>
+          <dd>Hoy se puede registrar hasta 7 días hacia atrás, salvo a quien un administrador le haya ampliado el plazo. Desde el octavo día la persona ya no puede ponerse al día por su cuenta, así que hay que decidir qué hace el aviso en ese punto.</dd>
+        </div>
+        <div>
+          <dt>Datos personales</dt>
+          <dd>Los avisos incluyen nombres, emails y horas de personas, y salen hacia un servicio externo. Conviene que lo valide quien lleve la protección de datos antes de activarlos.</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="s6">
+    <span class="num">6</span>
+    <div class="cuerpo">
+      <h2 id="s6">Seguridad y fiabilidad</h2>
+      <ul class="lista">
+        <li>Cada envío va firmado con una clave que solo conocen la plataforma y vuestro flujo, para que podáis comprobar su origen.</li>
+        <li>Cada aviso lleva un identificador único. Si por un reintento llega dos veces, vuestro flujo puede descartar el repetido.</li>
+        <li>Si vuestro flujo no responde, la plataforma lo reintenta y lo deja anotado en un historial que puede consultar cualquier administrador.</li>
+        <li>El envío nunca retrasa el registro. La persona guarda y sigue trabajando aunque Zapier tarde o esté caído.</li>
+        <li>Habrá un botón para mandar un aviso de prueba, porque tanto Zapier como n8n necesitan recibir un ejemplo para configurar los campos.</li>
+        <li>Los campos nuevos se añaden sin romper lo que ya funciona, y cualquier cambio de formato se comunica con antelación.</li>
+        <li>Las pruebas internas de la plataforma no generan avisos reales.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="s7">
+    <span class="num">7</span>
+    <div class="cuerpo">
+      <h2 id="s7">Fases y estimación</h2>
+      <p>Lo organizamos en fases cortas. Cada una deja algo funcionando que podéis conectar y probar antes de pasar a la siguiente.</p>
+      <div class="tabla">
+        <table>
+          <colgroup><col style="width: 25%"><col><col style="width: 13%"></colgroup>
+          <thead>
+            <tr><th>Fase</th><th>Qué incluye</th><th class="cifra">Horas</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="fn">0</span>Base</td>
+              <td>Envío de avisos con firma, reintentos e historial. Configuración de las direcciones con botón de prueba. Documento técnico. Sustitución de las alertas de Slack que se prepararon en su día y nunca llegaron a activarse. Cambio de nombre a Control de Rentabilidad.</td>
+              <td class="cifra">3 a 4</td>
+            </tr>
+            <tr>
+              <td><span class="fn">1</span>Registros</td>
+              <td>Registro enviado y registro llamativo.</td>
+              <td class="cifra">1 a 1,5</td>
+            </tr>
+            <tr>
+              <td><span class="fn">2</span>Bancos de horas</td>
+              <td>Avisos por proyecto y por posición con las mismas cifras que la plataforma, proyecto al tope y revisión diaria. Arranque controlado, para que no salten de golpe todos los bancos que ya están bajos.</td>
+              <td class="cifra">3 a 4</td>
+            </tr>
+            <tr>
+              <td><span class="fn">3</span>HUCHA</td>
+              <td>Proyecto nuevo, ampliación y presupuesto agotado.</td>
+              <td class="cifra">1 a 1,5</td>
+            </tr>
+            <tr>
+              <td><span class="fn">4</span>Resumen quincenal</td>
+              <td>Consulta con los proyectos con más capacidad y los más libres.</td>
+              <td class="cifra">1</td>
+            </tr>
+            <tr>
+              <td><span class="fn">5</span>Días sin registrar</td>
+              <td>Manager directo, calendario laboral y consulta para la escalera de recordatorios.</td>
+              <td class="cifra">4 a 5</td>
+            </tr>
+            <tr>
+              <td><span class="fn"></span>Coordinación</td>
+              <td>Reuniones, apoyo para conectar vuestros flujos y ajustes después de ver los primeros avisos reales.</td>
+              <td class="cifra">2 a 3</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr><td>Total</td><td></td><td class="cifra">15 a 20 h</td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="nota">Son horas de desarrollo, con pruebas y puesta en producción incluidas. La estimación da por hecho que las decisiones del punto 9 se cierran en la reunión y que las vacaciones se registran en Departamento, sin una pantalla propia. Si se quiere esa pantalla, la estimamos aparte.</p>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="s8">
+    <span class="num">8</span>
+    <div class="cuerpo">
+      <h2 id="s8">Cómo arrancar</h2>
+      <div class="etapas">
+        <div class="etapa actual">
+          <div><h3>Etapa 1</h3><span class="horas">Saldo actual · 5 h</span></div>
+          <p>Reunión de arranque y fase 0 y, si queda margen, el aviso de registro enviado. Al terminar, vuestros flujos ya reciben avisos de prueba y el circuito queda comprobado de principio a fin.</p>
+        </div>
+        <div class="etapa">
+          <div><h3>Etapa 2</h3><span class="horas">Ampliación · 10 a 15 h</span></div>
+          <p>Fases 1 a 5, en el orden que acordemos. Si hubiera que recortar, la fase 5 es la que más depende de decisiones pendientes y la más fácil de dejar para más adelante.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="s9">
+    <span class="num">9</span>
+    <div class="cuerpo">
+      <h2 id="s9">Decisiones para la reunión</h2>
+      <div class="tabla">
+        <table class="decisiones">
+          <colgroup><col style="width: 29%"><col style="width: 47%"><col style="width: 24%"></colgroup>
+          <thead>
+            <tr><th>Decisión</th><th>Propuesta</th><th>Acuerdo</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Zapier o n8n, y si es n8n, propio o en la nube</td><td>Lo decidís vosotros. Como referencia, calculamos unos 300 avisos al mes, la mayoría de registros enviados.</td><td></td></tr>
+            <tr><td>Datos personales</td><td>Validarlo con quien lleve protección de datos antes de activar nada.</td><td></td></tr>
+            <tr><td>Una dirección para todo o una por aviso</td><td>Una por aviso. Cada uno tiene su flujo y se puede pausar por separado.</td><td></td></tr>
+            <tr><td>Cuándo un banco está bajo</td><td>Cuando le queda menos del 20%, igual que en la plataforma.</td><td></td></tr>
+            <tr><td>Umbrales de HUCHA</td><td>Avisar al 80% y al 100% del presupuesto.</td><td></td></tr>
+            <tr><td>Registro llamativo</td><td>Más de 10 h en un día, o 6 h o más a un solo proyecto. Con los datos del último mes habría saltado como mucho 8 veces.</td><td></td></tr>
+            <tr><td>Día pendiente y festivos</td><td>Día laborable sin ningún registro. Falta saber qué calendario de festivos aplica.</td><td></td></tr>
+            <tr><td>Manager directo</td><td>Que lo rellene administración al dar de alta a cada persona.</td><td></td></tr>
+            <tr><td>Proyectos incluidos</td><td>Solo los activos.</td><td></td></tr>
+            <tr><td>Primer encendido</td><td>Un único resumen con el estado actual y, a partir de ahí, solo los cambios.</td><td></td></tr>
+            <tr><td>Resumen quincenal</td><td>Días 1 y 16 de cada mes, con los 10 proyectos con más horas disponibles y los 10 con menos consumo proporcional.</td><td></td></tr>
+            <tr><td>Cuarto día sin registrar</td><td>Por definir.</td><td></td></tr>
+            <tr><td>Orden de las fases y contacto</td><td>El orden del punto 7 y una persona de vuestro equipo para probar los flujos.</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="sa">
+    <span class="num">A</span>
+    <div class="cuerpo">
+      <h2 id="sa">Anexo: ejemplo de aviso</h2>
+      <p>Así llegaría a vuestro flujo un aviso de proyecto al tope. Los nombres son de ejemplo.</p>
+<pre>{
+  "id": "evt_2b7f9c41",
+  "tipo": "banco.al_tope",
+  "fecha": "2026-09-22T10:41:07+02:00",
+  "datos": {
+    "proyecto": "Proyecto de ejemplo",
+    "nivel": "consumido",
+    "horas_asignadas": 120,
+    "horas_consumidas": 120,
+    "horas_disponibles": 0,
+    "manager": {
+      "nombre": "Nombre Apellido",
+      "email": "nombre.apellido@ejemplo.com"
+    },
+    "enlace": "https://…/bancos/Proyecto%20de%20ejemplo"
+  }
+}</pre>
+      <p>El documento técnico recogerá un ejemplo de cada aviso y de cada consulta, con la descripción de cada campo.</p>
+    </div>
+  </section>
+
+  <footer class="pie">Documento de trabajo para la reunión del 14/09/2026. Las cifras de uso salen de la propia plataforma (últimos 30 días, a 10/09/2026).</footer>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avisos y consultas · Control de Rentabilidad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Geist:wght@400..600&family=Geist+Mono:wght@400..500&display=swap">
+<style>
+  :root {
+    --carmin: #BD0842;
+    --carmin-oscuro: #A0073A;
+    --carmin-tinte: #FBF1F4;
+    --tinta: #1E1A1B;
+    --gris: #6B6560;
+    --gris-claro: #9A938E;
+    --linea: #E6E0DD;
+    --papel: #FFFFFF;
+    --fondo: #EEEAE7;
+    --tinte: #F7F4F3;
+    --codigo: #FAF8F7;
+    --ok: #2F6B4F;
+    --ok-tinte: #EAF3EE;
+    --bajo: #B5760A;
+    --bajo-tinte: #FBF3E4;
+    --consumido: #6B6560;
+    --consumido-tinte: #F1EEEC;
+    --excedido: #A0073A;
+    --excedido-tinte: #FAEAEF;
+    --display: "Fraunces", Georgia, "Times New Roman", serif;
+    --texto: "Geist", "Helvetica Neue", Arial, sans-serif;
+    --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { font-size: 15px; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--tinta);
+    font-family: var(--texto);
+    line-height: 1.45;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .pagina {
+    max-width: 56rem;
+    margin: 2rem auto;
+    padding: 2.6rem 3rem;
+    background: var(--papel);
+    box-shadow: 0 1px 2px rgba(30, 26, 27, .06), 0 14px 36px -14px rgba(30, 26, 27, .14);
+  }
+
+  /* Cabecera */
+  .membrete { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.1rem; }
+  .logo { height: 26px; width: auto; display: block; }
+  .documento { font: 500 .66rem/1 var(--mono); color: var(--gris); letter-spacing: .04em; }
+  .antetitulo { margin: 0 0 .5rem; font: 600 .64rem/1 var(--texto); letter-spacing: .14em; text-transform: uppercase; color: var(--carmin); }
+  h1 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 2rem; line-height: 1.05; letter-spacing: -.015em; }
+  .entradilla { margin: .45rem 0 0; font-size: .95rem; color: var(--gris); }
+
+  /* Títulos */
+  .titulo { display: flex; align-items: baseline; gap: .55rem; margin: 1.25rem 0 .6rem; padding-top: .55rem; border-top: 1px solid var(--linea); }
+  .titulo.primero { border-top: 0; padding-top: 0; margin-top: 0; }
+  .num { font-family: var(--display); font-weight: 600; font-size: 1.2rem; line-height: 1.1; color: var(--carmin); }
+  h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.2rem; line-height: 1.15; letter-spacing: -.01em; }
+  .titulo .sub { margin-left: auto; font-size: .74rem; color: var(--gris); }
+  h3 { margin: 0 0 .35rem; font: 600 .62rem/1.2 var(--texto); letter-spacing: .12em; text-transform: uppercase; color: var(--gris); }
+  h3 + p, h3 + pre, h3 + table { margin-top: 0; }
+  p { margin: 0 0 .45rem; font-size: .82rem; }
+  strong { font-weight: 600; }
+  code { font-family: var(--mono); font-size: .86em; padding: .03em .25em; border-radius: 3px; background: var(--tinte); }
+  .gris { color: var(--gris); }
+
+  /* Rejillas */
+  .dos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 1.5rem; }
+  .bloque { margin-bottom: .75rem; }
+
+  /* Vías */
+  .vias { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin: 1rem 0 .5rem; }
+  .via { border: 1px solid var(--linea); border-radius: 6px; padding: .6rem .75rem; }
+  .via .linea { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5rem; margin-bottom: .45rem; }
+  .caja { font: 500 .72rem/1.2 var(--texto); padding: .28rem .5rem; border: 1px solid var(--tinta); border-radius: 4px; white-space: nowrap; }
+  .flecha { position: relative; height: 1px; background: var(--tinta); }
+  .flecha::after { content: ""; position: absolute; right: -1px; top: -3.5px; border: 4px solid transparent; border-left: 6px solid var(--tinta); border-right: 0; }
+  .flecha span { position: absolute; left: 50%; bottom: .25rem; transform: translateX(-50%); font: 500 .6rem/1 var(--mono); color: var(--gris); }
+  .via p { margin: 0; font-size: .76rem; color: var(--gris); }
+  .via b { color: var(--carmin); font-weight: 600; }
+  .conectar { font-size: .76rem; color: var(--gris); margin: 0; }
+
+  /* Listas */
+  .lista { margin: 0 0 .5rem; padding: 0; list-style: none; display: grid; gap: .28rem; font-size: .8rem; }
+  .lista li { position: relative; padding-left: .85rem; }
+  .lista li::before { content: ""; position: absolute; left: 0; top: .68em; width: .4rem; height: 1px; background: var(--carmin); }
+  .lista.dos-col { display: block; columns: 2; column-gap: 1.5rem; }
+  .lista.dos-col li { break-inside: avoid; margin-bottom: .28rem; }
+
+  /* Tablas */
+  .tabla { width: 100%; border-collapse: collapse; font-size: .78rem; margin: 0 0 .5rem; }
+  .tabla th { text-align: left; padding: .25rem .5rem .25rem 0; border-bottom: 1px solid var(--tinta); font: 600 .58rem/1.2 var(--texto); letter-spacing: .1em; text-transform: uppercase; color: var(--gris); }
+  .tabla td { padding: .25rem .5rem .25rem 0; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  .tabla tr:last-child td { border-bottom: 0; }
+  .tabla td:first-child code { background: none; padding: 0; font-weight: 500; white-space: nowrap; }
+
+  /* Código */
+  pre {
+    margin: 0 0 .45rem;
+    padding: .45rem .6rem;
+    background: var(--codigo);
+    border: 1px solid var(--linea);
+    border-radius: 5px;
+    font: 400 .69rem/1.4 var(--mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+  pre .k { color: var(--tinta); font-weight: 500; }
+  pre .s { color: #8A2346; }
+  pre .n { color: #1F5F8B; }
+  pre .l { color: #9A5B00; font-weight: 500; }
+  pre .p { color: var(--gris-claro); }
+  pre .ref { color: var(--ok); font-weight: 500; }
+  pre .c { color: var(--gris-claro); font-style: italic; }
+  .rotulo { margin: 0 0 .2rem; font: 500 .66rem/1.2 var(--mono); color: var(--gris); }
+  .rotulo b { color: var(--ok); font-weight: 600; }
+
+  /* Niveles */
+  .nivel { display: inline-block; padding: .06rem .38rem; border-radius: 999px; font: 500 .68rem/1.3 var(--mono); white-space: nowrap; }
+  .nivel.disponible { color: var(--ok); background: var(--ok-tinte); }
+  .nivel.bajo { color: var(--bajo); background: var(--bajo-tinte); }
+  .nivel.consumido { color: var(--consumido); background: var(--consumido-tinte); }
+  .nivel.excedido { color: var(--excedido); background: var(--excedido-tinte); }
+  .escala { display: grid; grid-template-columns: auto 1fr; gap: .22rem .6rem; align-items: center; font-size: .76rem; margin-bottom: .3rem; }
+
+  /* Tarjetas de aviso */
+  .avisos { columns: 2; column-gap: 1.5rem; }
+  .tarjeta { break-inside: avoid; border-top: 1.5px solid var(--tinta); padding-top: .4rem; margin-bottom: .85rem; }
+  .tarjeta-cab { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; }
+  .tipo { font: 500 .78rem/1.2 var(--mono); color: var(--carmin); }
+  .momento { font: 500 .6rem/1.2 var(--texto); letter-spacing: .08em; text-transform: uppercase; color: var(--gris); white-space: nowrap; }
+  .tarjeta h4 { margin: .08rem 0 .3rem; font-family: var(--display); font-weight: 600; font-size: .98rem; line-height: 1.2; }
+  .tarjeta p { font-size: .77rem; margin-bottom: .35rem; }
+  .tarjeta .lista { font-size: .74rem; gap: .18rem; margin-bottom: 0; }
+
+  /* Calendario */
+  .cal { display: grid; grid-template-columns: 3.4rem repeat(14, minmax(0, 1fr)); gap: 2px; margin: .2rem 0 .1rem; }
+  .cal .cab { font: 500 .56rem/1.15 var(--mono); color: var(--gris); text-align: center; }
+  .cal .cab b { display: block; font-weight: 600; color: var(--tinta); font-size: .66rem; }
+  .cal .cab.fin b { color: var(--gris-claro); }
+  .cal .nombre { font-size: .74rem; font-weight: 600; align-self: center; }
+  .cal .c { display: grid; place-items: center; height: 1.35rem; border-radius: 3px; font: 600 .7rem/1 var(--mono); }
+  .cal .reg { background: var(--ok-tinte); color: var(--ok); }
+  .cal .pen { background: var(--carmin-tinte); color: var(--carmin-oscuro); border: 1px solid #F0C9D5; }
+  .cal .c.fin { background: var(--consumido-tinte); }
+  .cal .hoy { border: 1.5px dashed var(--tinta); font: 500 .5rem/1 var(--mono); }
+  .cal .plazo { grid-column: 8 / 16; margin-top: .25rem; padding-top: .2rem; border-top: 1.5px solid var(--tinta); font: 500 .58rem/1.2 var(--mono); color: var(--gris); text-align: center; position: relative; }
+  .cal .plazo::before, .cal .plazo::after { content: ""; position: absolute; top: -5px; width: 1.5px; height: 8px; background: var(--tinta); }
+  .cal .plazo::before { left: 0; }
+  .cal .plazo::after { right: 0; }
+  .leyenda { display: flex; flex-wrap: wrap; gap: .2rem 1rem; font-size: .7rem; color: var(--gris); margin: .35rem 0 .45rem; }
+  .leyenda span { display: inline-flex; align-items: center; gap: .3rem; }
+  .leyenda i { display: inline-block; width: .75rem; height: .75rem; border-radius: 2px; }
+
+  .recuadro { padding: .45rem .7rem; background: var(--tinte); border-left: 2px solid var(--carmin); border-radius: 0 5px 5px 0; font-size: .78rem; margin: .3rem 0 .5rem; }
+  .recuadro p { font-size: inherit; margin: 0; }
+
+  @media screen and (max-width: 720px) {
+    .pagina { margin: 0; padding: 1.6rem 1.1rem; box-shadow: none; }
+    .dos, .vias { grid-template-columns: 1fr; }
+    .avisos, .lista.dos-col { columns: 1; }
+    .cal { min-width: 34rem; }
+    .calendario { overflow-x: auto; }
+  }
+
+  @page {
+    size: A4;
+    margin: 11mm 13mm 12mm;
+    @bottom-left { content: "Avisos y consultas · Control de Rentabilidad · v1"; font: 500 7pt "Geist Mono", Consolas, monospace; color: #9A938E; }
+    @bottom-right { content: counter(page) " / " counter(pages); font: 500 7pt "Geist Mono", Consolas, monospace; color: #9A938E; }
+  }
+  @media print {
+    html { font-size: 12px; }
+    body { background: var(--papel); }
+    .pagina { max-width: none; margin: 0; padding: 0; box-shadow: none; break-after: page; }
+    .pagina:last-child { break-after: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================ Página 1 ============================ -->
+<section class="pagina">
+  <div class="membrete">
+    <img class="logo" src="../../public/logo-negro.png" alt="Bastida &amp; Farina" width="400" height="140">
+    <span class="documento">Documento técnico · v1 · 11/09/2026</span>
+  </div>
+  <p class="antetitulo">Control de Rentabilidad · Avisos</p>
+  <h1>Avisos y consultas</h1>
+  <p class="entradilla">Qué llega al webhook en cada aviso, qué devuelve la API de consultas y cómo se cuentan los días sin registrar.</p>
+
+  <div class="vias">
+    <div class="via">
+      <div class="linea"><span class="caja">Plataforma</span><span class="flecha"><span>POST</span></span><span class="caja">Webhook</span></div>
+      <p><b>Avisos.</b> Los envía la plataforma cuando pasa algo. Una sola URL para los 7 tipos.</p>
+    </div>
+    <div class="via">
+      <div class="linea"><span class="caja">Automatización</span><span class="flecha"><span>GET</span></span><span class="caja">Plataforma</span></div>
+      <p><b>Consultas.</b> Se piden cuando se quiera, con una clave. Para lo que va por calendario.</p>
+    </div>
+  </div>
+  <p class="conectar">Para conectar: la automatización nos pasa la URL del webhook (una sola, con <code>https://</code>) y nosotros le pasamos la clave de firma y la clave de consultas.</p>
+
+  <div class="titulo"><span class="num">1</span><h2>Cómo llega un aviso</h2></div>
+  <div class="dos">
+    <div>
+      <div class="bloque">
+        <h3>La petición</h3>
+        <p><code>POST</code> a la URL del webhook. Cuerpo JSON en UTF-8, en una sola línea (aquí va con saltos para que se lea).</p>
+        <table class="tabla">
+          <tbody>
+            <tr><td><code>Content-Type</code></td><td><code>application/json</code></td></tr>
+            <tr><td><code>X-Avisos-Id</code></td><td>Igual que <code>id</code></td></tr>
+            <tr><td><code>X-Avisos-Tipo</code></td><td>Igual que <code>tipo</code></td></tr>
+            <tr><td><code>X-Avisos-Firma</code></td><td><code>t=&lt;segundos unix&gt;,v1=&lt;firma&gt;</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="bloque">
+        <h3>El sobre (igual en todos)</h3>
+<pre class="json"><code>{
+  "id": "3f1c2a9e-7b4d-4e2a-9c1f-5a8b6d0e2f11",
+  "tipo": "registro.enviado",
+  "version": 1,
+  "fecha": "2026-09-14T15:32:10.412Z",
+  "prueba": false,
+  "datos": { … }
+}</code></pre>
+        <p class="gris" style="font-size: .76rem;"><code>id</code> único (solo se repite si el mismo aviso llega dos veces) · <code>fecha</code> es el momento del hecho, en UTC · <code>prueba</code> es <code>true</code> solo desde «Enviar prueba» · <code>datos</code> depende del tipo (página 2).</p>
+      </div>
+    </div>
+    <div>
+      <div class="bloque">
+        <h3>Objetos que se repiten</h3>
+        <p class="rotulo"><b>«Persona»</b></p>
+<pre class="json"><code>{
+  "id": "00000000-0000-4000-8000-00000000a1b2",
+  "nombre": "Laura Gómez",
+  "email": "laura.gomez@ejemplo.com",
+  "posicion": "SEO Strategist",
+  "rol": "operativo"
+}</code></pre>
+        <p class="rotulo"><b>«Manager»</b></p>
+<pre class="json"><code>{
+  "id": "00000000-0000-4000-8000-00000000c3d4",
+  "nombre": "Carlos Ruiz",
+  "email": "carlos.ruiz@ejemplo.com"
+}</code></pre>
+        <ul class="lista">
+          <li><code>posicion</code>: <code>null</code> si la persona no tiene posición.</li>
+          <li><code>manager_directo</code>: el de la ficha de la persona. Es un dato nuevo: llega <code>null</code> hasta que se asigne.</li>
+          <li><code>manager_proyecto</code>: sale del nombre en el Excel de bancos. Si no hay un único usuario con ese nombre, llega con <code>id</code> y <code>email</code> a <code>null</code>; sin manager en el Excel, <code>null</code>.</li>
+          <li><code>managers</code> (HUCHA): lista; puede venir vacía.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="dos">
+    <div>
+      <h3>Niveles de un banco o de una HUCHA</h3>
+      <div class="escala">
+        <span class="nivel disponible">disponible</span><span>Queda el 20&nbsp;% o más</span>
+        <span class="nivel bajo">bajo</span><span>Queda menos del 20&nbsp;%</span>
+        <span class="nivel consumido">consumido</span><span>Queda exactamente 0</span>
+        <span class="nivel excedido">excedido</span><span>Se ha gastado más de lo asignado</span>
+      </div>
+      <p class="gris" style="font-size: .76rem;">Solo se avisa cuando el nivel empeora, y puede saltarse niveles.</p>
+    </div>
+    <div>
+      <h3>Formatos</h3>
+      <ul class="lista">
+        <li><code>dia</code>, <code>desde</code>…: día en hora de Madrid (<code>2026-09-14</code>).</li>
+        <li>Horas e importes con punto decimal (<code>7.5</code>); porcentajes sobre 100 con un decimal (<code>83.8</code>).</li>
+        <li><code>proyectos_texto</code> y <code>descripcion</code> ya vienen redactados (<code>2,5 h</code>, <code>14/09</code>).</li>
+        <li><code>enlace</code> abre la ficha en la plataforma (pide iniciar sesión).</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin-top: .5rem;">Entrega, firma y pruebas</h3>
+  <ul class="lista dos-col">
+    <li>Entregado = respuesta 2xx en menos de 5 segundos. Solo cuenta el código.</li>
+    <li>Si no, se reintenta a los 5 min, 30 min, 2 h y 12 h (5 intentos). Salen con el siguiente guardado en la plataforma o, como tarde, en la revisión diaria (06:00 UTC).</li>
+    <li>Un aviso puede llegar repetido, con el mismo <code>id</code> y la misma <code>fecha</code>. El orden de llegada no está garantizado.</li>
+    <li>Firma: <code>v1</code> = HMAC-SHA256 en hexadecimal de <code>&lt;t&gt;.&lt;cuerpo&gt;</code> con la clave de firma. <code>t</code> es el momento del envío y cambia en cada reintento.</li>
+    <li>«Enviar prueba» (Administración → Avisos) manda los datos de ejemplo de este documento con <code>prueba: true</code>, aunque el tipo esté pausado. No se reintenta.</li>
+    <li>Cada tipo se activa o pausa por separado; lo que pasa en pausa no se guarda para después. Al encender no se avisa de lo que ya estaba bajo o excedido.</li>
+    <li>La <strong>revisión diaria</strong> detecta lo que cambia sin que nadie guarde (Excel de bancos, cierre de mes).</li>
+    <li>Pueden aparecer campos nuevos sin cambiar <code>version</code>. Si cambia o se quita alguno, llegará <code>version: 2</code> y se avisará antes.</li>
+  </ul>
+  <div class="recuadro"><p><strong>No se envía:</strong> un aviso por cada gasto de HUCHA, al anular un registro de horas, cuando un banco o una HUCHA mejora, un pulso al editar un registro, nada de proyectos que no estén <code>Activo</code> en el Excel ni de posiciones sin horas asignadas. Recordatorios y resúmenes no van por el webhook: se piden a la API.</p></div>
+</section>
+
+<!-- ============================ Página 2 ============================ -->
+<section class="pagina">
+  <div class="titulo primero"><span class="num">2</span><h2>Los avisos, uno a uno</h2><span class="sub">Solo cambia <code>datos</code>. <span style="color: var(--ok); font-weight: 600;">«Persona»</span> y <span style="color: var(--ok); font-weight: 600;">«Manager»</span> son los objetos de la página 1.</span></div>
+
+  <div class="avisos">
+    <article class="tarjeta">
+      <div class="tarjeta-cab"><span class="tipo">registro.enviado</span><span class="momento">Al guardar</span></div>
+      <h4>Alta de un registro</h4>
+      <p>Cada alta de un registro de horas: uno por cada día que incluya. No al editar ni al anular.</p>
+<pre class="json"><code>{
+  "persona": «Persona»,
+  "manager_directo": «Manager»,
+  "dia": "2026-09-14",
+  "horas_registro": 7.5,
+  "horas_dia": 7.5,
+  "proyectos": [
+    { "proyecto": "Proyecto Ejemplo", "horas": 5 },
+    { "proyecto": "Departamento", "horas": 2.5 }
+  ],
+  "proyectos_texto":
+    "Proyecto Ejemplo (5 h), Departamento (2,5 h)"
+}</code></pre>
+      <ul class="lista">
+        <li><code>horas_registro</code> y <code>proyectos</code> son de este alta; <code>horas_dia</code> es el total del día. Dos altas el mismo día = dos avisos.</li>
+        <li><code>dia</code> puede ser de hasta 7 días atrás (más si un administrador amplió el plazo de esa persona).</li>
+        <li>El de más volumen: cerca de uno por persona y día laborable.</li>
+      </ul>
+    </article>
+
+    <article class="tarjeta">
+      <div class="tarjeta-cab"><span class="tipo">registro.llamativo</span><span class="momento">Al guardar (alta o edición)</span></div>
+      <h4>Un día fuera de lo normal</h4>
+      <p><code>dia_largo</code>: más de 10 h en el día, <code>Departamento</code> incluido. <code>proyecto_largo</code>: 6 h o más a un proyecto (sin <code>Departamento</code>); llega uno por proyecto, con <code>proyecto</code> relleno. Una sola vez por persona, día y regla.</p>
+<pre class="json"><code>{
+  "persona": «Persona»,
+  "manager_directo": «Manager»,
+  "dia": "2026-09-14",
+  "regla": "dia_largo",
+  "valor": 11,
+  "limite": 10,
+  "proyecto": null,
+  "horas_dia": 11,
+  "descripcion": "11 h registradas el 14/09 (límite: 10 h)"
+}</code></pre>
+      <ul class="lista">
+        <li><code>valor</code> son las horas del día (o del proyecto); <code>limite</code>, 10 o 6. Puede llegar después del pulso si el día se edita más tarde.</li>
+      </ul>
+    </article>
+
+    <article class="tarjeta">
+      <div class="tarjeta-cab"><span class="tipo">banco.nivel</span><span class="momento">Al guardar o revisión diaria</span></div>
+      <h4>Un banco de horas empeora</h4>
+      <p>El banco de un proyecto activo pasa a un nivel peor, por posición (<code>alcance: "posicion"</code>) o en el total del proyecto (<code>alcance: "proyecto"</code>, <code>posicion: null</code>, con las ampliaciones sumadas). No cuando mejora ni en posiciones sin horas.</p>
+<pre class="json"><code>{
+  "proyecto": "Proyecto Ejemplo",
+  "alcance": "posicion",
+  "posicion": "SEO Strategist",
+  "nivel": "bajo",
+  "nivel_anterior": "disponible",
+  "horas": {
+    "asignadas": 40, "ampliadas": 0, "consumidas": 33.5,
+    "inutilizables": 0, "disponibles": 6.5
+  },
+  "porcentaje_consumido": 83.8,
+  "estado_proyecto": "Activo",
+  "manager_proyecto": «Manager»,
+  "enlace": "https://&lt;dominio&gt;/bancos/Proyecto%20Ejemplo"
+}</code></pre>
+      <ul class="lista">
+        <li><code>disponibles</code> = asignadas − consumidas − inutilizables (negativo si está excedido). <code>inutilizables</code>: horas perdidas al cerrar meses (75/25).</li>
+        <li><code>porcentaje_consumido</code> se calcula sobre asignadas − inutilizables; <code>null</code> si esa base es 0.</li>
+      </ul>
+    </article>
+
+    <article class="tarjeta">
+      <div class="tarjeta-cab"><span class="tipo">banco.al_tope</span><span class="momento">Junto con su banco.nivel</span></div>
+      <h4>Un proyecto llega al tope</h4>
+      <p>El total de un proyecto pasa de <span class="nivel disponible">disponible</span> o <span class="nivel bajo">bajo</span> a <span class="nivel consumido">consumido</span> o <span class="nivel excedido">excedido</span>. Llega junto con un <code>banco.nivel</code> con los mismos datos y otro <code>id</code>.</p>
+<pre class="json"><code>{
+  "proyecto": "Proyecto Ejemplo",
+  "alcance": "proyecto",
+  "posicion": null,
+  "nivel": "consumido",
+  "nivel_anterior": "bajo",
+  "horas": {
+    "asignadas": 120, "ampliadas": 20, "consumidas": 120,
+    "inutilizables": 0, "disponibles": 0
+  },
+  "porcentaje_consumido": 100,
+  … el resto, igual que banco.nivel
+}</code></pre>
+      <ul class="lista">
+        <li>No se repite al pasar de consumido a excedido. Si se amplían horas y vuelve a llegar al tope, sí.</li>
+      </ul>
+    </article>
+
+    <article class="tarjeta">
+      <div class="tarjeta-cab"><span class="tipo">hucha.proyecto_nuevo</span><span class="momento">Al sincronizar HUCHA</span></div>
+      <h4>Proyecto nuevo con presupuesto</h4>
+      <p>Uno por proyecto nuevo con presupuesto cuando un administrador sincroniza el Excel de HUCHA (hoy es manual). No si ya existía ni si un archivado se reactiva.</p>
+<pre class="json"><code>{
+  "proyecto": "Proyecto Ejemplo",
+  "proyecto_id": "00000000-0000-4000-8000-00000000e5f6",
+  "presupuesto": 2500,
+  "moneda": "EUR",
+  "managers": [«Manager»],
+  "enlace": "https://&lt;dominio&gt;/presupuestos/&lt;proyecto_id&gt;"
+}</code></pre>
+    </article>
+
+    <article class="tarjeta">
+      <div class="tarjeta-cab"><span class="tipo">hucha.ampliacion</span><span class="momento">Al guardar</span></div>
+      <h4>Ampliación de presupuesto</h4>
+      <p>Uno por ampliación. <code>saldo</code> y <code>nivel</code> son los de después de ampliar.</p>
+<pre class="json"><code>{
+  "proyecto": "Proyecto Ejemplo",
+  "proyecto_id": "00000000-0000-4000-8000-00000000e5f6",
+  "importe": 500,
+  "moneda": "EUR",
+  "motivo": "Ampliación aprobada por el cliente",
+  "referencia": "PO-2026-118",
+  "dia": "2026-09-14",
+  "actor": { "nombre": "Marta López" },
+  "saldo": {
+    "asignado": 3000, "consumido": 2450, "disponible": 550
+  },
+  "nivel": "bajo",
+  "managers": [«Manager»],
+  "enlace": "https://&lt;dominio&gt;/presupuestos/&lt;proyecto_id&gt;"
+}</code></pre>
+      <ul class="lista">
+        <li><code>referencia</code> puede ser <code>null</code> y <code>motivo</code> puede venir vacío. <code>actor</code> es quien la registró. Nunca genera un <code>hucha.nivel</code>.</li>
+      </ul>
+    </article>
+
+    <article class="tarjeta">
+      <div class="tarjeta-cab"><span class="tipo">hucha.nivel</span><span class="momento">Al guardar o revisión diaria</span></div>
+      <h4>La HUCHA empeora</h4>
+      <p>La HUCHA de un proyecto activo pasa a un nivel peor: por un gasto, al anular una ampliación, al sincronizar o en la revisión diaria. No por cada gasto ni cuando mejora.</p>
+<pre class="json"><code>{
+  "proyecto": "Proyecto Ejemplo",
+  "proyecto_id": "00000000-0000-4000-8000-00000000e5f6",
+  "nivel": "consumido",
+  "nivel_anterior": "bajo",
+  "moneda": "EUR",
+  "saldo": {
+    "asignado": 3000, "consumido": 3000, "disponible": 0
+  },
+  "managers": [«Manager»],
+  "enlace": "https://&lt;dominio&gt;/presupuestos/&lt;proyecto_id&gt;"
+}</code></pre>
+    </article>
+  </div>
+</section>
+
+<!-- ============================ Página 3 ============================ -->
+<section class="pagina">
+  <div class="titulo primero"><span class="num">3</span><h2>La API de consultas</h2></div>
+  <p>Solo lectura: <code>GET</code> a <code>https://&lt;dominio&gt;/api/avisos/v1/…</code> con la cabecera <code>Authorization: Bearer &lt;clave&gt;</code> (la clave de consultas, distinta de la de firma). Las URLs completas están en Administración → Avisos. La respuesta se calcula en el momento.</p>
+  <table class="tabla" style="margin-bottom: .7rem;">
+    <tbody>
+      <tr><td><code>200</code></td><td>Correcto</td><td class="gris">El JSON de la consulta</td></tr>
+      <tr><td><code>400</code></td><td><code>fecha</code> sin formato <code>AAAA-MM-DD</code></td><td><code>{ "error": "El parámetro fecha tiene que ser YYYY-MM-DD." }</code></td></tr>
+      <tr><td><code>401</code></td><td>Falta la clave o no es la buena</td><td><code>{ "error": "No autorizado" }</code></td></tr>
+      <tr><td><code>500</code></td><td>Error de la plataforma</td><td><code>{ "error": "&lt;detalle&gt;" }</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="dos">
+    <div>
+      <div class="tarjeta">
+        <div class="tarjeta-cab"><span class="tipo">GET /resumen-capacidad?top=10</span></div>
+        <h4>Proyectos con más capacidad</h4>
+        <p>Proyectos activos, con su total (ampliaciones incluidas). <code>top</code>: de 1 a 50, por defecto 10. No lleva fecha: siempre es la situación actual.</p>
+<pre class="json"><code>{
+  "generado": "2026-09-16T07:00:02.118Z",
+  "top": 10,
+  "con_mas_horas": [
+    {
+      "proyecto": "Proyecto Ejemplo",
+      "horas": {
+        "asignadas": 160, "ampliadas": 0, "consumidas": 40,
+        "inutilizables": 12, "disponibles": 108
+      },
+      "porcentaje_consumido": 27,
+      "manager_proyecto": «Manager»,
+      "enlace": "https://&lt;dominio&gt;/bancos/Proyecto%20Ejemplo"
+    }
+  ],
+  "mas_libres": [ … mismo formato ]
+}</code></pre>
+        <ul class="lista">
+          <li><code>con_mas_horas</code>: por <code>horas.disponibles</code>, de más a menos. <code>mas_libres</code>: por <code>porcentaje_consumido</code>, de menos a más (sin los <code>null</code>). Un proyecto puede salir en las dos.</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="tarjeta">
+        <div class="tarjeta-cab"><span class="tipo">GET /dias-sin-registrar?fecha=2026-09-16</span></div>
+        <h4>Personas con días pendientes</h4>
+        <p><code>fecha</code> es opcional (por defecto, hoy en Madrid). Solo salen las personas con al menos un día pendiente, de más a menos días.</p>
+<pre class="json"><code>{
+  "fecha": "2026-09-16",
+  "personas": [
+    {
+      "persona": «Persona»,
+      "manager_directo": «Manager»,
+      "dias": 2,
+      "desde": "2026-09-14",
+      "ultimo_registro": "2026-09-11",
+      "dentro_de_plazo": true
+    }
+  ]
+}</code></pre>
+        <ul class="lista">
+          <li><code>dias</code>: días laborables seguidos sin registrar (máximo 30).</li>
+          <li><code>desde</code>: el día pendiente más antiguo.</li>
+          <li><code>ultimo_registro</code>: último día con algún registro; mira 90 días atrás y es <code>null</code> si no hay ninguno.</li>
+          <li><code>dentro_de_plazo</code>: si todavía puede registrar <code>desde</code> por su cuenta.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="titulo"><span class="num">4</span><h2>Personas que no registran en días</h2></div>
+  <ul class="lista dos-col">
+    <li><strong>Quién:</strong> personas activas con rol <code>operativo</code> o <code>manager</code>.</li>
+    <li><strong>Día registrado:</strong> cualquier registro no anulado ese día, <code>Departamento</code> incluido (así cuentan las vacaciones).</li>
+    <li><strong>Cómo se cuenta:</strong> desde el día anterior a <code>fecha</code> hacia atrás, solo días laborables (lunes a viernes, sin festivos cargados). Se para en el primer día con registro.</li>
+    <li>Fines de semana y festivos ni suman ni cortan. No cuentan los días anteriores al alta del usuario.</li>
+    <li><strong>Solo la racha más reciente:</strong> si alguien registra el último día pendiente, sale de la lista aunque le falten días anteriores.</li>
+    <li><strong>Plazo:</strong> se puede registrar hasta 7 días naturales atrás (ampliable por persona). Fuera de plazo hace falta un administrador.</li>
+    <li><strong>No guarda nada:</strong> cada llamada recalcula. Con una fecha pasada, usa los registros que existen hoy.</li>
+    <li><strong>Festivos:</strong> solo los cargados en la plataforma (el calendario está pendiente). Uno sin cargar cuenta como laborable.</li>
+  </ul>
+
+  <div class="calendario">
+    <div class="cal">
+      <span></span>
+      <span class="cab">jue<b>03</b></span><span class="cab">vie<b>04</b></span><span class="cab fin">sáb<b>05</b></span><span class="cab fin">dom<b>06</b></span><span class="cab">lun<b>07</b></span><span class="cab">mar<b>08</b></span><span class="cab">mié<b>09</b></span><span class="cab">jue<b>10</b></span><span class="cab">vie<b>11</b></span><span class="cab fin">sáb<b>12</b></span><span class="cab fin">dom<b>13</b></span><span class="cab">lun<b>14</b></span><span class="cab">mar<b>15</b></span><span class="cab">mié<b>16</b></span>
+
+      <span class="nombre">Laura</span>
+      <span class="c reg">✓</span><span class="c reg">✓</span><span class="c fin"></span><span class="c fin"></span><span class="c reg">✓</span><span class="c reg">✓</span><span class="c reg">✓</span><span class="c reg">✓</span><span class="c reg">✓</span><span class="c fin"></span><span class="c fin"></span><span class="c pen">2</span><span class="c pen">1</span><span class="c hoy">consulta</span>
+
+      <span class="nombre">Pablo</span>
+      <span class="c reg">✓</span><span class="c pen">8</span><span class="c fin"></span><span class="c fin"></span><span class="c pen">7</span><span class="c pen">6</span><span class="c pen">5</span><span class="c pen">4</span><span class="c pen">3</span><span class="c fin"></span><span class="c fin"></span><span class="c pen">2</span><span class="c pen">1</span><span class="c hoy">consulta</span>
+
+      <span class="plazo">Plazo para registrar sin ayuda: del 09/09 al 16/09</span>
+    </div>
+    <div class="leyenda">
+      <span><i style="background: var(--ok-tinte); border: 1px solid #CFE3D7;"></i>Registró</span>
+      <span><i style="background: var(--carmin-tinte); border: 1px solid #F0C9D5;"></i>Pendiente (orden en que se cuenta)</span>
+      <span><i style="background: var(--consumido-tinte); border: 1px solid var(--linea);"></i>Fin de semana</span>
+    </div>
+  </div>
+  <p>Consulta del 16/09: <strong>Laura</strong> sale con <code>dias: 2</code>, <code>desde: "2026-09-14"</code> y <code>dentro_de_plazo: true</code>. <strong>Pablo</strong>, con <code>dias: 8</code>, <code>desde: "2026-09-04"</code> y <code>dentro_de_plazo: false</code>: el 04/09 ya no lo puede registrar él solo.</p>
+
+  <div class="recuadro"><p><strong>Lo que ha pedido negocio</strong> (pendiente de cerrar el 14/09): con 1 y 2 días, aviso a la persona; con 3, a su manager (<code>manager_directo</code>); de 4 en adelante, a definir. La plataforma no envía estos recordatorios: la consulta devuelve la lista y los datos del manager.</p></div>
+
+  <p class="gris" style="font-size: .74rem; margin-top: .6rem;"><strong>Pendiente del 14/09</strong> (no cambia el formato): umbrales (bajo &lt; 20&nbsp;%; llamativo &gt; 10 h al día o ≥ 6 h a un proyecto), calendario de festivos, quién asigna el manager directo, qué pasa desde el cuarto día sin registrar y si al encender se manda un resumen de lo que ya estaba bajo.</p>
+</section>
+
+<script>
+  // Colorea los ejemplos JSON: claves, textos, números, true/false/null y las referencias «…».
+  document.querySelectorAll('pre.json code').forEach(function (el) {
+    var esc = function (s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') };
+    el.innerHTML = esc(el.textContent).replace(
+      /(«[^»]+»)|(…[^\n]*)|("(?:[^"\\]|\\.)*")(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?)|([{}\[\],])/g,
+      function (m, ref, com, str, colon, lit, num, punt) {
+        if (ref) return '<span class="ref">' + ref + '</span>'
+        if (com) return '<span class="c">' + com + '</span>'
+        if (str) return colon ? '<span class="k">' + str + '</span>' + colon : '<span class="s">' + str + '</span>'
+        if (lit) return '<span class="l">' + lit + '</span>'
+        if (num) return '<span class="n">' + num + '</span>'
+        return '<span class="p">' + punt + '</span>'
+      })
+  })
+</script>
+</body>
+</html>
