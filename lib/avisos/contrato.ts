@@ -44,7 +44,7 @@ export interface DatosHuchaNuevo {
 }
 export interface DatosHuchaAmpliacion {
   proyecto: string; proyecto_id: string; importe: number; moneda: string; motivo: string; referencia: string | null
-  dia: string; actor: { nombre: string }; saldo: SaldoHucha; nivel: Nivel | null; managers: ManagerAviso[]; enlace: string
+  dia: string; actor: { nombre: string; email: string | null }; saldo: SaldoHucha; nivel: Nivel | null; managers: ManagerAviso[]; enlace: string
 }
 export interface DatosHuchaNivel {
   proyecto: string; proyecto_id: string; nivel: Nivel; nivel_anterior: Nivel; moneda: string
@@ -81,9 +81,11 @@ export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
       proyectos: [{ proyecto: 'Proyecto Ejemplo', horas: 5 }, { proyecto: 'Departamento', horas: 2.5 }],
       proyectos_texto: 'Proyecto Ejemplo (5 h), Departamento (2,5 h)',
     },
+    // Distinto del contrato a propósito: la prueba enseña el caso con proyecto (en dia_largo
+    // `proyecto` siempre es null), que es el que Julián no podía ver.
     'registro.llamativo': {
-      persona, manager_directo: manager, dia: '2026-09-14', regla: 'dia_largo', valor: 11, limite: 10, proyecto: null,
-      horas_dia: 11, descripcion: '11 h registradas el 14/09 (límite: 10 h)',
+      persona, manager_directo: manager, dia: '2026-09-14', regla: 'proyecto_largo', valor: 6, limite: 5,
+      proyecto: 'Proyecto Ejemplo', horas_dia: 8, descripcion: '6 h a Proyecto Ejemplo el 14/09 (límite: 5 h)',
     },
     'banco.nivel': banco,
     'banco.al_tope': {
@@ -95,7 +97,8 @@ export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
     },
     'hucha.ampliacion': {
       proyecto: 'Proyecto Ejemplo', proyecto_id: proyectoId, importe: 500, moneda: 'EUR',
-      motivo: 'Ampliación aprobada por el cliente', referencia: 'PO-2026-118', dia: '2026-09-14', actor: { nombre: 'Marta López' },
+      motivo: 'Ampliación aprobada por el cliente', referencia: 'PO-2026-118', dia: '2026-09-14',
+      actor: { nombre: 'Marta López', email: 'marta.lopez@ejemplo.com' },
       saldo: { asignado: 3000, consumido: 2450, disponible: 550 }, nivel: 'bajo', managers: [manager], enlace: enlaceHucha,
     },
     'hucha.nivel': {

@@ -15,6 +15,7 @@ export interface MovimientoAmpliacion {
   reason: string | null
   reference: string | null
   entry_date: string
+  actor_id: string | null
   actor_name: string
 }
 
@@ -113,6 +114,14 @@ export async function evaluarHucha(ids?: string[]): Promise<void> {
   }
 }
 
+// Email de quien registró la ampliación (actor_id del movimiento). Si no se encuentra,
+// null: el aviso sale igual.
+async function emailDe(db: SupabaseClient, perfilId: string | null): Promise<string | null> {
+  if (!perfilId) return null
+  const { data } = await db.from('profiles').select('email').eq('id', perfilId).maybeSingle()
+  return (data as { email: string | null } | null)?.email ?? null
+}
+
 export async function alAmpliarHucha(projectId: string, mov: MovimientoAmpliacion): Promise<void> {
   if (!esProduccion()) return
   try {
@@ -121,7 +130,8 @@ export async function alAmpliarHucha(projectId: string, mov: MovimientoAmpliacio
     if (h) {
       await emitirAviso('hucha.ampliacion', {
         proyecto: h.nombre, proyecto_id: h.id, importe: centesimas(Number(mov.amount)), moneda: h.moneda,
-        motivo: mov.reason ?? '', referencia: mov.reference, dia: mov.entry_date, actor: { nombre: mov.actor_name },
+        motivo: mov.reason ?? '', referencia: mov.reference, dia: mov.entry_date,
+        actor: { nombre: mov.actor_name, email: await emailDe(db, mov.actor_id) },
         saldo: h.saldo, nivel: h.nivel, managers: h.managers, enlace: enlaceHucha(h.id),
       }, { clave: `hucha.ampliacion:${mov.id}` })
     }

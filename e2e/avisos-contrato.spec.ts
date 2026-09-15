@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { TIPOS_AVISO, DESCRIPCION_TIPO, ejemplos } from '../lib/avisos/contrato'
 import { appUrl, enlaceBanco, esPersonaDePrueba } from '../lib/avisos/entorno'
-import { textoProyectos, descripcionLlamativo } from '../lib/avisos/reglas'
+import { textoProyectos, descripcionLlamativo, LIMITE_PROYECTO_HORAS } from '../lib/avisos/reglas'
 
 test('hay un ejemplo y una descripción por cada tipo', () => {
   const e = ejemplos('https://app.test')
@@ -16,6 +16,15 @@ test('los ejemplos cuadran con las reglas (los textos no se escriben dos veces a
   expect(descripcionLlamativo({ regla: l.regla, valor: l.valor, limite: l.limite, proyecto: l.proyecto }, l.dia)).toBe(l.descripcion)
   expect(e['banco.al_tope'].alcance).toBe('proyecto')
   expect(e['banco.nivel'].enlace).toBe('https://app.test/bancos/Proyecto%20Ejemplo')
+})
+
+test('la prueba de registro.llamativo trae un proyecto y la de ampliación, el email de quien amplía', () => {
+  const e = ejemplos('https://app.test')
+  const l = e['registro.llamativo']
+  expect(l.regla).toBe('proyecto_largo')
+  expect(l.proyecto).toBe('Proyecto Ejemplo')
+  expect(l.limite).toBe(LIMITE_PROYECTO_HORAS)
+  expect(e['hucha.ampliacion'].actor).toEqual({ nombre: 'Marta López', email: 'marta.lopez@ejemplo.com' })
 })
 
 test('appUrl: APP_URL sin barra final, o el dominio de producción de Vercel', () => {
