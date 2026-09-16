@@ -70,6 +70,11 @@ export function laborablesDesde(desde: string, fecha: string, festivos: Set<stri
   return n
 }
 
+// AAAA-MM-DD → dd-mm, para mensajes (lo pidió Julián). Sin año: la fecha completa sigue en `pendientes`.
+export function diaMes(iso: string): string {
+  return `${iso.slice(8, 10)}-${iso.slice(5, 7)}`
+}
+
 export function ultimoAntesDe(fechas: Iterable<string>, fecha: string): string | null {
   let ultimo: string | null = null
   for (const f of fechas) if (f < fecha && (ultimo === null || f > ultimo)) ultimo = f

@@ -7,7 +7,7 @@ import { nivelesActuales } from '@/lib/avisos/detector-bancos'
 import { rankingCapacidad, porcentajeDisponible, type NivelBanco } from '@/lib/avisos/capacidad'
 import { perfilesPorId, managerDe, managerPorNombre, type Perfil } from '@/lib/avisos/personas'
 import {
-  diasSinRegistrar, diasPendientes, laborablesDesde, ultimoAntesDe, dentroDePlazo, TOPE_DIAS,
+  diasSinRegistrar, diasPendientes, laborablesDesde, diaMes, ultimoAntesDe, dentroDePlazo, TOPE_DIAS,
 } from '@/lib/avisos/calendario'
 import { enlaceBanco, esPersonaDePrueba } from '@/lib/avisos/entorno'
 import type { ManagerAviso, PersonaAviso } from '@/lib/avisos/contrato'
@@ -36,6 +36,7 @@ export interface PersonaPendiente {
   ultimo_registro: string | null // dentro de la ventana consultada (3 × tope días naturales)
   dentro_de_plazo: boolean | null // si todavía puede registrar `desde`; null si dias es 0
   pendientes: string[] // los laborables sin registro de los últimos TOPE_DIAS, del más antiguo al más reciente
+  pendientes_dd_mm: string[] // los mismos días, en el mismo orden, como dd-mm
   dias_desde_mas_antiguo: number // laborables desde el pendiente más antiguo (pendientes[0]) hasta ayer
 }
 
@@ -78,6 +79,7 @@ export async function diasSinRegistrarDe(fecha: string): Promise<{ fecha: string
       ultimo_registro: ultimoAntesDe(registrados, fecha),
       dentro_de_plazo: desde ? dentroDePlazo(desde, fecha, p.diasAtras ?? 7) : null,
       pendientes,
+      pendientes_dd_mm: pendientes.map(diaMes),
       dias_desde_mas_antiguo: laborablesDesde(pendientes[0], fecha, festivos),
     })
   }

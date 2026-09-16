@@ -4,7 +4,9 @@ import {
   resumirPorDia, motivosLlamativo, claveLlamativo, comoNivel, transicion, avisosDeBanco,
   siguienteIntento, MAX_INTENTOS, textoProyectos, descripcionLlamativo,
 } from '../lib/avisos/reglas'
-import { diasSinRegistrar, diasPendientes, laborablesDesde, ultimoAntesDe, dentroDePlazo, fechaDeConsulta } from '../lib/avisos/calendario'
+import {
+  diasSinRegistrar, diasPendientes, laborablesDesde, diaMes, ultimoAntesDe, dentroDePlazo, fechaDeConsulta,
+} from '../lib/avisos/calendario'
 import { nivelesDeBancos, rankingCapacidad, porcentajeConsumido, porcentajeDisponible } from '../lib/avisos/capacidad'
 import { firmar, construirEnvio } from '../lib/avisos/firma'
 import type { BancoHorasRow } from '../lib/horas/bancos-status'
@@ -168,6 +170,12 @@ test('laborablesDesde: del pendiente más antiguo hasta ayer, sin fines de seman
   expect(laborablesDesde('2026-09-04', '2026-09-16', fechas('2026-09-11'))).toBe(7)
   expect(laborablesDesde('2026-09-15', '2026-09-16', fechas())).toBe(1)
   expect(laborablesDesde('2026-09-11', '2026-09-14', fechas())).toBe(1)
+})
+
+test('diaMes: dd-mm sin año', () => {
+  expect(diaMes('2026-09-04')).toBe('04-09')
+  expect(diaMes('2027-01-08')).toBe('08-01')
+  expect(['2026-12-15', '2026-12-22', '2027-01-08'].map(diaMes)).toEqual(['15-12', '22-12', '08-01'])
 })
 
 // --- capacidad -------------------------------------------------------------
