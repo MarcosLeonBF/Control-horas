@@ -4,7 +4,7 @@ import {
   resumirPorDia, motivosLlamativo, claveLlamativo, comoNivel, transicion, avisosDeBanco,
   siguienteIntento, MAX_INTENTOS, textoProyectos, descripcionLlamativo,
 } from '../lib/avisos/reglas'
-import { diasSinRegistrar, diasPendientes, ultimoAntesDe, dentroDePlazo, fechaDeConsulta } from '../lib/avisos/calendario'
+import { diasSinRegistrar, diasPendientes, laborablesDesde, ultimoAntesDe, dentroDePlazo, fechaDeConsulta } from '../lib/avisos/calendario'
 import { nivelesDeBancos, rankingCapacidad, porcentajeConsumido, porcentajeDisponible } from '../lib/avisos/capacidad'
 import { firmar, construirEnvio } from '../lib/avisos/firma'
 import type { BancoHorasRow } from '../lib/horas/bancos-status'
@@ -161,6 +161,13 @@ test('días pendientes: sin fines de semana, festivos, hoy ni días anteriores a
 test('días pendientes: mira solo los últimos N laborables, registrados o no', () => {
   expect(diasPendientes({ fecha: '2026-09-16', registrados: fechas('2026-09-14'), festivos: fechas(), alta: '2026-01-01', tope: 3 }))
     .toEqual(['2026-09-11', '2026-09-15'])
+})
+
+test('laborablesDesde: del pendiente más antiguo hasta ayer, sin fines de semana ni festivos', () => {
+  expect(laborablesDesde('2026-09-04', '2026-09-16', fechas())).toBe(8)
+  expect(laborablesDesde('2026-09-04', '2026-09-16', fechas('2026-09-11'))).toBe(7)
+  expect(laborablesDesde('2026-09-15', '2026-09-16', fechas())).toBe(1)
+  expect(laborablesDesde('2026-09-11', '2026-09-14', fechas())).toBe(1)
 })
 
 // --- capacidad -------------------------------------------------------------

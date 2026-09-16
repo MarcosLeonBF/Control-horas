@@ -62,6 +62,14 @@ export function diasPendientes(args: {
   return pendientes.reverse()
 }
 
+// Laborables desde `desde` (incluido) hasta el día anterior a `fecha`: la antigüedad del
+// pendiente más antiguo, en la misma unidad que `dias`.
+export function laborablesDesde(desde: string, fecha: string, festivos: Set<string>): number {
+  let n = 0
+  for (let d = desde; d < fecha; d = addDiasISO(d, 1)) if (esLaborable(d, festivos)) n++
+  return n
+}
+
 export function ultimoAntesDe(fechas: Iterable<string>, fecha: string): string | null {
   let ultimo: string | null = null
   for (const f of fechas) if (f < fecha && (ultimo === null || f > ultimo)) ultimo = f
