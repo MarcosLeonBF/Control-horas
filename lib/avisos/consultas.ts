@@ -4,30 +4,36 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { addDiasISO } from '@/lib/horas/auditoria-types'
 import { nivelesActuales } from '@/lib/avisos/detector-bancos'
-import { rankingCapacidad, type NivelBanco } from '@/lib/avisos/capacidad'
+import { rankingCapacidad, porcentajeDisponible, type NivelBanco } from '@/lib/avisos/capacidad'
 import { perfilesPorId, managerDe, managerPorNombre, type Perfil } from '@/lib/avisos/personas'
-import { diasSinRegistrar, ultimoAntesDe, dentroDePlazo, TOPE_DIAS } from '@/lib/avisos/calendario'
+import { diasSinRegistrar, diasPendientes, ultimoAntesDe, dentroDePlazo, TOPE_DIAS } from '@/lib/avisos/calendario'
 import { enlaceBanco, esPersonaDePrueba } from '@/lib/avisos/entorno'
 import type { ManagerAviso, PersonaAviso } from '@/lib/avisos/contrato'
 
 export async function resumenCapacidad(top: number) {
   const db = createAdminClient()
   const [niveles, perfiles] = await Promise.all([nivelesActuales(db), perfilesPorId(db)])
-  const { conMasHoras, masLibres } = rankingCapacidad(niveles.filter((n) => n.alcance === 'proyecto'), top)
+  const r = rankingCapacidad(niveles.filter((n) => n.alcance === 'proyecto'), top)
   const item = (n: NivelBanco) => ({
     proyecto: n.proyecto, horas: n.horas, porcentaje_consumido: n.porcentajeConsumido,
+    porcentaje_disponible: porcentajeDisponible(n.porcentajeConsumido),
     manager_proyecto: managerPorNombre(n.managerExcel, perfiles), enlace: enlaceBanco(n.proyecto),
   })
-  return { generado: new Date().toISOString(), top, con_mas_horas: conMasHoras.map(item), mas_libres: masLibres.map(item) }
+  return {
+    generado: new Date().toISOString(), top,
+    con_mas_horas: r.conMasHoras.map(item), mas_libres: r.masLibres.map(item),
+    con_menos_horas: r.conMenosHoras.map(item), menos_libres: r.menosLibres.map(item),
+  }
 }
 
 export interface PersonaPendiente {
   persona: PersonaAviso
   manager_directo: ManagerAviso | null
-  dias: number
-  desde: string
+  dias: number // laborables seguidos sin registrar hasta ayer (la escalera); 0 si ayer registró
+  desde: string | null // el más antiguo de esos seguidos; null si dias es 0
   ultimo_registro: string | null // dentro de la ventana consultada (3 × tope días naturales)
-  dentro_de_plazo: boolean
+  dentro_de_plazo: boolean | null // si todavía puede registrar `desde`; null si dias es 0
+  pendientes: string[] // los laborables sin registro de los últimos TOPE_DIAS, del más antiguo al más reciente
 }
 
 // Registran los operativos y managers activos (los admin no), sin los usuarios de los E2E.
@@ -60,14 +66,18 @@ export async function diasSinRegistrarDe(fecha: string): Promise<{ fecha: string
   for (const p of perfiles.values()) {
     if (!debeRegistrar(p)) continue
     const registrados = registradosPor.get(p.persona.id) ?? new Set<string>()
+    // Sale quien tenga algún día pendiente, aunque ayer registrara (entonces dias es 0).
+    const pendientes = diasPendientes({ fecha, registrados, festivos, alta: p.alta })
+    if (pendientes.length === 0) continue
     const { dias, desde } = diasSinRegistrar({ fecha, registrados, festivos, alta: p.alta })
-    if (dias < 1 || !desde) continue
     personas.push({
       persona: p.persona, manager_directo: managerDe(p, perfiles), dias, desde,
       ultimo_registro: ultimoAntesDe(registrados, fecha),
-      dentro_de_plazo: dentroDePlazo(desde, fecha, p.diasAtras ?? 7),
+      dentro_de_plazo: desde ? dentroDePlazo(desde, fecha, p.diasAtras ?? 7) : null,
+      pendientes,
     })
   }
-  personas.sort((a, b) => b.dias - a.dias || a.persona.nombre.localeCompare(b.persona.nombre))
+  personas.sort((a, b) =>
+    b.dias - a.dias || b.pendientes.length - a.pendientes.length || a.persona.nombre.localeCompare(b.persona.nombre))
   return { fecha, personas }
 }

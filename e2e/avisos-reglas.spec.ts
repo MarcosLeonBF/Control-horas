@@ -4,8 +4,8 @@ import {
   resumirPorDia, motivosLlamativo, claveLlamativo, comoNivel, transicion, avisosDeBanco,
   siguienteIntento, MAX_INTENTOS, textoProyectos, descripcionLlamativo,
 } from '../lib/avisos/reglas'
-import { diasSinRegistrar, ultimoAntesDe, dentroDePlazo, fechaDeConsulta } from '../lib/avisos/calendario'
-import { nivelesDeBancos, rankingCapacidad, porcentajeConsumido } from '../lib/avisos/capacidad'
+import { diasSinRegistrar, diasPendientes, ultimoAntesDe, dentroDePlazo, fechaDeConsulta } from '../lib/avisos/calendario'
+import { nivelesDeBancos, rankingCapacidad, porcentajeConsumido, porcentajeDisponible } from '../lib/avisos/capacidad'
 import { firmar, construirEnvio } from '../lib/avisos/firma'
 import type { BancoHorasRow } from '../lib/horas/bancos-status'
 
@@ -141,6 +141,28 @@ test('fechaDeConsulta: hoy por defecto, y 400 con formato raro o fecha futura', 
   expect(fechaDeConsulta('14/09/2026', '2026-09-14')).toEqual({ error: 'El parámetro fecha tiene que ser YYYY-MM-DD.' })
 })
 
+test('días pendientes: falta el lunes, registró el martes y hoy es miércoles', () => {
+  const r = { fecha: '2026-09-16', registrados: fechas('2026-09-10', '2026-09-11', '2026-09-15'), festivos: fechas(), alta: '2026-09-10' }
+  expect(diasSinRegistrar(r)).toEqual({ dias: 0, desde: null })
+  expect(diasPendientes(r)).toEqual(['2026-09-14'])
+})
+
+test('días pendientes: ni lunes ni martes, del más antiguo al más reciente', () => {
+  expect(diasPendientes({ fecha: '2026-09-16', registrados: fechas('2026-09-11'), festivos: fechas(), alta: '2026-09-11' }))
+    .toEqual(['2026-09-14', '2026-09-15'])
+})
+
+test('días pendientes: sin fines de semana, festivos, hoy ni días anteriores al alta', () => {
+  expect(diasPendientes({ fecha: '2026-09-14', registrados: fechas(), festivos: fechas('2026-09-11'), alta: '2026-09-10' }))
+    .toEqual(['2026-09-10'])
+  expect(diasPendientes({ fecha: '2026-09-16', registrados: fechas(), festivos: fechas(), alta: '2026-09-16' })).toEqual([])
+})
+
+test('días pendientes: mira solo los últimos N laborables, registrados o no', () => {
+  expect(diasPendientes({ fecha: '2026-09-16', registrados: fechas('2026-09-14'), festivos: fechas(), alta: '2026-01-01', tope: 3 }))
+    .toEqual(['2026-09-11', '2026-09-15'])
+})
+
 // --- capacidad -------------------------------------------------------------
 
 const fila = (p: Partial<BancoHorasRow> & Pick<BancoHorasRow, 'project' | 'position'>): BancoHorasRow => ({
@@ -152,6 +174,12 @@ test('porcentajeConsumido con un decimal, y null sin base', () => {
   expect(porcentajeConsumido(40, 33.5)).toBe(83.8)
   expect(porcentajeConsumido(148, 40)).toBe(27)
   expect(porcentajeConsumido(0, 5)).toBeNull()
+})
+
+test('porcentajeDisponible: lo que falta hasta 100, con un decimal, y null sin base', () => {
+  expect(porcentajeDisponible(83.8)).toBe(16.2)
+  expect(porcentajeDisponible(112.5)).toBe(-12.5)
+  expect(porcentajeDisponible(null)).toBeNull()
 })
 
 test('nivelesDeBancos: posición con banco, total con ampliaciones, sin inactivos', () => {
@@ -175,13 +203,15 @@ test('nivelesDeBancos: posición con banco, total con ampliaciones, sin inactivo
   expect(totalA.managerExcel).toBe('Carlos Ruiz')
 })
 
-test('rankingCapacidad: más horas disponibles y menos porcentaje consumido', () => {
+test('rankingCapacidad: más y menos horas disponibles, y más y menos porcentaje disponible', () => {
   const it = (proyecto: string, disponibles: number, pct: number | null) => ({
     proyecto, horas: { asignadas: 0, ampliadas: 0, consumidas: 0, inutilizables: 0, disponibles }, porcentajeConsumido: pct,
   })
-  const r = rankingCapacidad([it('A', 10, 90), it('B', 50, 40), it('C', 30, 10), it('D', 0, null)], 2)
+  const r = rankingCapacidad([it('A', 10, 90), it('B', 50, 40), it('C', 30, 10), it('D', 0, null), it('E', -5, 120)], 2)
   expect(r.conMasHoras.map((x) => x.proyecto)).toEqual(['B', 'C'])
   expect(r.masLibres.map((x) => x.proyecto)).toEqual(['C', 'B'])
+  expect(r.conMenosHoras.map((x) => x.proyecto)).toEqual(['E', 'D'])
+  expect(r.menosLibres.map((x) => x.proyecto)).toEqual(['E', 'A']) // sin base (D) no entra en las listas por %
 })
 
 // --- firma -----------------------------------------------------------------

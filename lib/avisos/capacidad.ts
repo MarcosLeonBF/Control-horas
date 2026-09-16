@@ -79,13 +79,22 @@ export function nivelesDeBancos(rows: BancoHorasRow[], ampliadas: Map<string, nu
   return out
 }
 
+// Lo que queda hasta 100 del porcentaje consumido, con un decimal (negativo si se excedió).
+export function porcentajeDisponible(consumido: number | null): number | null {
+  return consumido === null ? null : Math.round((100 - consumido) * 10) / 10
+}
+
+// Arriba y abajo por horas disponibles y por porcentaje disponible. Las listas por
+// porcentaje dejan fuera los proyectos sin base (porcentaje null).
 export function rankingCapacidad<T extends { horas: HorasBanco; porcentajeConsumido: number | null }>(
   items: T[], top: number,
-): { conMasHoras: T[]; masLibres: T[] } {
-  const conMasHoras = [...items].sort((a, b) => b.horas.disponibles - a.horas.disponibles).slice(0, top)
-  const masLibres = items
-    .filter((i) => i.porcentajeConsumido !== null)
-    .sort((a, b) => (a.porcentajeConsumido as number) - (b.porcentajeConsumido as number))
-    .slice(0, top)
-  return { conMasHoras, masLibres }
+): { conMasHoras: T[]; masLibres: T[]; conMenosHoras: T[]; menosLibres: T[] } {
+  const conPorcentaje = items.filter((i) => i.porcentajeConsumido !== null)
+  const pct = (i: T) => i.porcentajeConsumido as number
+  return {
+    conMasHoras: [...items].sort((a, b) => b.horas.disponibles - a.horas.disponibles).slice(0, top),
+    masLibres: [...conPorcentaje].sort((a, b) => pct(a) - pct(b)).slice(0, top),
+    conMenosHoras: [...items].sort((a, b) => a.horas.disponibles - b.horas.disponibles).slice(0, top),
+    menosLibres: [...conPorcentaje].sort((a, b) => pct(b) - pct(a)).slice(0, top),
+  }
 }

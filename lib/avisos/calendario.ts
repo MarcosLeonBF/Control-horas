@@ -38,6 +38,30 @@ export function diasSinRegistrar(args: {
   return { dias, desde }
 }
 
+// Los laborables sin registro entre los últimos `tope` laborables antes de `fecha` (hoy no
+// cuenta), sin días anteriores al alta, del más antiguo al más reciente. A diferencia de
+// diasSinRegistrar no se para en el primer día registrado: un lunes sin registrar sigue
+// pendiente aunque el martes sí se registrara.
+export function diasPendientes(args: {
+  fecha: string
+  registrados: Set<string>
+  festivos: Set<string>
+  alta: string
+  tope?: number
+}): string[] {
+  const tope = args.tope ?? TOPE_DIAS
+  const pendientes: string[] = []
+  let laborables = 0
+  for (let d = addDiasISO(args.fecha, -1), vueltas = 0;
+    d >= args.alta && laborables < tope && vueltas < tope * 3;
+    d = addDiasISO(d, -1), vueltas++) {
+    if (!esLaborable(d, args.festivos)) continue
+    laborables++
+    if (!args.registrados.has(d)) pendientes.push(d)
+  }
+  return pendientes.reverse()
+}
+
 export function ultimoAntesDe(fechas: Iterable<string>, fecha: string): string | null {
   let ultimo: string | null = null
   for (const f of fechas) if (f < fecha && (ultimo === null || f > ultimo)) ultimo = f
