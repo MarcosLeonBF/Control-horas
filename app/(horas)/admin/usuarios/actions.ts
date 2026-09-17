@@ -95,7 +95,7 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
 }
 
 // Ventana de registro ampliada (migración 0043): cuántos días hacia atrás puede
-// registrar, editar y anular este usuario. null = la ventana normal de 7 días.
+// registrar, editar y anular este usuario. null = la ventana normal (DIAS_REGISTRO_POR_DEFECTO).
 // Vive en su propia acción, y no dentro de actualizarUsuario, porque se concede
 // desde su propio diálogo en la fila: conceder días no debería obligar a abrir el
 // editor completo ni a reescribir de paso el rol, el estado y las áreas.

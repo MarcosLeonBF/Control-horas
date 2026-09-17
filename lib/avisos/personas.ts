@@ -8,7 +8,7 @@ export interface Perfil {
   persona: PersonaAviso
   managerId: string | null
   alta: string // día del alta en Madrid (YYYY-MM-DD)
-  diasAtras: number | null // ventana de registro ampliada (0043); null = los 7 normales
+  diasAtras: number | null // ventana de registro ampliada (0043); null = la ventana por defecto
   activo: boolean
 }
 

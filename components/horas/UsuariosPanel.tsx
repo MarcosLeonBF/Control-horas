@@ -21,7 +21,7 @@ export interface UsuarioRow {
   id: string; full_name: string; email: string; positionId: string | null
   role: 'operativo' | 'manager' | 'admin'; status: 'activo' | 'inactivo'; areaIds: string[]
   canCreateUsers: boolean
-  registroDiasAtras: number | null // días hacia atrás que puede registrar; null = los 7 normales
+  registroDiasAtras: number | null // días hacia atrás que puede registrar; null = la ventana por defecto
   managerId: string | null // manager directo; null = sin asignar
 }
 

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { DIAS_REGISTRO_POR_DEFECTO } from '../lib/horas/ventana-registro'
 
 // Corre con el storage state del operativo (proyecto chromium-horas). El admin entra
 // en su propio contexto: la gracia del permiso es que lo concede uno y lo sufre otro.
@@ -25,10 +26,10 @@ test('el admin abre la ventana de registro de un usuario y vuelve a cerrarla', a
   const adminPage = await adminCtx.newPage()
 
   try {
-    // Punto de partida: el operativo solo alcanza 7 días atrás.
+    // Punto de partida: el operativo solo alcanza la ventana por defecto.
     await page.goto('/registrar')
-    await expect(page.getByText('Hasta 7 días atrás')).toBeVisible()
-    await expect(page.getByLabel('Fecha por defecto')).toHaveAttribute('min', fechaHaceDias(7))
+    await expect(page.getByText(`Hasta ${DIAS_REGISTRO_POR_DEFECTO} días atrás`)).toBeVisible()
+    await expect(page.getByLabel('Fecha por defecto')).toHaveAttribute('min', fechaHaceDias(DIAS_REGISTRO_POR_DEFECTO))
 
     // El admin le concede 30 días.
     await abrirDialogo(adminPage)
@@ -62,11 +63,11 @@ test('el admin abre la ventana de registro de un usuario y vuelve a cerrarla', a
     await expect(adminPage.getByText('Permiso quitado')).toBeVisible()
 
     await page.reload()
-    await expect(page.getByText('Hasta 7 días atrás')).toBeVisible()
-    await expect(page.getByLabel('Fecha por defecto')).toHaveAttribute('min', fechaHaceDias(7))
+    await expect(page.getByText(`Hasta ${DIAS_REGISTRO_POR_DEFECTO} días atrás`)).toBeVisible()
+    await expect(page.getByLabel('Fecha por defecto')).toHaveAttribute('min', fechaHaceDias(DIAS_REGISTRO_POR_DEFECTO))
   } finally {
     // Si el test falla a media asignación, el permiso no se queda puesto para el resto
-    // de la suite: el resto de specs de registro asumen la ventana de 7 días.
+    // de la suite: el resto de specs de registro asumen la ventana por defecto.
     await adminCtx.close()
   }
 })

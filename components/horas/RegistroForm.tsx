@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { guardarRegistro, type LineInput } from '@/app/(horas)/registrar/actions'
 import { formatHoras, hmAHoras, horasAHM } from '@/lib/horas/format'
 import type { AreaRow, EtapaRow, DepartamentoRow } from '@/lib/horas/types'
+import { DIAS_REGISTRO_POR_DEFECTO } from '@/lib/horas/ventana-registro'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -95,7 +96,7 @@ function MobileField({ label, children }: { label: ReactNode; children: ReactNod
   )
 }
 
-export default function RegistroForm({ projects, finishedProjects, pausedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, descripcionesPosicion = [], descripcionLibre = false, departamentos, internalAreaId, canBackdate = false, diasAtras = 7, initial, returnTo = '/mis-registros' }: {
+export default function RegistroForm({ projects, finishedProjects, pausedProjects, exceededProjects, areas, etapas, clientEtapas, descripciones, descripcionesPosicion = [], descripcionLibre = false, departamentos, internalAreaId, canBackdate = false, diasAtras = DIAS_REGISTRO_POR_DEFECTO, initial, returnTo = '/mis-registros' }: {
   projects: string[]; finishedProjects: string[]; pausedProjects: string[]; exceededProjects: string[]; areas: AreaRow[]; etapas: EtapaRow[]; clientEtapas: EtapaRow[]; descripciones: string[]; departamentos: DepartamentoRow[]; internalAreaId: string
   // Descripciones específicas de la posición del dueño (0044). Se muestran en su propio
   // grupo del desplegable de "Departamento"; sin ellas, el campo se ve como siempre.

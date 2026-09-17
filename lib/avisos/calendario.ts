@@ -81,7 +81,7 @@ export function ultimoAntesDe(fechas: Iterable<string>, fecha: string): string |
   return ultimo
 }
 
-// ¿Puede la persona registrar todavía `desde` por su cuenta? (7 días o su ventana ampliada)
+// ¿Puede la persona registrar todavía `desde` por su cuenta? (la ventana por defecto o la ampliada)
 export function dentroDePlazo(desde: string, hoy: string, diasAtras: number): boolean {
   return desde >= addDiasISO(hoy, -diasAtras)
 }

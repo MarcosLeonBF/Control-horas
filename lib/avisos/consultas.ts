@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { addDiasISO } from '@/lib/horas/auditoria-types'
+import { DIAS_REGISTRO_POR_DEFECTO } from '@/lib/horas/ventana-registro'
 import { nivelesActuales } from '@/lib/avisos/detector-bancos'
 import { rankingCapacidad, porcentajeDisponible, type NivelBanco } from '@/lib/avisos/capacidad'
 import { perfilesPorId, managerDe, managerPorNombre, type Perfil } from '@/lib/avisos/personas'
@@ -77,7 +78,7 @@ export async function diasSinRegistrarDe(fecha: string): Promise<{ fecha: string
     personas.push({
       persona: p.persona, manager_directo: managerDe(p, perfiles), dias, desde,
       ultimo_registro: ultimoAntesDe(registrados, fecha),
-      dentro_de_plazo: desde ? dentroDePlazo(desde, fecha, p.diasAtras ?? 7) : null,
+      dentro_de_plazo: desde ? dentroDePlazo(desde, fecha, p.diasAtras ?? DIAS_REGISTRO_POR_DEFECTO) : null,
       pendientes,
       pendientes_dd_mm: pendientes.map(diaMes),
       dias_desde_mas_antiguo: laborablesDesde(pendientes[0], fecha, festivos),
