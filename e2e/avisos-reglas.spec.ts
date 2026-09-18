@@ -220,16 +220,19 @@ test('nivelesDeBancos: posición con banco, total con ampliaciones, sin inactivo
   expect(totalA.managerExcel).toBe('Carlos Ruiz')
 })
 
-test('rankingCapacidad: más y menos horas disponibles, y más y menos porcentaje disponible', () => {
+// Sin tope (pedido de Roberto, 2026-09-18): cada lista trae TODOS los proyectos, solo
+// cambia el orden. "Sin tope" no es "sin reglas": las listas por porcentaje siguen
+// dejando fuera los que no tienen base (porcentaje null).
+test('rankingCapacidad: todos, ordenados por horas disponibles y por porcentaje', () => {
   const it = (proyecto: string, disponibles: number, pct: number | null) => ({
     proyecto, horas: { asignadas: 0, ampliadas: 0, consumidas: 0, inutilizables: 0, disponibles }, porcentajeConsumido: pct,
   })
-  const r = rankingCapacidad([it('A', 10, 90), it('B', 50, 40), it('C', 30, 10), it('D', 0, null), it('E', -5, 120)], 2,
+  const r = rankingCapacidad([it('A', 10, 90), it('B', 50, 40), it('C', 30, 10), it('D', 0, null), it('E', -5, 120)],
     (x) => x.horas.disponibles)
-  expect(r.conMas.map((x) => x.proyecto)).toEqual(['B', 'C'])
-  expect(r.masLibres.map((x) => x.proyecto)).toEqual(['C', 'B'])
-  expect(r.conMenos.map((x) => x.proyecto)).toEqual(['E', 'D'])
-  expect(r.menosLibres.map((x) => x.proyecto)).toEqual(['E', 'A']) // sin base (D) no entra en las listas por %
+  expect(r.conMas.map((x) => x.proyecto)).toEqual(['B', 'C', 'A', 'D', 'E'])
+  expect(r.conMenos.map((x) => x.proyecto)).toEqual(['E', 'D', 'A', 'C', 'B'])
+  expect(r.masLibres.map((x) => x.proyecto)).toEqual(['C', 'B', 'A', 'E']) // sin base (D) no entra en las listas por %
+  expect(r.menosLibres.map((x) => x.proyecto)).toEqual(['E', 'A', 'B', 'C'])
 })
 
 // El mismo ranking sirve para HUCHA: lo único que cambia es qué se entiende por
@@ -239,11 +242,12 @@ test('rankingCapacidad: rankea HUCHA por el presupuesto disponible', () => {
   const it = (proyecto: string, disponible: number, pct: number | null) => ({
     proyecto, presupuesto: { asignado: 0, consumido: 0, disponible }, porcentajeConsumido: pct,
   })
-  const r = rankingCapacidad([it('A', 900, 10), it('B', 50, 95), it('C', 300, 70)], 2, (x) => x.presupuesto.disponible)
-  expect(r.conMas.map((x) => x.proyecto)).toEqual(['A', 'C'])
-  expect(r.conMenos.map((x) => x.proyecto)).toEqual(['B', 'C'])
-  expect(r.masLibres.map((x) => x.proyecto)).toEqual(['A', 'C'])
-  expect(r.menosLibres.map((x) => x.proyecto)).toEqual(['B', 'C'])
+  const r = rankingCapacidad([it('A', 900, 10), it('B', 50, 95), it('C', 300, 70), it('D', -20, null)],
+    (x) => x.presupuesto.disponible)
+  expect(r.conMas.map((x) => x.proyecto)).toEqual(['A', 'C', 'B', 'D'])
+  expect(r.conMenos.map((x) => x.proyecto)).toEqual(['D', 'B', 'C', 'A'])
+  expect(r.masLibres.map((x) => x.proyecto)).toEqual(['A', 'C', 'B'])
+  expect(r.menosLibres.map((x) => x.proyecto)).toEqual(['B', 'C', 'A'])
 })
 
 // banco.ampliacion: lo que sale de la base (quién, cuánto, por qué) llega siempre; lo que

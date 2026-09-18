@@ -323,13 +323,18 @@ Si el proyecto pasa de `consumido` a `excedido` llega un `banco.nivel`, pero no 
     "estado_proyecto": "Activo",
     "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
     "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo",
-    "registro": null
+    "registro": {
+      "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" },
+      "dia": "2026-09-14",
+      "enlace": "https://<dominio>/registros/7c2e…"
+    }
   }
 }
 ```
 
-(Aquí `registro` es `null` para enseñar ese caso: el tope llegó en la revisión diaria. Si
-lo provoca un registro, trae el mismo objeto que en `banco.nivel`.)
+`registro` es el registro que llevó el proyecto al tope: quién lo hizo, qué día y el
+enlace, igual que en `banco.nivel`. Llega en `null` si el tope no lo provocó un registro
+(por ejemplo, si lo detectó la revisión diaria o una sincronización del Excel).
 
 ### `banco.ampliacion`
 
@@ -452,11 +457,13 @@ clave o con una clave incorrecta, la respuesta es `401`.
 ### Resumen de capacidad
 
 ```
-GET https://<dominio>/api/avisos/v1/resumen-capacidad?top=10
+GET https://<dominio>/api/avisos/v1/resumen-capacidad
 ```
 
-Pensado para el resumen quincenal. `top` va de 1 a 50 (por defecto, 10). Solo proyectos
-activos. Cuatro listas, cada una con hasta `top` proyectos:
+Pensado para el resumen quincenal. **Solo proyectos activos** (Estado «Activo» en el Excel)
+y **sin tope**: cada lista trae **todos** los proyectos activos, lo único que cambia entre
+listas es el orden. No hay parámetro `top` (si tu llamada lo pasa, se ignora). Quedan fuera
+los activos sin ninguna hora asignada ni consumida. Cuatro listas:
 
 - `con_mas_horas`: los que tienen más horas disponibles.
 - `mas_libres`: los que llevan menos porcentaje consumido.
@@ -471,7 +478,6 @@ salen en `mas_libres` ni en `menos_libres`. `porcentaje_disponible` es lo que fa
 ```json
 {
   "generado": "2026-09-16T07:00:02.118Z",
-  "top": 10,
   "con_mas_horas": [
     {
       "proyecto": "Proyecto Ejemplo",
@@ -491,12 +497,12 @@ salen en `mas_libres` ni en `menos_libres`. `porcentaje_disponible` es lo que fa
 ### Resumen de HUCHA
 
 ```
-GET https://<dominio>/api/avisos/v1/resumen-hucha?top=10
+GET https://<dominio>/api/avisos/v1/resumen-hucha
 ```
 
 El mismo resumen que el de capacidad, pero del **presupuesto de HUCHA** (dinero) en vez
-del banco de horas. Mismas reglas: `top` de 1 a 50 (por defecto, 10), solo proyectos
-activos, y las mismas cuatro listas con los mismos criterios:
+del banco de horas. **Sin tope:** cada lista trae **todos** los proyectos activos con
+HUCHA, no hay parámetro `top`. Mismas cuatro listas con los mismos criterios:
 
 - `con_mas_presupuesto`: los que tienen más presupuesto disponible.
 - `mas_libres`: los que llevan menos porcentaje consumido.
@@ -509,7 +515,10 @@ Diferencias con el de capacidad:
 - `presupuesto` es el mismo objeto `{ asignado, consumido, disponible }` que llega como
   `saldo` en los avisos `hucha.*`. El `asignado` ya incluye las ampliaciones, así que no
   hay campo `ampliadas` aparte.
-- No salen los proyectos sin presupuesto (sin nada asignado ni consumido).
+- No salen los proyectos sin presupuesto (sin nada asignado ni consumido), ni los
+  archivados.
+- Las cuatro listas traen los mismos proyectos en distinto orden, salvo que `mas_libres` y
+  `menos_libres` dejan fuera los que tienen `porcentaje_consumido` en `null`.
 - Los responsables vienen en `managers` (una lista, como en los avisos `hucha.*`), no en
   `manager_proyecto`. Puede llegar vacía si el proyecto no tiene managers asignados.
 - `porcentaje_consumido` es `null` si el proyecto no tiene nada asignado pero sí algo
@@ -519,7 +528,6 @@ Diferencias con el de capacidad:
 ```json
 {
   "generado": "2026-09-18T07:00:01.502Z",
-  "top": 10,
   "con_mas_presupuesto": [
     {
       "proyecto": "Proyecto Ejemplo",
@@ -606,7 +614,11 @@ casi todo el mundo, hasta que Administración termine de asignar los equipos.
   proyecto. Llega **apagado**: hay que activarlo en Administración → Avisos, y ya tiene su
   «Enviar prueba».
 - Consulta nueva **`resumen-hucha`**: el resumen de capacidad, pero del presupuesto de
-  HUCHA.
+  HUCHA, y sin tope: trae todos los proyectos activos con HUCHA.
+- **Cambio en `resumen-capacidad`: ya no hay tope.** Cada lista trae todos los proyectos
+  activos, no los `top` primeros; si tu llamada pasa `?top=`, se ignora. Si tu flujo arma
+  un mensaje recorriendo las listas, ahora le llegan listas completas: conviene revisar
+  cuántos proyectos muestra.
 
 De paso se completa la sección del resumen de capacidad, que solo nombraba dos de sus
 cuatro listas (`con_menos_horas` y `menos_libres` ya llegaban, no es un cambio).

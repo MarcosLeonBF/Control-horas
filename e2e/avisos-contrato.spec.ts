@@ -34,10 +34,13 @@ test('los avisos de registro y el de nivel de banco enlazan al registro', () => 
   const e = ejemplos('https://app.test')
   expect(e['registro.enviado'].enlace_registro).toMatch(/^https:\/\/app\.test\/registros\/[0-9a-f-]{36}$/)
   expect(e['registro.llamativo'].enlace_registro).toMatch(/^https:\/\/app\.test\/registros\/[0-9a-f-]{36}$/)
-  const reg = e['banco.nivel'].registro
-  expect(reg?.enlace).toMatch(/^https:\/\/app\.test\/registros\/[0-9a-f-]{36}$/)
-  expect(reg?.persona.nombre).toBe('Laura Gómez')
-  expect(reg?.dia).toBe('2026-09-14')
+  // banco.nivel y banco.al_tope: los dos dicen por el registro de quién cayó el banco.
+  for (const t of ['banco.nivel', 'banco.al_tope'] as const) {
+    const reg = e[t].registro
+    expect(reg?.enlace).toMatch(/^https:\/\/app\.test\/registros\/[0-9a-f-]{36}$/)
+    expect(reg?.persona.nombre).toBe('Laura Gómez')
+    expect(reg?.dia).toBe('2026-09-14')
+  }
 })
 
 // El equipo (0049) es lo que usan los flujos para enrutar, así que ninguna persona del

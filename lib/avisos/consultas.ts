@@ -14,17 +14,21 @@ import {
 import { enlaceBanco, enlaceHucha, esPersonaDePrueba } from '@/lib/avisos/entorno'
 import type { ManagerAviso, PersonaAviso } from '@/lib/avisos/contrato'
 
-export async function resumenCapacidad(top: number) {
+// Todos los proyectos ACTIVOS (Estado «Activo» en el Excel) con su banco total, sin tope:
+// cada lista los trae todos, solo cambia el orden (pedido de Roberto, 2026-09-18). El
+// filtro de activos lo aplica nivelesDeBancos; también quedan fuera los activos sin ninguna
+// hora asignada ni consumida (sin_asignacion), porque no hay nada que ordenar.
+export async function resumenCapacidad() {
   const db = createAdminClient()
   const [niveles, perfiles] = await Promise.all([nivelesActuales(db), perfilesPorId(db)])
-  const r = rankingCapacidad(niveles.filter((n) => n.alcance === 'proyecto'), top, (n) => n.horas.disponibles)
+  const r = rankingCapacidad(niveles.filter((n) => n.alcance === 'proyecto'), (n) => n.horas.disponibles)
   const item = (n: NivelBanco) => ({
     proyecto: n.proyecto, horas: n.horas, porcentaje_consumido: n.porcentajeConsumido,
     porcentaje_disponible: porcentajeDisponible(n.porcentajeConsumido),
     manager_proyecto: managerPorNombre(n.managerExcel, perfiles), enlace: enlaceBanco(n.proyecto),
   })
   return {
-    generado: new Date().toISOString(), top,
+    generado: new Date().toISOString(),
     con_mas_horas: r.conMas.map(item), mas_libres: r.masLibres.map(item),
     con_menos_horas: r.conMenos.map(item), menos_libres: r.menosLibres.map(item),
   }
@@ -34,12 +38,17 @@ export async function resumenCapacidad(top: number) {
 // Mismas cuatro listas y mismos criterios (rankingCapacidad); lo que cambia es la fuente
 // —leerHuchas, que ya filtra activos y proyectos E2E— y los nombres del contrato.
 //
+// Sin tope: cada lista trae TODOS los proyectos activos con HUCHA (pedido de Roberto,
+// 2026-09-18). Son pocos —solo existen en HUCHA los que el Excel les da presupuesto— y el
+// flujo quiere verlos todos. Los archivados NO entran: archivar no pone el banco a cero, y
+// saldrían con un presupuesto que ya no tienen.
+//
 // A diferencia del de capacidad, este NO depende del Excel de SharePoint: todo sale de
 // la base (hucha_banks), así que una caída de Graph no lo tumba.
-export async function resumenHucha(top: number) {
+export async function resumenHucha() {
   const db = createAdminClient()
   const huchas = huchasParaRanking(await leerHuchas(db))
-  const r = rankingCapacidad(huchas, top, (h) => h.saldo.disponible)
+  const r = rankingCapacidad(huchas, (h) => h.saldo.disponible)
   const item = (h: (typeof huchas)[number]) => ({
     proyecto: h.nombre, proyecto_id: h.id,
     presupuesto: h.saldo, moneda: h.moneda, nivel: h.nivel,
@@ -48,7 +57,7 @@ export async function resumenHucha(top: number) {
     managers: h.managers, enlace: enlaceHucha(h.id),
   })
   return {
-    generado: new Date().toISOString(), top,
+    generado: new Date().toISOString(),
     con_mas_presupuesto: r.conMas.map(item), mas_libres: r.masLibres.map(item),
     con_menos_presupuesto: r.conMenos.map(item), menos_libres: r.menosLibres.map(item),
   }

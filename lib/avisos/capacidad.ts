@@ -102,23 +102,24 @@ export function porcentajeDisponible(consumido: number | null): number | null {
   return consumido === null ? null : Math.round((100 - consumido) * 10) / 10
 }
 
-// Arriba y abajo por lo disponible y por porcentaje disponible. Las listas por
-// porcentaje dejan fuera los proyectos sin base (porcentaje null).
+// Los mismos proyectos en cuatro órdenes: por lo disponible (de más a menos y al revés) y
+// por porcentaje disponible. Sin tope: cada lista los trae TODOS (pedido de Roberto,
+// 2026-09-18). Las listas por porcentaje dejan fuera los que no tienen base (null).
 //
 // Qué es "lo disponible" lo decide quien llama: horas en el banco de horas, euros en la
 // HUCHA. Por eso las claves son neutras (conMas, no conMasHoras) y cada consulta las
 // traduce a sus nombres del contrato. Así las cuatro listas y sus criterios viven en un
 // solo sitio, y los dos resúmenes no pueden desalinearse.
 export function rankingCapacidad<T extends { porcentajeConsumido: number | null }>(
-  items: T[], top: number, disponible: (i: T) => number,
+  items: T[], disponible: (i: T) => number,
 ): { conMas: T[]; masLibres: T[]; conMenos: T[]; menosLibres: T[] } {
   const conPorcentaje = items.filter((i) => i.porcentajeConsumido !== null)
   const pct = (i: T) => i.porcentajeConsumido as number
   return {
-    conMas: [...items].sort((a, b) => disponible(b) - disponible(a)).slice(0, top),
-    masLibres: [...conPorcentaje].sort((a, b) => pct(a) - pct(b)).slice(0, top),
-    conMenos: [...items].sort((a, b) => disponible(a) - disponible(b)).slice(0, top),
-    menosLibres: [...conPorcentaje].sort((a, b) => pct(b) - pct(a)).slice(0, top),
+    conMas: [...items].sort((a, b) => disponible(b) - disponible(a)),
+    masLibres: [...conPorcentaje].sort((a, b) => pct(a) - pct(b)),
+    conMenos: [...items].sort((a, b) => disponible(a) - disponible(b)),
+    menosLibres: [...conPorcentaje].sort((a, b) => pct(b) - pct(a)),
   }
 }
 
