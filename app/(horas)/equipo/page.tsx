@@ -95,9 +95,9 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
     <div className="space-y-10">
       <header>
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-(--brand)">Bastida &amp; Farina</p>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Equipo</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Estructura</h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Estructura del equipo por área —managers y operativos— y los registros de toda la operación.
+          Quién es quién por área —managers y operativos— y los registros de toda la operación.
         </p>
       </header>
 

@@ -104,19 +104,36 @@ function firmaValida(cabecera, cuerpoCrudo, secreto) {
 **Persona**
 
 ```json
-{ "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "rol": "operativo" }
+{ "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" }
 ```
 
 **Manager** (`manager_directo`, `manager_proyecto`, cada elemento de `managers`)
 
 ```json
-{ "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com" }
+{ "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" }
 ```
 
 - `manager_directo` es `null` si la persona todavía no tiene manager directo asignado.
 - En `manager_proyecto`, si el nombre que viene del Excel no coincide con ningún usuario,
-  llega `{ "id": null, "nombre": "<nombre del Excel>", "email": null }`. Si el proyecto no
-  tiene manager en el Excel, llega `null`.
+  llega `{ "id": null, "nombre": "<nombre del Excel>", "email": null, "equipo": null }`. Si
+  el proyecto no tiene manager en el Excel, llega `null`.
+
+**`equipo`: a qué parte de la empresa pertenece esa persona**
+
+Lo llevan **todas** las personas del payload: `persona`, `manager_directo`,
+`manager_proyecto`, cada elemento de `managers` y el `actor` de `hucha.ampliacion`. Es el
+campo pensado para enrutar: a qué canal va el mensaje, quién lo recibe.
+
+- Valores: los que haya dados de alta en la app. Hoy `"Clientes"` y `"RRHH"`; **la lista
+  crece**, así que conviene tratarla como abierta y tener una rama por defecto.
+- `null` significa *esa persona todavía no tiene equipo asignado* (o, en un manager que
+  viene por nombre del Excel, que no se pudo identificar). No es un error: el aviso sale
+  igual y hay que contemplarlo.
+- Es el equipo de la persona, no el del proyecto. En un aviso de banco, `manager_proyecto.equipo`
+  es el equipo del manager, no el del proyecto.
+- **No confundir con el `department` de una línea de horas** (`Clientes`, `Ventas`,
+  `Marketing`, `Todos`). Son dos listas distintas de la app, y aunque algún nombre coincida
+  no significan lo mismo. El `department` no viaja en los avisos.
 
 **Niveles de un banco o de una HUCHA**
 
@@ -153,8 +170,8 @@ total acumulado del día en `horas_dia`. Las ediciones no envían pulso.
   "fecha": "2026-09-14T15:32:10.412Z",
   "prueba": false,
   "datos": {
-    "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "rol": "operativo" },
-    "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com" },
+    "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" },
+    "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
     "dia": "2026-09-14",
     "horas_registro": 7.5,
     "horas_dia": 7.5,
@@ -191,8 +208,8 @@ persona vuelva a editar ese día.
 {
   "tipo": "registro.llamativo",
   "datos": {
-    "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "rol": "operativo" },
-    "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com" },
+    "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" },
+    "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
     "dia": "2026-09-14",
     "regla": "dia_largo",
     "valor": 11,
@@ -241,7 +258,7 @@ nivel (pasa a `bajo`, `consumido` o `excedido`). Solo proyectos activos. Si el b
     "horas": { "asignadas": 40, "ampliadas": 0, "consumidas": 33.5, "inutilizables": 0, "disponibles": 6.5 },
     "porcentaje_consumido": 83.8,
     "estado_proyecto": "Activo",
-    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com" },
+    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
     "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo"
   }
 }
@@ -274,7 +291,7 @@ Si el proyecto pasa de `consumido` a `excedido` llega un `banco.nivel`, pero no 
     "horas": { "asignadas": 120, "ampliadas": 20, "consumidas": 120, "inutilizables": 0, "disponibles": 0 },
     "porcentaje_consumido": 100,
     "estado_proyecto": "Activo",
-    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com" },
+    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
     "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo"
   }
 }
@@ -293,7 +310,7 @@ sincronización la lanza un administrador desde la plataforma).
     "proyecto_id": "e5f6…",
     "presupuesto": 2500,
     "moneda": "EUR",
-    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com" } ],
+    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" } ],
     "enlace": "https://<dominio>/presupuestos/e5f6…"
   }
 }
@@ -316,10 +333,10 @@ Cuando se amplía el presupuesto de una HUCHA.
     "motivo": "Ampliación aprobada por el cliente",
     "referencia": "PO-2026-118",
     "dia": "2026-09-14",
-    "actor": { "nombre": "Marta López" },
+    "actor": { "nombre": "Marta López", "email": "marta.lopez@ejemplo.com", "equipo": "RRHH" },
     "saldo": { "asignado": 3000, "consumido": 2450, "disponible": 550 },
     "nivel": "bajo",
-    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com" } ],
+    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" } ],
     "enlace": "https://<dominio>/presupuestos/e5f6…"
   }
 }
@@ -343,7 +360,7 @@ empeorar sí.
     "nivel_anterior": "bajo",
     "moneda": "EUR",
     "saldo": { "asignado": 3000, "consumido": 3000, "disponible": 0 },
-    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com" } ],
+    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" } ],
     "enlace": "https://<dominio>/presupuestos/e5f6…"
   }
 }
@@ -379,7 +396,7 @@ salen en `mas_libres`.
       "proyecto": "Proyecto Ejemplo",
       "horas": { "asignadas": 160, "ampliadas": 0, "consumidas": 40, "inutilizables": 12, "disponibles": 108 },
       "porcentaje_consumido": 27,
-      "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com" },
+      "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
       "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo"
     }
   ],
@@ -413,8 +430,8 @@ como día registrado.
   "fecha": "2026-09-16",
   "personas": [
     {
-      "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "rol": "operativo" },
-      "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com" },
+      "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" },
+      "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
       "dias": 2,
       "desde": "2026-09-14",
       "ultimo_registro": "2026-09-11",
@@ -441,3 +458,9 @@ Son las que hay para empezar y se ajustan tras la reunión del lunes 14/09:
 
 Los campos nuevos se añadirán sin cambiar la versión y sin romper lo que ya funciona. Si
 algún día hay que cambiar o quitar un campo, saldrá como `version: 2` y se avisará antes.
+
+**18/09/2026** · Se añade `equipo` a todas las personas del payload (`persona`,
+`manager_directo`, `manager_proyecto`, cada `managers` y el `actor` de `hucha.ampliacion`).
+Sigue siendo `version: 1`: es un campo nuevo y nada de lo anterior cambia, así que los
+flujos que ya funcionan siguen funcionando sin tocar nada. Al principio llegará `null` en
+casi todo el mundo, hasta que Administración termine de asignar los equipos.

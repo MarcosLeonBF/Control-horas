@@ -9,7 +9,7 @@ export default async function CatalogosPage() {
   const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (me?.role !== 'admin') redirect('/registrar')
 
-  const [{ data: areas }, { data: etapas }, { data: descripciones, error: descripcionesError }, { data: departamentos }, { data: positions }, { data: posAreas }, { data: posEtapas }, { data: posDepartamentos }, { data: depEtapas }, { data: posDescripciones, error: posDescripcionesError }] = await Promise.all([
+  const [{ data: areas }, { data: etapas }, { data: descripciones, error: descripcionesError }, { data: departamentos }, { data: positions }, { data: posAreas }, { data: posEtapas }, { data: posDepartamentos }, { data: depEtapas }, { data: posDescripciones, error: posDescripcionesError }, { data: equipos, error: equiposError }] = await Promise.all([
     supabase.from('areas').select('id, name, active, is_internal').order('name'),
     supabase.from('etapas').select('id, name, active').order('name'),
     supabase.from('descripciones').select('id, name, active, alcance').order('name'),
@@ -20,6 +20,7 @@ export default async function CatalogosPage() {
     supabase.from('position_departamentos').select('position_id, departamento_id'),
     supabase.from('departamento_etapas').select('departamento_id, etapa_id'),
     supabase.from('position_descripciones').select('position_id, descripcion_id'),
+    supabase.from('equipos').select('id, name, active').order('name'),
   ])
 
   const posiciones: PosicionRow[] = (positions ?? []).map((p) => ({
@@ -37,6 +38,9 @@ export default async function CatalogosPage() {
   // Descartarlos pintaría la sección vacía, como si no hubiera descripciones.
   if (descripcionesError) throw new Error(`No se pudieron leer las descripciones: ${descripcionesError.message}`)
   if (posDescripcionesError) throw new Error(`No se pudieron leer las descripciones por posición: ${posDescripcionesError.message}`)
+  // Mismo motivo con los equipos (0049): sin la migración aplicada la tabla no existe, y
+  // tragarse el error pintaría la sección vacía como si no hubiera ninguno.
+  if (equiposError) throw new Error(`No se pudieron leer los equipos: ${equiposError.message}`)
 
   // Cada descripción con su alcance y, si es específica, las posiciones que la ven (0044).
   const descripcionesConPosiciones: DescripcionRow[] = (descripciones ?? []).map((d) => ({
@@ -63,6 +67,8 @@ export default async function CatalogosPage() {
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Una posición define qué puede registrar cada persona: sus áreas, sus etapas, sus departamentos y sus
           descripciones. Lo demás son las listas de las que se nutre. Los proyectos y los bancos vienen del Excel.
+          Aparte va Equipos, que no decide nada de lo que se registra: es el organigrama, y sirve para que los
+          avisos automáticos sepan a quién corresponde cada persona.
         </p>
       </header>
 
@@ -72,6 +78,7 @@ export default async function CatalogosPage() {
         etapas={(etapas ?? []) as CatalogoRow[]}
         descripciones={descripcionesConPosiciones}
         departamentos={depsConEtapas}
+        equipos={(equipos ?? []) as CatalogoRow[]}
       />
     </div>
   )

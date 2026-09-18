@@ -24,7 +24,22 @@ test('la prueba de registro.llamativo trae un proyecto y la de ampliación, el e
   expect(l.regla).toBe('proyecto_largo')
   expect(l.proyecto).toBe('Proyecto Ejemplo')
   expect(l.limite).toBe(LIMITE_PROYECTO_HORAS)
-  expect(e['hucha.ampliacion'].actor).toEqual({ nombre: 'Marta López', email: 'marta.lopez@ejemplo.com' })
+  expect(e['hucha.ampliacion'].actor).toEqual({ nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH' })
+})
+
+// El equipo (0049) es lo que usan los flujos para enrutar, así que ninguna persona del
+// payload puede quedarse sin la clave: si un tipo nuevo trae una persona y se olvida el
+// equipo, este test lo caza antes de que Julián reciba un payload a medias.
+test('toda persona del payload trae su equipo', () => {
+  const e = ejemplos('https://app.test')
+  expect(e['registro.enviado'].persona.equipo).toBe('Clientes')
+  expect(e['registro.enviado'].manager_directo?.equipo).toBe('Clientes')
+  expect(e['registro.llamativo'].persona.equipo).toBe('Clientes')
+  expect(e['banco.nivel'].manager_proyecto?.equipo).toBe('Clientes')
+  expect(e['hucha.ampliacion'].actor.equipo).toBe('RRHH')
+  for (const t of ['hucha.proyecto_nuevo', 'hucha.ampliacion', 'hucha.nivel'] as const) {
+    for (const m of e[t].managers) expect(m).toHaveProperty('equipo')
+  }
 })
 
 test('appUrl: APP_URL sin barra final, o el dominio de producción de Vercel', () => {

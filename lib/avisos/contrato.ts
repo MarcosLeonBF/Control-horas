@@ -19,8 +19,15 @@ export const DESCRIPCION_TIPO: Record<TipoAviso, string> = {
   'hucha.nivel': 'Una HUCHA empeora de nivel (baja, agotada o excedida)',
 }
 
-export interface PersonaAviso { id: string; nombre: string; email: string; posicion: string | null; rol: string }
-export interface ManagerAviso { id: string | null; nombre: string; email: string | null }
+// `equipo` es el equipo de la EMPRESA (organigrama: Clientes, RRHH…, tabla `equipos`,
+// migración 0049), con el que los flujos deciden a qué canal va cada aviso. No confundir
+// con el `department` de una línea de registro (Clientes, Ventas, Marketing, Todos), que
+// es otra lista y no viaja en los avisos. Va en TODA persona del payload —persona,
+// managers y actor— para que ningún tipo de aviso se quede sin por dónde enrutar.
+// null = esa persona todavía no tiene equipo asignado, o no se pudo resolver quién es.
+export interface PersonaAviso { id: string; nombre: string; email: string; posicion: string | null; equipo: string | null; rol: string }
+export interface ManagerAviso { id: string | null; nombre: string; email: string | null; equipo: string | null }
+export interface ActorAviso { nombre: string; email: string | null; equipo: string | null }
 export interface HorasAviso { asignadas: number; ampliadas: number; consumidas: number; inutilizables: number; disponibles: number }
 export interface SaldoHucha { asignado: number; consumido: number; disponible: number }
 
@@ -44,7 +51,7 @@ export interface DatosHuchaNuevo {
 }
 export interface DatosHuchaAmpliacion {
   proyecto: string; proyecto_id: string; importe: number; moneda: string; motivo: string; referencia: string | null
-  dia: string; actor: { nombre: string; email: string | null }; saldo: SaldoHucha; nivel: Nivel | null; managers: ManagerAviso[]; enlace: string
+  dia: string; actor: ActorAviso; saldo: SaldoHucha; nivel: Nivel | null; managers: ManagerAviso[]; enlace: string
 }
 export interface DatosHuchaNivel {
   proyecto: string; proyecto_id: string; nivel: Nivel; nivel_anterior: Nivel; moneda: string
@@ -65,9 +72,9 @@ export interface DatosPorTipo {
 export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
   const persona: PersonaAviso = {
     id: '00000000-0000-4000-8000-00000000a1b2', nombre: 'Laura Gómez', email: 'laura.gomez@ejemplo.com',
-    posicion: 'SEO Strategist', rol: 'operativo',
+    posicion: 'SEO Strategist', equipo: 'Clientes', rol: 'operativo',
   }
-  const manager: ManagerAviso = { id: '00000000-0000-4000-8000-00000000c3d4', nombre: 'Carlos Ruiz', email: 'carlos.ruiz@ejemplo.com' }
+  const manager: ManagerAviso = { id: '00000000-0000-4000-8000-00000000c3d4', nombre: 'Carlos Ruiz', email: 'carlos.ruiz@ejemplo.com', equipo: 'Clientes' }
   const proyectoId = '00000000-0000-4000-8000-00000000e5f6'
   const enlaceHucha = `${base}/presupuestos/${proyectoId}`
   const banco: DatosBanco = {
@@ -98,7 +105,7 @@ export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
     'hucha.ampliacion': {
       proyecto: 'Proyecto Ejemplo', proyecto_id: proyectoId, importe: 500, moneda: 'EUR',
       motivo: 'Ampliación aprobada por el cliente', referencia: 'PO-2026-118', dia: '2026-09-14',
-      actor: { nombre: 'Marta López', email: 'marta.lopez@ejemplo.com' },
+      actor: { nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH' },
       saldo: { asignado: 3000, consumido: 2450, disponible: 550 }, nivel: 'bajo', managers: [manager], enlace: enlaceHucha,
     },
     'hucha.nivel': {

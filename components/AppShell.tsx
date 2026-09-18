@@ -40,7 +40,10 @@ function buildSections(role: string, canCreateUsers: boolean): Section[] {
     {
       title: 'Administración',
       items: [
-        { href: '/equipo', label: 'Equipo', icon: Users, show: isAdmin },
+        // "Estructura" y no "Equipo": desde la 0049 "equipo" es un dato de cada persona
+        // (su parte de la empresa), y esta pantalla no va de eso —muestra la composición
+        // por área con sus registros. La URL se queda en /equipo para no romper enlaces.
+        { href: '/equipo', label: 'Estructura', icon: Users, show: isAdmin },
         { href: '/admin/usuarios', label: 'Usuarios', icon: UserCog, show: isAdmin || canCreateUsers },
         { href: '/admin/catalogos', label: 'Catálogos', icon: Tags, show: isAdmin },
         { href: '/admin/auditoria', label: 'Auditoría', icon: History, show: isAdmin },

@@ -7,7 +7,7 @@ const horas = JSON.parse(fs.readFileSync('e2e/.horas.json', 'utf8')) as {
 
 test('el buscador de /equipo filtra por usuario', async ({ page }) => {
   await page.goto('/equipo')
-  await expect(page.getByRole('heading', { name: 'Equipo', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Estructura', exact: true })).toBeVisible()
   const buscar = page.getByLabel('Buscar registro')
   await buscar.fill(horas.operativoName)
   // La fila del operativo sembrado sigue visible…
@@ -31,7 +31,7 @@ test('el admin abre la edición de un registro ajeno con el nombre del dueño', 
 test('el admin anula un registro ajeno desde /equipo', async ({ page }) => {
   page.on('dialog', (d) => d.accept()) // aceptar el confirm() de anular
   await page.goto('/equipo')
-  await expect(page.getByRole('heading', { name: 'Equipo', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Estructura', exact: true })).toBeVisible()
   // Acotar por el buscador y desplegar la fila del operativo sembrado.
   await page.getByLabel('Buscar registro').fill(horas.operativoName)
   const fila = page.locator('li').filter({ hasText: horas.operativoName }).first()

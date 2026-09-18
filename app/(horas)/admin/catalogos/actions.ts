@@ -192,6 +192,64 @@ export async function setDescripcionPosiciones(id: string, positionIds: string[]
   return { ok: true }
 }
 
+// ── Equipos ────────────────────────────────────────────────────────────────
+// Equipos de la EMPRESA (organigrama: Clientes, RRHH…, migración 0049). No confundir con
+// los departamentos de aquí arriba, que son el desplegable del proyecto "Departamento" al
+// registrar horas: son dos listas distintas y no se cruzan. El equipo no gobierna nada de
+// lo que se puede registrar; solo etiqueta a la persona y viaja en el payload de los avisos.
+export async function crearEquipo(name: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const n = name.trim()
+  if (!n) return { ok: false, error: 'El nombre es obligatorio.' }
+  const { error: e } = await supabase.from('equipos').insert({ name: n })
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+export async function renombrarEquipo(id: string, name: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const n = name.trim()
+  if (!n) return { ok: false, error: 'El nombre es obligatorio.' }
+  const { error: e } = await supabase.from('equipos').update({ name: n, updated_at: new Date().toISOString() }).eq('id', id)
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+export async function toggleEquipo(id: string, active: boolean): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+  const { error: e } = await supabase.from('equipos').update({ active, updated_at: new Date().toISOString() }).eq('id', id)
+  if (e) return { ok: false, error: friendly(e) }
+  return { ok: true }
+}
+
+// La base no impide borrar un equipo con gente dentro: profiles.equipo_id es SET NULL
+// (0049), así que se la llevaría por delante en silencio y esas personas empezarían a
+// salir con `equipo: null` en los avisos sin que nadie se entere. Se comprueba antes y se
+// niega, igual que eliminarUsuario hace con quien tiene registros: primero se reasigna o
+// se desactiva, que para eso está el interruptor.
+export async function eliminarEquipo(id: string): Promise<Result> {
+  const { supabase, error } = await requireAdmin()
+  if (error) return { ok: false, error }
+
+  const { count, error: countError } = await supabase
+    .from('profiles').select('id', { count: 'exact', head: true }).eq('equipo_id', id)
+  if (countError) return { ok: false, error: friendly(countError) }
+  if ((count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `Tiene ${count} ${count === 1 ? 'persona asignada' : 'personas asignadas'}: reasígnalas en Usuarios, o desactiva el equipo en vez de borrarlo.`,
+    }
+  }
+
+  const { data, error: e } = await supabase.from('equipos').delete().eq('id', id).select('id')
+  if (e) return { ok: false, error: friendly(e) }
+  if (!data?.length) return { ok: false, error: 'No se pudo eliminar (no existe o sin permisos).' }
+  return { ok: true }
+}
+
 // ── Posiciones ─────────────────────────────────────────────────────────────
 // El banco de horas es por posición (columnas del Excel). Cada posición se liga
 // a una o más áreas: un manager ve los bancos de las posiciones de sus áreas.

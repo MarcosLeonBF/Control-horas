@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 export interface NuevoUsuario {
   full_name: string; email: string; password: string; positionId: string
   role: 'operativo' | 'manager' | 'admin'; areaIds: string[]
+  equipoId: string | null // equipo de la empresa (0049); opcional, viaja en los avisos
 }
 
 export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -36,6 +37,7 @@ export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | 
 
   const { error: profileError } = await admin.from('profiles').update({
     full_name: input.full_name.trim(), email: input.email.trim(), position_id: input.positionId || null,
+    equipo_id: input.equipoId || null,
     role: input.role, status: 'activo', created_by: user.id,
   }).eq('id', id)
   if (profileError) return { ok: false, error: `Usuario creado pero falló su perfil: ${profileError.message}` }
@@ -54,6 +56,7 @@ export interface EdicionUsuario {
   role: 'operativo' | 'manager' | 'admin'; status: 'activo' | 'inactivo'; areaIds: string[]
   canCreateUsers: boolean
   managerId: string | null // manager directo: a quién escala el recordatorio de días sin registrar
+  equipoId: string | null // equipo de la empresa (0049); opcional, viaja en los avisos
 }
 
 // Panel de usuarios (PDF §8/§19): editar datos + estado activo/inactivo. Solo admin.
@@ -76,6 +79,8 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
     // Un admin ya puede crear usuarios por rol: el flag delegado se limpia para no dejarlo huérfano.
     can_create_users: input.role === 'admin' ? false : input.canCreateUsers,
     manager_id: input.managerId || null,
+    // El equipo no depende del rol: un admin también pertenece a una parte de la empresa.
+    equipo_id: input.equipoId || null,
   }
   // Mismo motivo con la ventana ampliada (0043): el admin registra sin límite de fecha,
   // así que ascender a alguien a admin apaga su permiso en vez de dejarlo puesto y mudo.

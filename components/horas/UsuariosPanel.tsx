@@ -23,6 +23,7 @@ export interface UsuarioRow {
   canCreateUsers: boolean
   registroDiasAtras: number | null // días hacia atrás que puede registrar; null = la ventana por defecto
   managerId: string | null // manager directo; null = sin asignar
+  equipoId: string | null // equipo de la empresa (0049); null = sin asignar
 }
 
 const fieldSelect = 'h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
@@ -163,11 +164,11 @@ function DiasRegistroDialog({ u, onDone }: { u: UsuarioRow; onDone: () => void }
   )
 }
 
-function Editor({ u, areas, posiciones, managers, onDone }: { u: UsuarioRow; areas: AreaRow[]; posiciones: PosicionOpt[]; managers: PosicionOpt[]; onDone: () => void }) {
+function Editor({ u, areas, posiciones, managers, equipos, onDone }: { u: UsuarioRow; areas: AreaRow[]; posiciones: PosicionOpt[]; managers: PosicionOpt[]; equipos: PosicionOpt[]; onDone: () => void }) {
   const router = useRouter()
   const [f, setF] = useState<EdicionUsuario>({
     full_name: u.full_name, positionId: u.positionId ?? '', role: u.role, status: u.status, areaIds: u.areaIds,
-    canCreateUsers: u.canCreateUsers, managerId: u.managerId,
+    canCreateUsers: u.canCreateUsers, managerId: u.managerId, equipoId: u.equipoId,
   })
   const [saving, setSaving] = useState(false)
   const selectableAreas = areas.filter((a) => !a.is_internal)
@@ -225,6 +226,17 @@ function Editor({ u, areas, posiciones, managers, onDone }: { u: UsuarioRow; are
             {managers.filter((m) => m.id !== u.id).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </NativeSelect>
         </Field>
+        {/* Equipo de la empresa (0049): no condiciona nada de lo que esta persona puede
+            registrar. Lo leen los avisos automáticos para saber a qué canal mandarlos. */}
+        <Field label="Equipo (empresa)">
+          <NativeSelect
+            aria-label="Editar equipo" value={f.equipoId ?? ''}
+            onChange={(e) => setF({ ...f, equipoId: e.target.value || null })} className={fieldSelect} fullWidth
+          >
+            <option value="">— Sin equipo —</option>
+            {equipos.map((eq) => <option key={eq.id} value={eq.id}>{eq.name}</option>)}
+          </NativeSelect>
+        </Field>
       </div>
 
       {/* Áreas = visibilidad del manager/admin. El operativo las hereda de su posición
@@ -273,7 +285,7 @@ function Editor({ u, areas, posiciones, managers, onDone }: { u: UsuarioRow; are
   )
 }
 
-export default function UsuariosPanel({ usuarios, areas, posiciones, managers, readOnly = false }: { usuarios: UsuarioRow[]; areas: AreaRow[]; posiciones: PosicionOpt[]; managers: PosicionOpt[]; readOnly?: boolean }) {
+export default function UsuariosPanel({ usuarios, areas, posiciones, managers, equipos, readOnly = false }: { usuarios: UsuarioRow[]; areas: AreaRow[]; posiciones: PosicionOpt[]; managers: PosicionOpt[]; equipos: PosicionOpt[]; readOnly?: boolean }) {
   const router = useRouter()
   const [editing, setEditing] = useState<string | null>(null)
   const [dias, setDias] = useState<UsuarioRow | null>(null)
@@ -446,7 +458,7 @@ export default function UsuariosPanel({ usuarios, areas, posiciones, managers, r
                       {!readOnly && editing === u.id && (
                         <TableRow>
                           <TableCell colSpan={columnas} className="py-3">
-                            <Editor u={u} areas={areas} posiciones={posiciones} managers={managers} onDone={() => setEditing(null)} />
+                            <Editor u={u} areas={areas} posiciones={posiciones} managers={managers} equipos={equipos} onDone={() => setEditing(null)} />
                           </TableCell>
                         </TableRow>
                       )}

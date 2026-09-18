@@ -15,6 +15,7 @@ import {
   crearDescripcion, renombrarDescripcion, toggleDescripcion, eliminarDescripcion, setDescripcionAlcance, setDescripcionPosiciones,
   crearDepartamento, renombrarDepartamento, toggleDepartamento, eliminarDepartamento, setDepartamentoEtapasNombres,
   crearPosicion, renombrarPosicion, togglePosicion, eliminarPosicion, setPosicionAreas, setPosicionEtapas, setPosicionDepartamentos, setPosicionDescripcionLibre,
+  crearEquipo, renombrarEquipo, toggleEquipo, eliminarEquipo,
 } from '@/app/(horas)/admin/catalogos/actions'
 import type { DepartamentoRow } from '@/lib/horas/types'
 import { esDescripcionHuerfana } from '@/lib/horas/descripciones'
@@ -598,8 +599,9 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
   )
 }
 
-export default function CatalogosPanel({ areas, etapas, descripciones, departamentos, posiciones }: {
+export default function CatalogosPanel({ areas, etapas, descripciones, departamentos, posiciones, equipos }: {
   areas: CatalogoRow[]; etapas: CatalogoRow[]; descripciones: DescripcionRow[]; departamentos: DepartamentoRow[]; posiciones: PosicionRow[]
+  equipos: CatalogoRow[]
 }) {
   // Etapas ligadas a un departamento: exclusivas del proyecto "Departamento", no
   // asignables a posiciones (las de posición son las etapas generales).
@@ -624,6 +626,16 @@ export default function CatalogosPanel({ areas, etapas, descripciones, departame
           <Seccion title="Etapas" hint="Las fases del trabajo. Se asignan a posiciones y aparecen al registrar en un proyecto de cliente." rows={etapas} addPlaceholder="Nueva etapa…"
             ops={{ crear: crearEtapa, renombrar: renombrarEtapa, toggle: toggleEtapa, eliminar: eliminarEtapa }} />
         </div>
+
+        {/* Aparte de todo lo demás y con su propia explicación: es el único catálogo de
+            esta página que NO decide nada de lo que se puede registrar, y su nombre se
+            parece peligrosamente al de Departamentos. Merece el espacio para decirlo. */}
+        <Seccion
+          title="Equipos"
+          hint="Los equipos de la empresa (el organigrama: Clientes, RRHH…). Se asignan persona por persona en Usuarios y viajan en los avisos automáticos, que los usan para decidir a qué canal va cada mensaje. No confundir con Departamentos: aquello es lo que se elige al registrar horas en el proyecto «Departamento», y son dos listas distintas aunque algún nombre coincida."
+          rows={equipos}
+          addPlaceholder="Nuevo equipo…"
+          ops={{ crear: crearEquipo, renombrar: renombrarEquipo, toggle: toggleEquipo, eliminar: eliminarEquipo }} />
       </div>
     </TooltipProvider>
   )

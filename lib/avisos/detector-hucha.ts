@@ -7,7 +7,7 @@ import { emitirAviso } from '@/lib/avisos/bandeja'
 import { esProduccion, esPersonaDePrueba, enlaceHucha } from '@/lib/avisos/entorno'
 import { transicion, comoNivel, centesimas, type Nivel } from '@/lib/avisos/reglas'
 import { leerEstados, guardarEstados } from '@/lib/avisos/estado'
-import type { ManagerAviso, SaldoHucha } from '@/lib/avisos/contrato'
+import type { ActorAviso, ManagerAviso, SaldoHucha } from '@/lib/avisos/contrato'
 
 export interface MovimientoAmpliacion {
   id: string
@@ -20,11 +20,19 @@ export interface MovimientoAmpliacion {
 }
 
 interface BancoRaw { currency: string | null; assigned_total: number; consumed_total: number; remaining: number; status: string }
+// El equipo (0049) llega anidado dos niveles y, como todo join de PostgREST, puede venir
+// como objeto o como array de uno: se normaliza al mapear.
+type EquipoRaw = { name: string } | { name: string }[] | null
+type ManagerRaw = { id: string; full_name: string | null; email: string | null; equipos: EquipoRaw }
 interface HuchaRaw {
   id: string
   name: string
   hucha_banks: BancoRaw | BancoRaw[] | null
-  project_assignments: { profiles: { id: string; full_name: string | null; email: string | null } | null }[] | null
+  project_assignments: { profiles: ManagerRaw | null }[] | null
+}
+
+function nombreEquipo(e: EquipoRaw): string | null {
+  return (Array.isArray(e) ? e[0] : e)?.name ?? null
 }
 
 interface Hucha {
@@ -37,7 +45,7 @@ interface Hucha {
 }
 
 const SELECT_HUCHA =
-  'id, name, hucha_banks(currency, assigned_total, consumed_total, remaining, status), project_assignments(profiles(id, full_name, email))'
+  'id, name, hucha_banks(currency, assigned_total, consumed_total, remaining, status), project_assignments(profiles(id, full_name, email, equipos(name)))'
 
 // Los E2E siembran en la única base (la de producción) los proyectos «Cliente E2E
 // Asignado» y «Cliente E2E NoAsignado» y managers @hucha.test: ni esos proyectos ni esas
@@ -56,9 +64,9 @@ async function leerHuchas(db: SupabaseClient, ids?: string[]): Promise<Hucha[]> 
     if (!b) return []
     const managers = (p.project_assignments ?? [])
       .map((a) => a.profiles)
-      .filter((pr): pr is { id: string; full_name: string | null; email: string | null } => pr !== null)
+      .filter((pr): pr is ManagerRaw => pr !== null)
       .filter((pr) => !esPersonaDePrueba(pr.email))
-      .map((pr) => ({ id: pr.id, nombre: pr.full_name ?? '', email: pr.email }))
+      .map((pr) => ({ id: pr.id, nombre: pr.full_name ?? '', email: pr.email, equipo: nombreEquipo(pr.equipos) }))
     return [{
       id: p.id, nombre: p.name, moneda: b.currency ?? 'EUR',
       saldo: {
@@ -114,12 +122,13 @@ export async function evaluarHucha(ids?: string[]): Promise<void> {
   }
 }
 
-// Email de quien registró la ampliación (actor_id del movimiento). Si no se encuentra,
-// null: el aviso sale igual.
-async function emailDe(db: SupabaseClient, perfilId: string | null): Promise<string | null> {
-  if (!perfilId) return null
-  const { data } = await db.from('profiles').select('email').eq('id', perfilId).maybeSingle()
-  return (data as { email: string | null } | null)?.email ?? null
+// Email y equipo de quien registró la ampliación (actor_id del movimiento). Si no se
+// encuentra, ambos null: el aviso sale igual, con el nombre que trae el movimiento.
+async function actorDe(db: SupabaseClient, perfilId: string | null, nombre: string): Promise<ActorAviso> {
+  if (!perfilId) return { nombre, email: null, equipo: null }
+  const { data } = await db.from('profiles').select('email, equipos(name)').eq('id', perfilId).maybeSingle()
+  const p = data as { email: string | null; equipos: EquipoRaw } | null
+  return { nombre, email: p?.email ?? null, equipo: nombreEquipo(p?.equipos ?? null) }
 }
 
 export async function alAmpliarHucha(projectId: string, mov: MovimientoAmpliacion): Promise<void> {
@@ -131,7 +140,7 @@ export async function alAmpliarHucha(projectId: string, mov: MovimientoAmpliacio
       await emitirAviso('hucha.ampliacion', {
         proyecto: h.nombre, proyecto_id: h.id, importe: centesimas(Number(mov.amount)), moneda: h.moneda,
         motivo: mov.reason ?? '', referencia: mov.reference, dia: mov.entry_date,
-        actor: { nombre: mov.actor_name, email: await emailDe(db, mov.actor_id) },
+        actor: await actorDe(db, mov.actor_id, mov.actor_name),
         saldo: h.saldo, nivel: h.nivel, managers: h.managers, enlace: enlaceHucha(h.id),
       }, { clave: `hucha.ampliacion:${mov.id}` })
     }

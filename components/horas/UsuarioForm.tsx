@@ -10,15 +10,17 @@ import NativeSelect from '@/components/ui/native-select'
 
 const selectClass = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
-export default function UsuarioForm({ areas, posiciones, allowAdminRole = true }: { areas: AreaRow[]; posiciones: PosicionOpt[]; allowAdminRole?: boolean }) {
-  const [f, setF] = useState<NuevoUsuario>({ full_name: '', email: '', password: '', positionId: '', role: 'operativo', areaIds: [] })
+const VACIO: NuevoUsuario = { full_name: '', email: '', password: '', positionId: '', role: 'operativo', areaIds: [], equipoId: null }
+
+export default function UsuarioForm({ areas, posiciones, equipos, allowAdminRole = true }: { areas: AreaRow[]; posiciones: PosicionOpt[]; equipos: PosicionOpt[]; allowAdminRole?: boolean }) {
+  const [f, setF] = useState<NuevoUsuario>(VACIO)
   const [saving, setSaving] = useState(false)
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault(); setSaving(true)
     const res = await crearUsuario(f); setSaving(false)
     if (!res.ok) { toast.error(res.error); return }
     toast.success('Usuario creado')
-    setF({ full_name: '', email: '', password: '', positionId: '', role: 'operativo', areaIds: [] })
+    setF(VACIO)
   }
   return (
     <form onSubmit={onSubmit} className="max-w-md space-y-3 rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -28,6 +30,12 @@ export default function UsuarioForm({ areas, posiciones, allowAdminRole = true }
       <NativeSelect aria-label="Posición" value={f.positionId} onChange={(e) => setF({ ...f, positionId: e.target.value })} className={selectClass} fullWidth>
         <option value="">— Posición (banco de horas) —</option>
         {posiciones.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </NativeSelect>
+      {/* Equipo de la empresa (0049): opcional y sin relación con la posición ni con las
+          áreas. Solo etiqueta a la persona para que los avisos sepan por dónde enrutar. */}
+      <NativeSelect aria-label="Equipo" value={f.equipoId ?? ''} onChange={(e) => setF({ ...f, equipoId: e.target.value || null })} className={selectClass} fullWidth>
+        <option value="">— Equipo (sin asignar) —</option>
+        {equipos.map((eq) => <option key={eq.id} value={eq.id}>{eq.name}</option>)}
       </NativeSelect>
       <NativeSelect aria-label="Rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as NuevoUsuario['role'] })} className={selectClass} fullWidth>
         <option value="operativo">operativo</option><option value="manager">manager</option>{allowAdminRole && <option value="admin">admin</option>}
