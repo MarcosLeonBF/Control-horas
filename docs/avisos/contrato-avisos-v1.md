@@ -104,18 +104,18 @@ function firmaValida(cabecera, cuerpoCrudo, secreto) {
 **Persona**
 
 ```json
-{ "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" }
+{ "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo" }
 ```
 
 **Manager** (`manager_directo`, `manager_proyecto`, cada elemento de `managers`)
 
 ```json
-{ "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" }
+{ "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" }
 ```
 
 - `manager_directo` es `null` si la persona todavía no tiene manager directo asignado.
 - En `manager_proyecto`, si el nombre que viene del Excel no coincide con ningún usuario,
-  llega `{ "id": null, "nombre": "<nombre del Excel>", "email": null, "equipo": null }`. Si
+  llega `{ "id": null, "nombre": "<nombre del Excel>", "email": null, "equipo": null, "slack_id": null }`. Si
   el proyecto no tiene manager en el Excel, llega `null`.
 
 **`equipo`: a qué parte de la empresa pertenece esa persona**
@@ -135,6 +135,20 @@ el mensaje, quién lo recibe.
 - **No confundir con el `department` de una línea de horas** (`Clientes`, `Ventas`,
   `Marketing`, `Todos`). Son dos listas distintas de la app, y aunque algún nombre coincida
   no significan lo mismo. El `department` no viaja en los avisos.
+
+**`slack_id`: el ID de miembro de Slack de esa persona**
+
+Lo llevan las mismas personas que `equipo` (todas), y también la `persona` de `registro`
+en los avisos de banco. Sirve para mencionarla en un mensaje (`<@U01ABCD2EFG>`) o para
+escribirle por mensaje directo, sin tener que buscarla en Slack por su email.
+
+- Es siempre un ID de **miembro**: empieza por `U` (o `W`) seguido de mayúsculas y dígitos,
+  p. ej. `U01ABCD2EFG`. Nunca un `@usuario` ni un nombre: la plataforma no deja guardar otra
+  cosa.
+- `null` significa *todavía no tiene su ID cargado* (o, en un manager que viene por nombre
+  del Excel, que no se pudo identificar). Al principio llegará `null` en casi todo el mundo:
+  conviene tener un plan B, por ejemplo mencionar por `email` o avisar al canal sin mención.
+- Lo carga Administración a mano en el panel de usuarios.
 
 **Enlaces a un registro** (`enlace_registro`, y `registro.enlace` en los avisos de banco)
 
@@ -185,8 +199,8 @@ total acumulado del día en `horas_dia`. Las ediciones no envían pulso.
   "fecha": "2026-09-14T15:32:10.412Z",
   "prueba": false,
   "datos": {
-    "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" },
-    "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
+    "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo" },
+    "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" },
     "dia": "2026-09-14",
     "horas_registro": 7.5,
     "horas_dia": 7.5,
@@ -225,8 +239,8 @@ persona vuelva a editar ese día.
 {
   "tipo": "registro.llamativo",
   "datos": {
-    "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" },
-    "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
+    "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo" },
+    "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" },
     "dia": "2026-09-14",
     "regla": "dia_largo",
     "valor": 11,
@@ -283,10 +297,10 @@ enlaza el del día más reciente.
     "horas": { "asignadas": 40, "ampliadas": 0, "consumidas": 33.5, "inutilizables": 0, "disponibles": 6.5 },
     "porcentaje_consumido": 83.8,
     "estado_proyecto": "Activo",
-    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
+    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" },
     "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo",
     "registro": {
-      "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" },
+      "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo" },
       "dia": "2026-09-14",
       "enlace": "https://<dominio>/registros/7c2e…"
     }
@@ -321,10 +335,10 @@ Si el proyecto pasa de `consumido` a `excedido` llega un `banco.nivel`, pero no 
     "horas": { "asignadas": 120, "ampliadas": 20, "consumidas": 120, "inutilizables": 0, "disponibles": 0 },
     "porcentaje_consumido": 100,
     "estado_proyecto": "Activo",
-    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
+    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" },
     "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo",
     "registro": {
-      "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" },
+      "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo" },
       "dia": "2026-09-14",
       "enlace": "https://<dominio>/registros/7c2e…"
     }
@@ -370,11 +384,11 @@ activo, el aviso llega igual con esos cuatro campos en `null`. Lo que no depende
     "horas_ampliacion": 20,
     "motivo": "Ampliación aprobada por el cliente",
     "dia": "2026-09-18",
-    "actor": { "nombre": "Marta López", "email": "marta.lopez@ejemplo.com", "equipo": "RRHH" },
+    "actor": { "nombre": "Marta López", "email": "marta.lopez@ejemplo.com", "equipo": "RRHH", "slack_id": "U01MARTA001" },
     "horas": { "asignadas": 180, "ampliadas": 20, "consumidas": 120, "inutilizables": 0, "disponibles": 60 },
     "nivel": "disponible",
     "porcentaje_consumido": 66.7,
-    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
+    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" },
     "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo"
   }
 }
@@ -393,7 +407,7 @@ sincronización la lanza un administrador desde la plataforma).
     "proyecto_id": "e5f6…",
     "presupuesto": 2500,
     "moneda": "EUR",
-    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" } ],
+    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" } ],
     "enlace": "https://<dominio>/presupuestos/e5f6…"
   }
 }
@@ -416,10 +430,10 @@ Cuando se amplía el presupuesto de una HUCHA.
     "motivo": "Ampliación aprobada por el cliente",
     "referencia": "PO-2026-118",
     "dia": "2026-09-14",
-    "actor": { "nombre": "Marta López", "email": "marta.lopez@ejemplo.com", "equipo": "RRHH" },
+    "actor": { "nombre": "Marta López", "email": "marta.lopez@ejemplo.com", "equipo": "RRHH", "slack_id": "U01MARTA001" },
     "saldo": { "asignado": 3000, "consumido": 2450, "disponible": 550 },
     "nivel": "bajo",
-    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" } ],
+    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" } ],
     "enlace": "https://<dominio>/presupuestos/e5f6…"
   }
 }
@@ -443,7 +457,7 @@ empeorar sí.
     "nivel_anterior": "bajo",
     "moneda": "EUR",
     "saldo": { "asignado": 3000, "consumido": 3000, "disponible": 0 },
-    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" } ],
+    "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" } ],
     "enlace": "https://<dominio>/presupuestos/e5f6…"
   }
 }
@@ -484,7 +498,7 @@ salen en `mas_libres` ni en `menos_libres`. `porcentaje_disponible` es lo que fa
       "horas": { "asignadas": 160, "ampliadas": 0, "consumidas": 40, "inutilizables": 12, "disponibles": 108 },
       "porcentaje_consumido": 27,
       "porcentaje_disponible": 73,
-      "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
+      "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" },
       "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo"
     }
   ],
@@ -537,7 +551,7 @@ Diferencias con el de capacidad:
       "nivel": "bajo",
       "porcentaje_consumido": 81.7,
       "porcentaje_disponible": 18.3,
-      "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" } ],
+      "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" } ],
       "enlace": "https://<dominio>/presupuestos/e5f6…"
     }
   ],
@@ -573,8 +587,8 @@ como día registrado.
   "fecha": "2026-09-16",
   "personas": [
     {
-      "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" },
-      "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
+      "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo" },
+      "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" },
       "dias": 2,
       "desde": "2026-09-14",
       "ultimo_registro": "2026-09-11",
@@ -629,3 +643,7 @@ cuatro listas (`con_menos_horas` y `menos_libres` ya llegaban, no es un cambio).
 - `banco.nivel` y `banco.al_tope` traen `registro`: por el registro de quién bajó el
   banco, o `null` si no lo provocó un registro.
 - Ver «Enlaces a un registro» para quién puede abrirlos.
+
+**18/09/2026** · Se añade `slack_id` a todas las personas del payload (las mismas que
+llevan `equipo`, más la `persona` de `registro` en los avisos de banco). Campo nuevo: nada
+de lo anterior cambia. Llegará `null` hasta que Administración cargue los IDs.

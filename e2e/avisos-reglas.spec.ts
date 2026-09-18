@@ -255,7 +255,7 @@ test('rankingCapacidad: rankea HUCHA por el presupuesto disponible', () => {
 // de Graph nunca se come el aviso de una ampliación (decisión de Roberto, 2026-09-18).
 test('datosAmpliacionHoras: con el Excel trae el banco; sin él, null pero el aviso sale', () => {
   const amp = { project: 'P', hours: 20, reason: 'Venta al cliente', entry_date: '2026-09-18' }
-  const actor = { nombre: 'Marta López', email: 'marta@ejemplo.com', equipo: 'RRHH' }
+  const actor = { nombre: 'Marta López', email: 'marta@ejemplo.com', equipo: 'RRHH', slack_id: 'U01MARTA001' }
   const total = nivelesDeBancos(
     [fila({ project: 'P', position: 'CRM', assigned: 100, consumed: 40, remaining: 60, status: 'disponible' })],
     new Map([['P', 20]]),

@@ -1,11 +1,43 @@
 'use server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { normalizarSlackId } from '@/lib/slack-id'
 
 export interface NuevoUsuario {
   full_name: string; email: string; password: string; positionId: string
   role: 'operativo' | 'manager' | 'admin'; areaIds: string[]
   equipoId: string | null // equipo de la empresa (0049); opcional, viaja en los avisos
+  slackId: string // ID de miembro de Slack (0050), tal como se tecleó; '' = sin asignar
+}
+
+type SlackIdResuelto = { ok: true; valor: string | null } | { ok: false; error: string }
+
+// Formato y unicidad del ID de Slack ANTES de escribir nada. La base impone las dos cosas
+// (CHECK + índice único, 0050), pero en el alta el usuario de auth se crea antes que el
+// perfil: si el ID fallara recién ahí, quedaría un usuario creado a medias. `excluir` es
+// la propia persona al editar, que obviamente puede conservar su ID.
+async function resolverSlackId(
+  admin: ReturnType<typeof createAdminClient>, raw: string, excluir?: string,
+): Promise<SlackIdResuelto> {
+  const n = normalizarSlackId(raw)
+  if (!n.ok) {
+    return { ok: false, error: 'El ID de Slack no es válido: es el ID de miembro, empieza por U (p. ej. U01ABCD2EFG), no el @usuario.' }
+  }
+  if (n.valor) {
+    let q = admin.from('profiles').select('full_name').eq('slack_id', n.valor)
+    if (excluir) q = q.neq('id', excluir)
+    const { data, error } = await q.limit(1)
+    if (error) return { ok: false, error: `No se pudo comprobar el ID de Slack: ${error.message}` }
+    if (data?.length) return { ok: false, error: `Ese ID de Slack ya lo tiene ${data[0].full_name || 'otra persona'}.` }
+  }
+  return { ok: true, valor: n.valor }
+}
+
+// Si aun así dos guardados a la vez chocan en el índice único, el mensaje de la base es
+// ininteligible: se traduce.
+function errorPerfil(e: { message: string; code?: string }): string {
+  if (e.code === '23505' && e.message.includes('slack_id')) return 'Ese ID de Slack ya lo tiene otra persona.'
+  return e.message
 }
 
 export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -28,6 +60,9 @@ export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | 
   }
 
   const admin = createAdminClient()
+  const slack = await resolverSlackId(admin, input.slackId)
+  if (!slack.ok) return { ok: false, error: slack.error }
+
   const { data: created, error } = await admin.auth.admin.createUser({
     email: input.email.trim(), password: input.password, email_confirm: true,
     user_metadata: { full_name: input.full_name.trim() },
@@ -37,10 +72,10 @@ export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | 
 
   const { error: profileError } = await admin.from('profiles').update({
     full_name: input.full_name.trim(), email: input.email.trim(), position_id: input.positionId || null,
-    equipo_id: input.equipoId || null,
+    equipo_id: input.equipoId || null, slack_id: slack.valor,
     role: input.role, status: 'activo', created_by: user.id,
   }).eq('id', id)
-  if (profileError) return { ok: false, error: `Usuario creado pero falló su perfil: ${profileError.message}` }
+  if (profileError) return { ok: false, error: `Usuario creado pero falló su perfil: ${errorPerfil(profileError)}` }
 
   // user_areas = visibilidad del manager/admin. El operativo no tiene (registra por su posición).
   const areaIds = input.role === 'operativo' ? [] : input.areaIds
@@ -57,6 +92,7 @@ export interface EdicionUsuario {
   canCreateUsers: boolean
   managerId: string | null // manager directo: a quién escala el recordatorio de días sin registrar
   equipoId: string | null // equipo de la empresa (0049); opcional, viaja en los avisos
+  slackId: string // ID de miembro de Slack (0050), tal como se tecleó; '' = sin asignar
 }
 
 // Panel de usuarios (PDF §8/§19): editar datos + estado activo/inactivo. Solo admin.
@@ -74,6 +110,9 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
   }
 
   const admin = createAdminClient()
+  const slack = await resolverSlackId(admin, input.slackId, id)
+  if (!slack.ok) return { ok: false, error: slack.error }
+
   const patch: Record<string, unknown> = {
     full_name: input.full_name.trim(), position_id: input.positionId || null, role: input.role, status: input.status,
     // Un admin ya puede crear usuarios por rol: el flag delegado se limpia para no dejarlo huérfano.
@@ -81,12 +120,13 @@ export async function actualizarUsuario(id: string, input: EdicionUsuario): Prom
     manager_id: input.managerId || null,
     // El equipo no depende del rol: un admin también pertenece a una parte de la empresa.
     equipo_id: input.equipoId || null,
+    slack_id: slack.valor,
   }
   // Mismo motivo con la ventana ampliada (0043): el admin registra sin límite de fecha,
   // así que ascender a alguien a admin apaga su permiso en vez de dejarlo puesto y mudo.
   if (input.role === 'admin') patch.registro_dias_atras = null
   const { error } = await admin.from('profiles').update(patch).eq('id', id)
-  if (error) return { ok: false, error: error.message }
+  if (error) return { ok: false, error: errorPerfil(error) }
 
   // Reemplaza las áreas de visibilidad (manager/admin). El operativo no tiene user_areas
   // (registra por su posición): si el rol es operativo, se limpian.

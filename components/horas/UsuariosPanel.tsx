@@ -6,6 +6,7 @@ import { CalendarClock, Pencil, Search, Trash2, UserCheck, UserX } from 'lucide-
 import { actualizarUsuario, actualizarDiasRegistro, cambiarEstadoUsuario, eliminarUsuario, type EdicionUsuario } from '@/app/(horas)/admin/usuarios/actions'
 import type { AreaRow } from '@/lib/horas/types'
 import { formatFechaISO } from '@/lib/horas/format'
+import { AYUDA_SLACK_ID } from '@/lib/slack-id'
 import { cn } from '@/lib/utils'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -24,6 +25,7 @@ export interface UsuarioRow {
   registroDiasAtras: number | null // días hacia atrás que puede registrar; null = la ventana por defecto
   managerId: string | null // manager directo; null = sin asignar
   equipoId: string | null // equipo de la empresa (0049); null = sin asignar
+  slackId: string | null // ID de miembro de Slack (0050); null = sin asignar
 }
 
 const fieldSelect = 'h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
@@ -168,7 +170,7 @@ function Editor({ u, areas, posiciones, managers, equipos, onDone }: { u: Usuari
   const router = useRouter()
   const [f, setF] = useState<EdicionUsuario>({
     full_name: u.full_name, positionId: u.positionId ?? '', role: u.role, status: u.status, areaIds: u.areaIds,
-    canCreateUsers: u.canCreateUsers, managerId: u.managerId, equipoId: u.equipoId,
+    canCreateUsers: u.canCreateUsers, managerId: u.managerId, equipoId: u.equipoId, slackId: u.slackId ?? '',
   })
   const [saving, setSaving] = useState(false)
   const selectableAreas = areas.filter((a) => !a.is_internal)
@@ -236,6 +238,17 @@ function Editor({ u, areas, posiciones, managers, equipos, onDone }: { u: Usuari
             <option value="">— Sin equipo —</option>
             {equipos.map((eq) => <option key={eq.id} value={eq.id}>{eq.name}</option>)}
           </NativeSelect>
+        </Field>
+        {/* ID de miembro de Slack (0050): lo usan los avisos automáticos para mencionar a la
+            persona o escribirle por mensaje directo. La ayuda dice dónde encontrarlo, porque
+            lo que la gente suele pegar es el @usuario, que no sirve. */}
+        <Field label="ID de Slack">
+          <Input
+            aria-label="Editar ID de Slack" value={f.slackId} placeholder="U01ABCD2EFG"
+            onChange={(e) => setF({ ...f, slackId: e.target.value })} className="h-9 font-mono"
+            autoComplete="off" spellCheck={false}
+          />
+          <span className="block text-xs text-muted-foreground">{AYUDA_SLACK_ID}</span>
         </Field>
       </div>
 

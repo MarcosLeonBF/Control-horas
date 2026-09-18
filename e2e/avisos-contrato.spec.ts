@@ -24,7 +24,9 @@ test('la prueba de registro.llamativo trae un proyecto y la de ampliación, el e
   expect(l.regla).toBe('proyecto_largo')
   expect(l.proyecto).toBe('Proyecto Ejemplo')
   expect(l.limite).toBe(LIMITE_PROYECTO_HORAS)
-  expect(e['hucha.ampliacion'].actor).toEqual({ nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH' })
+  expect(e['hucha.ampliacion'].actor).toEqual({
+    nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH', slack_id: 'U01MARTA001',
+  })
 })
 
 // Los avisos que nacen de un registro llevan el enlace a ese registro (/registros/<id>),
@@ -40,6 +42,23 @@ test('los avisos de registro y el de nivel de banco enlazan al registro', () => 
     expect(reg?.enlace).toMatch(/^https:\/\/app\.test\/registros\/[0-9a-f-]{36}$/)
     expect(reg?.persona.nombre).toBe('Laura Gómez')
     expect(reg?.dia).toBe('2026-09-14')
+  }
+})
+
+// El ID de Slack (0050) es lo que usan los flujos para mencionar o escribir por mensaje
+// directo. Mismo criterio que el equipo: TODA persona del payload lo lleva, también los
+// managers, el actor de las ampliaciones y la persona del registro en los avisos de banco.
+test('toda persona del payload trae su slack_id', () => {
+  const e = ejemplos('https://app.test')
+  expect(e['registro.enviado'].persona.slack_id).toBe('U01LAURA001')
+  expect(e['registro.enviado'].manager_directo?.slack_id).toBe('U01CARLOS01')
+  expect(e['registro.llamativo'].persona.slack_id).toBe('U01LAURA001')
+  expect(e['banco.nivel'].manager_proyecto?.slack_id).toBe('U01CARLOS01')
+  expect(e['banco.nivel'].registro?.persona.slack_id).toBe('U01LAURA001')
+  expect(e['banco.ampliacion'].actor.slack_id).toBe('U01MARTA001')
+  expect(e['hucha.ampliacion'].actor.slack_id).toBe('U01MARTA001')
+  for (const t of ['hucha.proyecto_nuevo', 'hucha.ampliacion', 'hucha.nivel'] as const) {
+    for (const m of e[t].managers) expect(m).toHaveProperty('slack_id')
   }
 })
 

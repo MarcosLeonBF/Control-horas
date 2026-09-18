@@ -21,7 +21,7 @@ export interface MovimientoAmpliacion {
 }
 
 interface BancoRaw { currency: string | null; assigned_total: number; consumed_total: number; remaining: number; status: string }
-type ManagerRaw = { id: string; full_name: string | null; email: string | null; equipos: EquipoRaw }
+type ManagerRaw = { id: string; full_name: string | null; email: string | null; slack_id: string | null; equipos: EquipoRaw }
 interface HuchaRaw {
   id: string
   name: string
@@ -39,7 +39,7 @@ export interface Hucha {
 }
 
 const SELECT_HUCHA =
-  'id, name, hucha_banks(currency, assigned_total, consumed_total, remaining, status), project_assignments(profiles(id, full_name, email, equipos(name)))'
+  'id, name, hucha_banks(currency, assigned_total, consumed_total, remaining, status), project_assignments(profiles(id, full_name, email, slack_id, equipos(name)))'
 
 // Los E2E siembran en la única base (la de producción) los proyectos «Cliente E2E
 // Asignado» y «Cliente E2E NoAsignado» y managers @hucha.test: ni esos proyectos ni esas
@@ -62,7 +62,9 @@ export async function leerHuchas(db: SupabaseClient, ids?: string[]): Promise<Hu
       .map((a) => a.profiles)
       .filter((pr): pr is ManagerRaw => pr !== null)
       .filter((pr) => !esPersonaDePrueba(pr.email))
-      .map((pr) => ({ id: pr.id, nombre: pr.full_name ?? '', email: pr.email, equipo: nombreEquipo(pr.equipos) }))
+      .map((pr) => ({
+        id: pr.id, nombre: pr.full_name ?? '', email: pr.email, equipo: nombreEquipo(pr.equipos), slack_id: pr.slack_id ?? null,
+      }))
     return [{
       id: p.id, nombre: p.name, moneda: b.currency ?? 'EUR',
       saldo: {

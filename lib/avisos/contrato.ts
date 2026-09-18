@@ -26,9 +26,15 @@ export const DESCRIPCION_TIPO: Record<TipoAviso, string> = {
 // es otra lista y no viaja en los avisos. Va en TODA persona del payload —persona,
 // managers y actor— para que ningún tipo de aviso se quede sin por dónde enrutar.
 // null = esa persona todavía no tiene equipo asignado, o no se pudo resolver quién es.
-export interface PersonaAviso { id: string; nombre: string; email: string; posicion: string | null; equipo: string | null; rol: string }
-export interface ManagerAviso { id: string | null; nombre: string; email: string | null; equipo: string | null }
-export interface ActorAviso { nombre: string; email: string | null; equipo: string | null }
+//
+// `slack_id` es su ID de miembro de Slack (U…, migración 0050), para que los flujos la
+// mencionen (<@U…>) o le escriban por mensaje directo. Mismo criterio que `equipo`: va en
+// toda persona del payload, y null = sin asignar todavía o no se sabe quién es.
+export interface PersonaAviso {
+  id: string; nombre: string; email: string; posicion: string | null; equipo: string | null; slack_id: string | null; rol: string
+}
+export interface ManagerAviso { id: string | null; nombre: string; email: string | null; equipo: string | null; slack_id: string | null }
+export interface ActorAviso { nombre: string; email: string | null; equipo: string | null; slack_id: string | null }
 export interface HorasAviso { asignadas: number; ampliadas: number; consumidas: number; inutilizables: number; disponibles: number }
 export interface SaldoHucha { asignado: number; consumido: number; disponible: number }
 
@@ -97,9 +103,14 @@ export interface DatosPorTipo {
 export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
   const persona: PersonaAviso = {
     id: '00000000-0000-4000-8000-00000000a1b2', nombre: 'Laura Gómez', email: 'laura.gomez@ejemplo.com',
-    posicion: 'SEO Strategist', equipo: 'Clientes', rol: 'operativo',
+    posicion: 'SEO Strategist', equipo: 'Clientes', slack_id: 'U01LAURA001', rol: 'operativo',
   }
-  const manager: ManagerAviso = { id: '00000000-0000-4000-8000-00000000c3d4', nombre: 'Carlos Ruiz', email: 'carlos.ruiz@ejemplo.com', equipo: 'Clientes' }
+  const manager: ManagerAviso = {
+    id: '00000000-0000-4000-8000-00000000c3d4', nombre: 'Carlos Ruiz', email: 'carlos.ruiz@ejemplo.com',
+    equipo: 'Clientes', slack_id: 'U01CARLOS01',
+  }
+  // Quien amplía, en los dos avisos de ampliación (horas y HUCHA).
+  const marta: ActorAviso = { nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH', slack_id: 'U01MARTA001' }
   const proyectoId = '00000000-0000-4000-8000-00000000e5f6'
   const enlaceHucha = `${base}/presupuestos/${proyectoId}`
   // Un id que no existe: en la prueba, el enlace abre «Registro no disponible», que es
@@ -134,7 +145,7 @@ export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
     // `manager_proyecto` puedan llegar en null lo cuenta el contrato, no la prueba.
     'banco.ampliacion': {
       proyecto: 'Proyecto Ejemplo', horas_ampliacion: 20, motivo: 'Ampliación aprobada por el cliente', dia: '2026-09-18',
-      actor: { nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH' },
+      actor: marta,
       horas: { asignadas: 180, ampliadas: 20, consumidas: 120, inutilizables: 0, disponibles: 60 },
       nivel: 'disponible', porcentaje_consumido: 66.7,
       manager_proyecto: manager, enlace: `${base}/bancos/Proyecto%20Ejemplo`,
@@ -145,7 +156,7 @@ export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
     'hucha.ampliacion': {
       proyecto: 'Proyecto Ejemplo', proyecto_id: proyectoId, importe: 500, moneda: 'EUR',
       motivo: 'Ampliación aprobada por el cliente', referencia: 'PO-2026-118', dia: '2026-09-14',
-      actor: { nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH' },
+      actor: marta,
       saldo: { asignado: 3000, consumido: 2450, disponible: 550 }, nivel: 'bajo', managers: [manager], enlace: enlaceHucha,
     },
     'hucha.nivel': {

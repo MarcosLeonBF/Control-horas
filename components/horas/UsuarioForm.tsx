@@ -7,10 +7,11 @@ import type { PosicionOpt } from '@/components/horas/UsuariosPanel'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import NativeSelect from '@/components/ui/native-select'
+import { AYUDA_SLACK_ID } from '@/lib/slack-id'
 
 const selectClass = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
-const VACIO: NuevoUsuario = { full_name: '', email: '', password: '', positionId: '', role: 'operativo', areaIds: [], equipoId: null }
+const VACIO: NuevoUsuario = { full_name: '', email: '', password: '', positionId: '', role: 'operativo', areaIds: [], equipoId: null, slackId: '' }
 
 export default function UsuarioForm({ areas, posiciones, equipos, allowAdminRole = true }: { areas: AreaRow[]; posiciones: PosicionOpt[]; equipos: PosicionOpt[]; allowAdminRole?: boolean }) {
   const [f, setF] = useState<NuevoUsuario>(VACIO)
@@ -37,6 +38,13 @@ export default function UsuarioForm({ areas, posiciones, equipos, allowAdminRole
         <option value="">— Equipo (sin asignar) —</option>
         {equipos.map((eq) => <option key={eq.id} value={eq.id}>{eq.name}</option>)}
       </NativeSelect>
+      {/* ID de miembro de Slack (0050), opcional: los avisos lo usan para mencionar o
+          escribir por mensaje directo. Se puede dejar vacío y cargarlo después. */}
+      <div className="space-y-1">
+        <Input aria-label="ID de Slack" placeholder="ID de Slack (opcional), p. ej. U01ABCD2EFG" value={f.slackId}
+          onChange={(e) => setF({ ...f, slackId: e.target.value })} className="font-mono" autoComplete="off" spellCheck={false} />
+        <p className="text-xs text-muted-foreground">{AYUDA_SLACK_ID}</p>
+      </div>
       <NativeSelect aria-label="Rol" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as NuevoUsuario['role'] })} className={selectClass} fullWidth>
         <option value="operativo">operativo</option><option value="manager">manager</option>{allowAdminRole && <option value="admin">admin</option>}
       </NativeSelect>

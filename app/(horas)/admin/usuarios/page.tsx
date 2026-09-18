@@ -12,6 +12,7 @@ interface RawUsuario {
   registro_dias_atras: number | null
   manager_id: string | null
   equipo_id: string | null
+  slack_id: string | null
   user_areas: { area_id: string }[]
 }
 
@@ -42,13 +43,13 @@ export default async function UsuariosPage() {
   // hubiera usuarios. Una lista vacía y una consulta rota tienen que distinguirse.
   const { data: raw, error: usuariosError } = await admin
     .from('profiles')
-    .select('id, full_name, email, position_id, role, status, can_create_users, registro_dias_atras, manager_id, equipo_id, user_areas(area_id)')
+    .select('id, full_name, email, position_id, role, status, can_create_users, registro_dias_atras, manager_id, equipo_id, slack_id, user_areas(area_id)')
     .order('full_name')
   if (usuariosError) throw new Error(`No se pudo leer la lista de usuarios: ${usuariosError.message}`)
   const usuarios: UsuarioRow[] = ((raw ?? []) as RawUsuario[]).map((u) => ({
     id: u.id, full_name: u.full_name, email: u.email, positionId: u.position_id,
     role: u.role, status: u.status, canCreateUsers: u.can_create_users, areaIds: (u.user_areas ?? []).map((a) => a.area_id),
-    registroDiasAtras: u.registro_dias_atras, managerId: u.manager_id, equipoId: u.equipo_id,
+    registroDiasAtras: u.registro_dias_atras, managerId: u.manager_id, equipoId: u.equipo_id, slackId: u.slack_id,
   }))
 
   // Candidatos a manager directo: managers y admins activos.
