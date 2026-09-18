@@ -2,12 +2,14 @@ import { test, expect } from '@playwright/test'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import {
   resumirPorDia, motivosLlamativo, claveLlamativo, comoNivel, transicion, avisosDeBanco,
-  siguienteIntento, MAX_INTENTOS, textoProyectos, descripcionLlamativo,
+  siguienteIntento, MAX_INTENTOS, textoProyectos, descripcionLlamativo, registroPorProyecto, type Nivel,
 } from '../lib/avisos/reglas'
 import {
   diasSinRegistrar, diasPendientes, laborablesDesde, diaMes, ultimoAntesDe, dentroDePlazo, fechaDeConsulta,
 } from '../lib/avisos/calendario'
-import { nivelesDeBancos, rankingCapacidad, porcentajeConsumido, porcentajeDisponible } from '../lib/avisos/capacidad'
+import {
+  nivelesDeBancos, rankingCapacidad, huchasParaRanking, datosAmpliacionHoras, porcentajeConsumido, porcentajeDisponible,
+} from '../lib/avisos/capacidad'
 import { firmar, construirEnvio } from '../lib/avisos/firma'
 import type { BancoHorasRow } from '../lib/horas/bancos-status'
 
@@ -222,11 +224,92 @@ test('rankingCapacidad: más y menos horas disponibles, y más y menos porcentaj
   const it = (proyecto: string, disponibles: number, pct: number | null) => ({
     proyecto, horas: { asignadas: 0, ampliadas: 0, consumidas: 0, inutilizables: 0, disponibles }, porcentajeConsumido: pct,
   })
-  const r = rankingCapacidad([it('A', 10, 90), it('B', 50, 40), it('C', 30, 10), it('D', 0, null), it('E', -5, 120)], 2)
-  expect(r.conMasHoras.map((x) => x.proyecto)).toEqual(['B', 'C'])
+  const r = rankingCapacidad([it('A', 10, 90), it('B', 50, 40), it('C', 30, 10), it('D', 0, null), it('E', -5, 120)], 2,
+    (x) => x.horas.disponibles)
+  expect(r.conMas.map((x) => x.proyecto)).toEqual(['B', 'C'])
   expect(r.masLibres.map((x) => x.proyecto)).toEqual(['C', 'B'])
-  expect(r.conMenosHoras.map((x) => x.proyecto)).toEqual(['E', 'D'])
+  expect(r.conMenos.map((x) => x.proyecto)).toEqual(['E', 'D'])
   expect(r.menosLibres.map((x) => x.proyecto)).toEqual(['E', 'A']) // sin base (D) no entra en las listas por %
+})
+
+// El mismo ranking sirve para HUCHA: lo único que cambia es qué se entiende por
+// "disponible" (euros en vez de horas). Si alguien vuelve a atar el ranking a
+// `horas.disponibles`, este test deja de compilar.
+test('rankingCapacidad: rankea HUCHA por el presupuesto disponible', () => {
+  const it = (proyecto: string, disponible: number, pct: number | null) => ({
+    proyecto, presupuesto: { asignado: 0, consumido: 0, disponible }, porcentajeConsumido: pct,
+  })
+  const r = rankingCapacidad([it('A', 900, 10), it('B', 50, 95), it('C', 300, 70)], 2, (x) => x.presupuesto.disponible)
+  expect(r.conMas.map((x) => x.proyecto)).toEqual(['A', 'C'])
+  expect(r.conMenos.map((x) => x.proyecto)).toEqual(['B', 'C'])
+  expect(r.masLibres.map((x) => x.proyecto)).toEqual(['A', 'C'])
+  expect(r.menosLibres.map((x) => x.proyecto)).toEqual(['B', 'C'])
+})
+
+// banco.ampliacion: lo que sale de la base (quién, cuánto, por qué) llega siempre; lo que
+// sale del Excel (el estado del banco) llega si Graph respondió, y si no, en null. Un hipo
+// de Graph nunca se come el aviso de una ampliación (decisión de Roberto, 2026-09-18).
+test('datosAmpliacionHoras: con el Excel trae el banco; sin él, null pero el aviso sale', () => {
+  const amp = { project: 'P', hours: 20, reason: 'Venta al cliente', entry_date: '2026-09-18' }
+  const actor = { nombre: 'Marta López', email: 'marta@ejemplo.com', equipo: 'RRHH' }
+  const total = nivelesDeBancos(
+    [fila({ project: 'P', position: 'CRM', assigned: 100, consumed: 40, remaining: 60, status: 'disponible' })],
+    new Map([['P', 20]]),
+  ).find((n) => n.alcance === 'proyecto')
+
+  const con = datosAmpliacionHoras(amp, actor, total, null, 'https://app.test/bancos/P')
+  expect(con.horas_ampliacion).toBe(20)
+  expect(con.horas).toEqual({ asignadas: 120, ampliadas: 20, consumidas: 40, inutilizables: 0, disponibles: 80 })
+  expect(con.nivel).toBe('disponible')
+  expect(con.porcentaje_consumido).toBe(33.3)
+
+  const sin = datosAmpliacionHoras(amp, actor, undefined, null, 'https://app.test/bancos/P')
+  expect(sin.horas).toBeNull()
+  expect(sin.nivel).toBeNull()
+  expect(sin.porcentaje_consumido).toBeNull()
+  // Lo que no depende del Excel sigue ahí.
+  expect(sin).toMatchObject({
+    proyecto: 'P', horas_ampliacion: 20, motivo: 'Venta al cliente', dia: '2026-09-18', actor,
+    enlace: 'https://app.test/bancos/P',
+  })
+})
+
+test('huchasParaRanking: fuera las que no tienen presupuesto; % sobre el asignado', () => {
+  const h = (id: string, asignado: number, consumido: number, nivel: Nivel | null) => ({
+    id, saldo: { asignado, consumido, disponible: asignado - consumido }, nivel,
+  })
+  const r = huchasParaRanking([
+    h('ok', 3000, 2450, 'bajo'),
+    h('sin', 0, 0, null), // sin_presupuesto: nada que rankear
+    h('pasada', 1000, 1200, 'excedido'),
+  ])
+  expect(r.map((x) => x.id)).toEqual(['ok', 'pasada'])
+  // El asignado de HUCHA ya incluye las ampliaciones (lo suma el ledger), así que no
+  // hay que sumarlas aparte como en el banco de horas.
+  expect(r[0].porcentajeConsumido).toBe(81.7)
+  expect(r[1].porcentajeConsumido).toBe(120)
+})
+
+// banco.nivel enlaza el registro que lo hizo caer. Un guardado puede partirse en varios
+// registros (uno por día), y un mismo proyecto puede aparecer en varios: se enlaza el del
+// día más reciente. Departamento no tiene banco, así que no entra.
+test('registroPorProyecto: el registro del día más reciente de cada proyecto', () => {
+  const lineas = [
+    { entry_date: '2026-09-16', project: 'A' },
+    { entry_date: '2026-09-18', project: 'A' },
+    { entry_date: '2026-09-16', project: ' B ' },
+    { entry_date: '2026-09-18', project: 'Departamento' },
+  ]
+  const logPorDia = new Map([['2026-09-16', 'log-16'], ['2026-09-18', 'log-18']])
+  const r = registroPorProyecto(lineas, logPorDia)
+  expect(r.get('A')).toEqual({ id: 'log-18', dia: '2026-09-18' })
+  expect(r.get('B')).toEqual({ id: 'log-16', dia: '2026-09-16' }) // el nombre se recorta, como en el detector
+  expect(r.has('Departamento')).toBe(false)
+})
+
+test('registroPorProyecto: un día sin registro resuelto no inventa uno', () => {
+  const r = registroPorProyecto([{ entry_date: '2026-09-18', project: 'A' }], new Map())
+  expect(r.has('A')).toBe(false)
 })
 
 // --- firma -----------------------------------------------------------------

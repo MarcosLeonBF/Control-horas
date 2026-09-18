@@ -14,5 +14,7 @@ test('logout redirige a login y bloquea el área', async ({ page, context }) => 
   await expect(page).toHaveURL(/\/login$/)
   await context.clearCookies()
   await page.goto('/presupuestos')
-  await expect(page).toHaveURL(/\/login$/)
+  // Sin sesión va al login recordando a dónde iba, para volver ahí al entrar (es lo que
+  // hace útiles los enlaces que llegan por Slack).
+  await expect(page).toHaveURL(/\/login\?next=%2Fpresupuestos$/)
 })

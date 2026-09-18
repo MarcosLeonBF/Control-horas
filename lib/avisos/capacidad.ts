@@ -2,6 +2,7 @@
 // Puro, sin IO: parte de las filas de getBancosHoras y de las ampliaciones activas.
 import { computeHorasStatus, type BancoHorasRow } from '@/lib/horas/bancos-status'
 import { centesimas, comoNivel, type Nivel } from '@/lib/avisos/reglas'
+import type { ActorAviso, DatosBancoAmpliacion, ManagerAviso } from '@/lib/avisos/contrato'
 
 export interface HorasBanco {
   asignadas: number
@@ -79,22 +80,57 @@ export function nivelesDeBancos(rows: BancoHorasRow[], ampliadas: Map<string, nu
   return out
 }
 
+// Una ampliación de horas tal como quedó guardada (horas_ampliaciones, migración 0014).
+export interface AmpliacionHoras { project: string; hours: number; reason: string; entry_date: string }
+
+// Datos de banco.ampliacion. `total` es el banco del proyecto tras ampliar (nivelesDeBancos,
+// alcance 'proyecto'); llega undefined si el Excel no respondió, y entonces horas, nivel y
+// porcentaje van a null en vez de perder el aviso. Lo que viene de la base sale siempre.
+export function datosAmpliacionHoras(
+  amp: AmpliacionHoras, actor: ActorAviso, total: NivelBanco | undefined,
+  manager: ManagerAviso | null, enlace: string,
+): DatosBancoAmpliacion {
+  return {
+    proyecto: amp.project, horas_ampliacion: centesimas(Number(amp.hours)), motivo: amp.reason, dia: amp.entry_date, actor,
+    horas: total?.horas ?? null, nivel: total?.nivel ?? null, porcentaje_consumido: total?.porcentajeConsumido ?? null,
+    manager_proyecto: manager, enlace,
+  }
+}
+
 // Lo que queda hasta 100 del porcentaje consumido, con un decimal (negativo si se excedió).
 export function porcentajeDisponible(consumido: number | null): number | null {
   return consumido === null ? null : Math.round((100 - consumido) * 10) / 10
 }
 
-// Arriba y abajo por horas disponibles y por porcentaje disponible. Las listas por
+// Arriba y abajo por lo disponible y por porcentaje disponible. Las listas por
 // porcentaje dejan fuera los proyectos sin base (porcentaje null).
-export function rankingCapacidad<T extends { horas: HorasBanco; porcentajeConsumido: number | null }>(
-  items: T[], top: number,
-): { conMasHoras: T[]; masLibres: T[]; conMenosHoras: T[]; menosLibres: T[] } {
+//
+// Qué es "lo disponible" lo decide quien llama: horas en el banco de horas, euros en la
+// HUCHA. Por eso las claves son neutras (conMas, no conMasHoras) y cada consulta las
+// traduce a sus nombres del contrato. Así las cuatro listas y sus criterios viven en un
+// solo sitio, y los dos resúmenes no pueden desalinearse.
+export function rankingCapacidad<T extends { porcentajeConsumido: number | null }>(
+  items: T[], top: number, disponible: (i: T) => number,
+): { conMas: T[]; masLibres: T[]; conMenos: T[]; menosLibres: T[] } {
   const conPorcentaje = items.filter((i) => i.porcentajeConsumido !== null)
   const pct = (i: T) => i.porcentajeConsumido as number
   return {
-    conMasHoras: [...items].sort((a, b) => b.horas.disponibles - a.horas.disponibles).slice(0, top),
+    conMas: [...items].sort((a, b) => disponible(b) - disponible(a)).slice(0, top),
     masLibres: [...conPorcentaje].sort((a, b) => pct(a) - pct(b)).slice(0, top),
-    conMenosHoras: [...items].sort((a, b) => a.horas.disponibles - b.horas.disponibles).slice(0, top),
+    conMenos: [...items].sort((a, b) => disponible(a) - disponible(b)).slice(0, top),
     menosLibres: [...conPorcentaje].sort((a, b) => pct(b) - pct(a)).slice(0, top),
   }
+}
+
+// HUCHAs listas para el ranking. Las que no tienen nivel (sin_presupuesto: ni asignado ni
+// consumido) no entran, igual que nivelesDeBancos deja fuera los bancos sin nivel: no hay
+// nada que rankear. El porcentaje es sobre el asignado a secas: en HUCHA el asignado YA
+// incluye las ampliaciones (las suma el ledger al registrarlas) y no hay corte 75/25 de
+// cierre de mes, así que no existen ni `ampliadas` aparte ni `inutilizables`.
+export function huchasParaRanking<T extends { nivel: Nivel | null; saldo: { asignado: number; consumido: number } }>(
+  huchas: T[],
+): (T & { nivel: Nivel; porcentajeConsumido: number | null })[] {
+  return huchas
+    .filter((h): h is T & { nivel: Nivel } => h.nivel !== null)
+    .map((h) => ({ ...h, porcentajeConsumido: porcentajeConsumido(h.saldo.asignado, h.saldo.consumido) }))
 }

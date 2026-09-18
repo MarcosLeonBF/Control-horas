@@ -5,18 +5,19 @@ import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { addDiasISO } from '@/lib/horas/auditoria-types'
 import { DIAS_REGISTRO_POR_DEFECTO } from '@/lib/horas/ventana-registro'
 import { nivelesActuales } from '@/lib/avisos/detector-bancos'
-import { rankingCapacidad, porcentajeDisponible, type NivelBanco } from '@/lib/avisos/capacidad'
+import { leerHuchas } from '@/lib/avisos/detector-hucha'
+import { rankingCapacidad, huchasParaRanking, porcentajeDisponible, type NivelBanco } from '@/lib/avisos/capacidad'
 import { perfilesPorId, managerDe, managerPorNombre, type Perfil } from '@/lib/avisos/personas'
 import {
   diasSinRegistrar, diasPendientes, laborablesDesde, diaMes, ultimoAntesDe, dentroDePlazo, TOPE_DIAS,
 } from '@/lib/avisos/calendario'
-import { enlaceBanco, esPersonaDePrueba } from '@/lib/avisos/entorno'
+import { enlaceBanco, enlaceHucha, esPersonaDePrueba } from '@/lib/avisos/entorno'
 import type { ManagerAviso, PersonaAviso } from '@/lib/avisos/contrato'
 
 export async function resumenCapacidad(top: number) {
   const db = createAdminClient()
   const [niveles, perfiles] = await Promise.all([nivelesActuales(db), perfilesPorId(db)])
-  const r = rankingCapacidad(niveles.filter((n) => n.alcance === 'proyecto'), top)
+  const r = rankingCapacidad(niveles.filter((n) => n.alcance === 'proyecto'), top, (n) => n.horas.disponibles)
   const item = (n: NivelBanco) => ({
     proyecto: n.proyecto, horas: n.horas, porcentaje_consumido: n.porcentajeConsumido,
     porcentaje_disponible: porcentajeDisponible(n.porcentajeConsumido),
@@ -24,8 +25,32 @@ export async function resumenCapacidad(top: number) {
   })
   return {
     generado: new Date().toISOString(), top,
-    con_mas_horas: r.conMasHoras.map(item), mas_libres: r.masLibres.map(item),
-    con_menos_horas: r.conMenosHoras.map(item), menos_libres: r.menosLibres.map(item),
+    con_mas_horas: r.conMas.map(item), mas_libres: r.masLibres.map(item),
+    con_menos_horas: r.conMenos.map(item), menos_libres: r.menosLibres.map(item),
+  }
+}
+
+// El mismo resumen sobre la HUCHA (presupuesto en euros) en vez del banco de horas.
+// Mismas cuatro listas y mismos criterios (rankingCapacidad); lo que cambia es la fuente
+// —leerHuchas, que ya filtra activos y proyectos E2E— y los nombres del contrato.
+//
+// A diferencia del de capacidad, este NO depende del Excel de SharePoint: todo sale de
+// la base (hucha_banks), así que una caída de Graph no lo tumba.
+export async function resumenHucha(top: number) {
+  const db = createAdminClient()
+  const huchas = huchasParaRanking(await leerHuchas(db))
+  const r = rankingCapacidad(huchas, top, (h) => h.saldo.disponible)
+  const item = (h: (typeof huchas)[number]) => ({
+    proyecto: h.nombre, proyecto_id: h.id,
+    presupuesto: h.saldo, moneda: h.moneda, nivel: h.nivel,
+    porcentaje_consumido: h.porcentajeConsumido,
+    porcentaje_disponible: porcentajeDisponible(h.porcentajeConsumido),
+    managers: h.managers, enlace: enlaceHucha(h.id),
+  })
+  return {
+    generado: new Date().toISOString(), top,
+    con_mas_presupuesto: r.conMas.map(item), mas_libres: r.masLibres.map(item),
+    con_menos_presupuesto: r.conMenos.map(item), menos_libres: r.menosLibres.map(item),
   }
 }
 

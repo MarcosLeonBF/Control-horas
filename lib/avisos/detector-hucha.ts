@@ -7,7 +7,8 @@ import { emitirAviso } from '@/lib/avisos/bandeja'
 import { esProduccion, esPersonaDePrueba, enlaceHucha } from '@/lib/avisos/entorno'
 import { transicion, comoNivel, centesimas, type Nivel } from '@/lib/avisos/reglas'
 import { leerEstados, guardarEstados } from '@/lib/avisos/estado'
-import type { ActorAviso, ManagerAviso, SaldoHucha } from '@/lib/avisos/contrato'
+import { actorDe, nombreEquipo, type EquipoRaw } from '@/lib/avisos/personas'
+import type { ManagerAviso, SaldoHucha } from '@/lib/avisos/contrato'
 
 export interface MovimientoAmpliacion {
   id: string
@@ -20,9 +21,6 @@ export interface MovimientoAmpliacion {
 }
 
 interface BancoRaw { currency: string | null; assigned_total: number; consumed_total: number; remaining: number; status: string }
-// El equipo (0049) llega anidado dos niveles y, como todo join de PostgREST, puede venir
-// como objeto o como array de uno: se normaliza al mapear.
-type EquipoRaw = { name: string } | { name: string }[] | null
 type ManagerRaw = { id: string; full_name: string | null; email: string | null; equipos: EquipoRaw }
 interface HuchaRaw {
   id: string
@@ -31,11 +29,7 @@ interface HuchaRaw {
   project_assignments: { profiles: ManagerRaw | null }[] | null
 }
 
-function nombreEquipo(e: EquipoRaw): string | null {
-  return (Array.isArray(e) ? e[0] : e)?.name ?? null
-}
-
-interface Hucha {
+export interface Hucha {
   id: string
   nombre: string
   moneda: string
@@ -53,7 +47,9 @@ const SELECT_HUCHA =
 const PROYECTO_E2E = /\be2e\b/i
 
 // Proyectos activos con su banco y sus managers (project_assignments), sin los de los E2E.
-async function leerHuchas(db: SupabaseClient, ids?: string[]): Promise<Hucha[]> {
+// También la usa el resumen de HUCHA (consultas.ts), igual que nivelesActuales sirve al de
+// capacidad: así el ranking y los avisos ven exactamente los mismos proyectos.
+export async function leerHuchas(db: SupabaseClient, ids?: string[]): Promise<Hucha[]> {
   let q = db.from('projects').select(SELECT_HUCHA).eq('status', 'activo')
   if (ids) q = q.in('id', ids)
   const { data, error } = await q
@@ -120,15 +116,6 @@ export async function evaluarHucha(ids?: string[]): Promise<void> {
   } catch (e) {
     console.error('[avisos] evaluarHucha:', e instanceof Error ? e.message : e)
   }
-}
-
-// Email y equipo de quien registró la ampliación (actor_id del movimiento). Si no se
-// encuentra, ambos null: el aviso sale igual, con el nombre que trae el movimiento.
-async function actorDe(db: SupabaseClient, perfilId: string | null, nombre: string): Promise<ActorAviso> {
-  if (!perfilId) return { nombre, email: null, equipo: null }
-  const { data } = await db.from('profiles').select('email, equipos(name)').eq('id', perfilId).maybeSingle()
-  const p = data as { email: string | null; equipos: EquipoRaw } | null
-  return { nombre, email: p?.email ?? null, equipo: nombreEquipo(p?.equipos ?? null) }
 }
 
 export async function alAmpliarHucha(projectId: string, mov: MovimientoAmpliacion): Promise<void> {

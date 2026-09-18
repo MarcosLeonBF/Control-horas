@@ -121,8 +121,9 @@ function firmaValida(cabecera, cuerpoCrudo, secreto) {
 **`equipo`: a qué parte de la empresa pertenece esa persona**
 
 Lo llevan **todas** las personas del payload: `persona`, `manager_directo`,
-`manager_proyecto`, cada elemento de `managers` y el `actor` de `hucha.ampliacion`. Es el
-campo pensado para enrutar: a qué canal va el mensaje, quién lo recibe.
+`manager_proyecto`, cada elemento de `managers` y el `actor` de las ampliaciones
+(`hucha.ampliacion` y `banco.ampliacion`). Es el campo pensado para enrutar: a qué canal va
+el mensaje, quién lo recibe.
 
 - Valores: los que haya dados de alta en la app. Hoy `"Clientes"` y `"RRHH"`; **la lista
   crece**, así que conviene tratarla como abierta y tener una rama por defecto.
@@ -134,6 +135,19 @@ campo pensado para enrutar: a qué canal va el mensaje, quién lo recibe.
 - **No confundir con el `department` de una línea de horas** (`Clientes`, `Ventas`,
   `Marketing`, `Todos`). Son dos listas distintas de la app, y aunque algún nombre coincida
   no significan lo mismo. El `department` no viaja en los avisos.
+
+**Enlaces a un registro** (`enlace_registro`, y `registro.enlace` en los avisos de banco)
+
+Llevan a `https://<dominio>/registros/<id>`: la ficha de solo lectura de un registro
+diario, con sus líneas (proyecto, área o departamento, etapa, horas y descripción).
+
+- **Hace falta sesión.** Quien lo abra sin haber entrado pasa por el login y, al entrar,
+  vuelve a ese registro.
+- **Lo ve quien ya podía verlo en la plataforma:** la persona que lo hizo, su manager y
+  Administración. Cualquier otra persona ve «Registro no disponible», igual que si no
+  existiera. Tenlo en cuenta al elegir a quién le llega el mensaje con el enlace.
+- **Enseña el registro como está ahora.** Si se editó o se anuló después del aviso, se ve
+  el cambio (y los anulados lo indican).
 
 **Niveles de un banco o de una HUCHA**
 
@@ -161,6 +175,7 @@ total acumulado del día en `horas_dia`. Las ediciones no envían pulso.
 | `horas_dia` | Total del día (si ha hecho varios registros ese día, los suma) |
 | `proyectos` | Reparto de este registro por proyecto |
 | `proyectos_texto` | El mismo reparto en una línea, listo para un mensaje |
+| `enlace_registro` | Enlace a este registro en la plataforma (ver «Enlaces a un registro») |
 
 ```json
 {
@@ -179,7 +194,8 @@ total acumulado del día en `horas_dia`. Las ediciones no envían pulso.
       { "proyecto": "Proyecto Ejemplo", "horas": 5 },
       { "proyecto": "Departamento", "horas": 2.5 }
     ],
-    "proyectos_texto": "Proyecto Ejemplo (5 h), Departamento (2,5 h)"
+    "proyectos_texto": "Proyecto Ejemplo (5 h), Departamento (2,5 h)",
+    "enlace_registro": "https://<dominio>/registros/7c2e…"
   }
 }
 ```
@@ -203,6 +219,7 @@ persona vuelva a editar ese día.
 | `proyecto` | El proyecto en `proyecto_largo`; `null` en `dia_largo` |
 | `horas_dia` | Total del día |
 | `descripcion` | Frase lista para un mensaje |
+| `enlace_registro` | Enlace al registro que hizo llamativo el día. El día puede tener otros registros: `horas_dia` los suma todos |
 
 ```json
 {
@@ -216,7 +233,8 @@ persona vuelva a editar ese día.
     "limite": 10,
     "proyecto": null,
     "horas_dia": 11,
-    "descripcion": "11 h registradas el 14/09 (límite: 10 h)"
+    "descripcion": "11 h registradas el 14/09 (límite: 10 h)",
+    "enlace_registro": "https://<dominio>/registros/7c2e…"
   }
 }
 ```
@@ -245,6 +263,13 @@ nivel (pasa a `bajo`, `consumido` o `excedido`). Solo proyectos activos. Si el b
 | `estado_proyecto` | Estado en el Excel (`Activo`) |
 | `manager_proyecto` | Manager del proyecto según el Excel |
 | `enlace` | Ficha del banco en la plataforma |
+| `registro` | El registro que hizo caer el banco: `{ persona, dia, enlace }`, o `null` |
+
+`registro` dice **por el registro de quién** bajó el banco: la `persona` (mismo objeto que
+en todos los avisos), el `dia` del registro y el `enlace` para abrirlo. Llega en `null`
+cuando la caída no la provocó un registro: la revisión diaria, una sincronización del
+Excel o anular una ampliación. Si un mismo guardado tocó el proyecto en varios días, se
+enlaza el del día más reciente.
 
 ```json
 {
@@ -259,7 +284,12 @@ nivel (pasa a `bajo`, `consumido` o `excedido`). Solo proyectos activos. Si el b
     "porcentaje_consumido": 83.8,
     "estado_proyecto": "Activo",
     "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
-    "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo"
+    "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo",
+    "registro": {
+      "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "rol": "operativo" },
+      "dia": "2026-09-14",
+      "enlace": "https://<dominio>/registros/7c2e…"
+    }
   }
 }
 ```
@@ -291,6 +321,54 @@ Si el proyecto pasa de `consumido` a `excedido` llega un `banco.nivel`, pero no 
     "horas": { "asignadas": 120, "ampliadas": 20, "consumidas": 120, "inutilizables": 0, "disponibles": 0 },
     "porcentaje_consumido": 100,
     "estado_proyecto": "Activo",
+    "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
+    "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo",
+    "registro": null
+  }
+}
+```
+
+(Aquí `registro` es `null` para enseñar ese caso: el tope llegó en la revisión diaria. Si
+lo provoca un registro, trae el mismo objeto que en `banco.nivel`.)
+
+### `banco.ampliacion`
+
+Cuando alguien amplía las horas del banco de un proyecto. Es el equivalente en horas de
+`hucha.ampliacion`. Solo avisa al ampliar: anular una ampliación no envía nada.
+
+| Campo | Qué es |
+|---|---|
+| `proyecto` | Nombre del proyecto |
+| `horas_ampliacion` | Horas de **esta** ampliación |
+| `motivo` | El motivo que se escribió al ampliar |
+| `dia` | Día de la ampliación (`YYYY-MM-DD`) |
+| `actor` | Quien amplió: `{ nombre, email, equipo }` |
+| `horas` | El banco del proyecto **después** de ampliar (mismo objeto que en `banco.nivel`) |
+| `nivel` | Nivel del banco después de ampliar |
+| `porcentaje_consumido` | Sobre la base efectiva, igual que en `banco.nivel` |
+| `manager_proyecto` | Manager del proyecto según el Excel |
+| `enlace` | Enlace al banco del proyecto |
+
+No confundir `horas_ampliacion` (lo que se sumó ahora) con `horas.ampliadas` (el total
+ampliado del proyecto, esta incluida).
+
+**`horas`, `nivel`, `porcentaje_consumido` y `manager_proyecto` pueden llegar en `null`.**
+Salen del Excel de SharePoint: si en ese momento no responde, o si el proyecto no está
+activo, el aviso llega igual con esos cuatro campos en `null`. Lo que no depende del Excel
+(proyecto, horas de la ampliación, motivo, día, quién la hizo y el enlace) llega siempre.
+
+```json
+{
+  "tipo": "banco.ampliacion",
+  "datos": {
+    "proyecto": "Proyecto Ejemplo",
+    "horas_ampliacion": 20,
+    "motivo": "Ampliación aprobada por el cliente",
+    "dia": "2026-09-18",
+    "actor": { "nombre": "Marta López", "email": "marta.lopez@ejemplo.com", "equipo": "RRHH" },
+    "horas": { "asignadas": 180, "ampliadas": 20, "consumidas": 120, "inutilizables": 0, "disponibles": 60 },
+    "nivel": "disponible",
+    "porcentaje_consumido": 66.7,
     "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
     "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo"
   }
@@ -378,14 +456,17 @@ GET https://<dominio>/api/avisos/v1/resumen-capacidad?top=10
 ```
 
 Pensado para el resumen quincenal. `top` va de 1 a 50 (por defecto, 10). Solo proyectos
-activos.
+activos. Cuatro listas, cada una con hasta `top` proyectos:
 
-- `con_mas_horas`: los proyectos con más horas disponibles.
-- `mas_libres`: los proyectos con menos porcentaje consumido.
+- `con_mas_horas`: los que tienen más horas disponibles.
+- `mas_libres`: los que llevan menos porcentaje consumido.
+- `con_menos_horas`: los que tienen menos horas disponibles (primero los que se pasaron).
+- `menos_libres`: los que llevan más porcentaje consumido.
 
 `porcentaje_consumido` es `null` cuando el proyecto no tiene base efectiva: no le quedan
 horas asignadas después del corte del cierre de mes (reparto 75/25). Esos proyectos no
-salen en `mas_libres`.
+salen en `mas_libres` ni en `menos_libres`. `porcentaje_disponible` es lo que falta hasta
+100 (negativo si se pasó), o `null` en el mismo caso.
 
 ```json
 {
@@ -396,11 +477,65 @@ salen en `mas_libres`.
       "proyecto": "Proyecto Ejemplo",
       "horas": { "asignadas": 160, "ampliadas": 0, "consumidas": 40, "inutilizables": 12, "disponibles": 108 },
       "porcentaje_consumido": 27,
+      "porcentaje_disponible": 73,
       "manager_proyecto": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" },
       "enlace": "https://<dominio>/bancos/Proyecto%20Ejemplo"
     }
   ],
-  "mas_libres": [ ]
+  "mas_libres": [ ],
+  "con_menos_horas": [ ],
+  "menos_libres": [ ]
+}
+```
+
+### Resumen de HUCHA
+
+```
+GET https://<dominio>/api/avisos/v1/resumen-hucha?top=10
+```
+
+El mismo resumen que el de capacidad, pero del **presupuesto de HUCHA** (dinero) en vez
+del banco de horas. Mismas reglas: `top` de 1 a 50 (por defecto, 10), solo proyectos
+activos, y las mismas cuatro listas con los mismos criterios:
+
+- `con_mas_presupuesto`: los que tienen más presupuesto disponible.
+- `mas_libres`: los que llevan menos porcentaje consumido.
+- `con_menos_presupuesto`: los que tienen menos presupuesto disponible (primero los que
+  se pasaron).
+- `menos_libres`: los que llevan más porcentaje consumido.
+
+Diferencias con el de capacidad:
+
+- `presupuesto` es el mismo objeto `{ asignado, consumido, disponible }` que llega como
+  `saldo` en los avisos `hucha.*`. El `asignado` ya incluye las ampliaciones, así que no
+  hay campo `ampliadas` aparte.
+- No salen los proyectos sin presupuesto (sin nada asignado ni consumido).
+- Los responsables vienen en `managers` (una lista, como en los avisos `hucha.*`), no en
+  `manager_proyecto`. Puede llegar vacía si el proyecto no tiene managers asignados.
+- `porcentaje_consumido` es `null` si el proyecto no tiene nada asignado pero sí algo
+  gastado. Esos no salen en `mas_libres` ni en `menos_libres`.
+- No depende del Excel de SharePoint: todo sale de la base de la plataforma.
+
+```json
+{
+  "generado": "2026-09-18T07:00:01.502Z",
+  "top": 10,
+  "con_mas_presupuesto": [
+    {
+      "proyecto": "Proyecto Ejemplo",
+      "proyecto_id": "e5f6…",
+      "presupuesto": { "asignado": 3000, "consumido": 2450, "disponible": 550 },
+      "moneda": "EUR",
+      "nivel": "bajo",
+      "porcentaje_consumido": 81.7,
+      "porcentaje_disponible": 18.3,
+      "managers": [ { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes" } ],
+      "enlace": "https://<dominio>/presupuestos/e5f6…"
+    }
+  ],
+  "mas_libres": [ ],
+  "con_menos_presupuesto": [ ],
+  "menos_libres": [ ]
 }
 ```
 
@@ -464,3 +599,21 @@ algún día hay que cambiar o quitar un campo, saldrá como `version: 2` y se av
 Sigue siendo `version: 1`: es un campo nuevo y nada de lo anterior cambia, así que los
 flujos que ya funcionan siguen funcionando sin tocar nada. Al principio llegará `null` en
 casi todo el mundo, hasta que Administración termine de asignar los equipos.
+
+**18/09/2026** · Dos cosas nuevas, ninguna cambia lo que ya existe:
+
+- Aviso nuevo **`banco.ampliacion`**: cuando se amplían las horas del banco de un
+  proyecto. Llega **apagado**: hay que activarlo en Administración → Avisos, y ya tiene su
+  «Enviar prueba».
+- Consulta nueva **`resumen-hucha`**: el resumen de capacidad, pero del presupuesto de
+  HUCHA.
+
+De paso se completa la sección del resumen de capacidad, que solo nombraba dos de sus
+cuatro listas (`con_menos_horas` y `menos_libres` ya llegaban, no es un cambio).
+
+**18/09/2026** · Enlaces al registro, campos nuevos sin cambiar nada de lo anterior:
+
+- `registro.enviado` y `registro.llamativo` traen `enlace_registro`.
+- `banco.nivel` y `banco.al_tope` traen `registro`: por el registro de quién bajó el
+  banco, o `null` si no lo provocó un registro.
+- Ver «Enlaces a un registro» para quién puede abrirlos.

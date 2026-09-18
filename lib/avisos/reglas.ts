@@ -94,6 +94,25 @@ export function avisosDeBanco(t: Transicion, alcance: 'posicion' | 'proyecto'): 
   return t.alTope && alcance === 'proyecto' ? ['banco.nivel', 'banco.al_tope'] : ['banco.nivel']
 }
 
+// Qué registro enlazar en el aviso de banco de cada proyecto que tocó un guardado. Un
+// guardado se parte en un registro por día (guardar_registro), y un proyecto puede estar en
+// varios: se enlaza el del día más reciente. `logPorDia` son los registros de ESTE guardado;
+// un día que no esté ahí no se inventa. Departamento no tiene banco, así que no entra.
+export function registroPorProyecto(
+  lineas: { entry_date: string; project: string }[], logPorDia: Map<string, string>,
+): Map<string, { id: string; dia: string }> {
+  const out = new Map<string, { id: string; dia: string }>()
+  for (const l of lineas) {
+    const proyecto = l.project.trim()
+    const id = logPorDia.get(l.entry_date)
+    if (proyecto === 'Departamento' || !id) continue
+    const previo = out.get(proyecto)
+    // Fechas ISO (AAAA-MM-DD): el orden de texto es el orden de fechas.
+    if (!previo || l.entry_date > previo.dia) out.set(proyecto, { id, dia: l.entry_date })
+  }
+  return out
+}
+
 // --- Reintentos --------------------------------------------------------------
 
 export const MAX_INTENTOS = 5

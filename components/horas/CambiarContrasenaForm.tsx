@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
-export default function CambiarContrasenaForm({ forced }: { forced?: boolean }) {
+export default function CambiarContrasenaForm() {
   const router = useRouter()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -33,13 +33,11 @@ export default function CambiarContrasenaForm({ forced }: { forced?: boolean }) 
     if (!res.ok) { toast.error(res.error); return }
     toast.success('Contraseña actualizada correctamente.')
     setCurrentPassword(''); setNewPassword(''); setConfirmPassword('')
-    if (forced) {
-      // Tras cambiar, redirigir a la app
-      router.push('/registrar')
-      router.refresh()
-    } else {
-      router.refresh()
-    }
+    // Forzado o no, se queda en la página actual. El cambio forzado (ForcePasswordGate) se
+    // pinta EN la URL a la que iba la persona, así que refrescar la deja justo ahí: si
+    // entraba por el enlace de un registro que llegó por Slack, llega al registro. Antes
+    // mandaba siempre a /registrar y ese destino se perdía en el primer inicio de sesión.
+    router.refresh()
   }
 
   return (

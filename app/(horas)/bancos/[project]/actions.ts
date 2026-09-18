@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { trasResponder } from '@/lib/avisos/tras-responder'
-import { evaluarBancos } from '@/lib/avisos/detector-bancos'
+import { alAmpliarHoras, evaluarBancos } from '@/lib/avisos/detector-bancos'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -12,15 +12,16 @@ export async function ampliarHoras(
   input: { hours: number; reason: string; entry_date: string },
 ): Promise<Result> {
   const supabase = await createClient()
-  const { error } = await supabase.rpc('ampliar_horas', {
+  const { data: ampliacionId, error } = await supabase.rpc('ampliar_horas', {
     p_project: project,
     p_hours: input.hours,
     p_reason: input.reason,
     p_entry_date: input.entry_date,
   })
   if (error) return { ok: false, error: error.message }
-  // Una ampliación mejora el banco: se rearma para avisar otra vez si vuelve a caer.
-  trasResponder(() => evaluarBancos([project]))
+  // Avisa de la ampliación (banco.ampliacion) y rearma el banco, que ha mejorado, para
+  // avisar otra vez si vuelve a caer. El id que devuelve el RPC es la clave anti-duplicados.
+  trasResponder(() => alAmpliarHoras(ampliacionId as string, project))
   revalidatePath(`/bancos/${encodeURIComponent(project)}`)
   revalidatePath('/bancos')
   return { ok: true }

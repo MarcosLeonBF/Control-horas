@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { rutaInternaSegura } from '@/lib/ruta-segura'
 
 const underline = cn(
   'h-11 rounded-none border-0 border-b border-border bg-transparent px-0 text-sm',
@@ -40,7 +41,12 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/')
+    // Vuelve a donde iba antes de pedirle sesión (el proxy lo deja en `next`), p. ej. el
+    // registro de un aviso de Slack. Se lee aquí, al enviar, y no con useSearchParams, que
+    // en esta página estática obligaría a envolverla en un <Suspense>. rutaInternaSegura
+    // descarta todo lo que no sea una ruta de esta app: sin ella, esto sería un open redirect.
+    const next = new URLSearchParams(window.location.search).get('next')
+    router.push(rutaInternaSegura(next) ?? '/')
     router.refresh()
   }
 

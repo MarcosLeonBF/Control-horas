@@ -27,6 +27,19 @@ test('la prueba de registro.llamativo trae un proyecto y la de ampliación, el e
   expect(e['hucha.ampliacion'].actor).toEqual({ nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH' })
 })
 
+// Los avisos que nacen de un registro llevan el enlace a ese registro (/registros/<id>),
+// para abrirlo desde Slack. En banco.nivel, además, quién lo hizo y qué día: es lo que
+// permite decir "el banco bajó por el registro de Laura" sin abrir el enlace.
+test('los avisos de registro y el de nivel de banco enlazan al registro', () => {
+  const e = ejemplos('https://app.test')
+  expect(e['registro.enviado'].enlace_registro).toMatch(/^https:\/\/app\.test\/registros\/[0-9a-f-]{36}$/)
+  expect(e['registro.llamativo'].enlace_registro).toMatch(/^https:\/\/app\.test\/registros\/[0-9a-f-]{36}$/)
+  const reg = e['banco.nivel'].registro
+  expect(reg?.enlace).toMatch(/^https:\/\/app\.test\/registros\/[0-9a-f-]{36}$/)
+  expect(reg?.persona.nombre).toBe('Laura Gómez')
+  expect(reg?.dia).toBe('2026-09-14')
+})
+
 // El equipo (0049) es lo que usan los flujos para enrutar, así que ninguna persona del
 // payload puede quedarse sin la clave: si un tipo nuevo trae una persona y se olvida el
 // equipo, este test lo caza antes de que Julián reciba un payload a medias.
@@ -37,6 +50,8 @@ test('toda persona del payload trae su equipo', () => {
   expect(e['registro.llamativo'].persona.equipo).toBe('Clientes')
   expect(e['banco.nivel'].manager_proyecto?.equipo).toBe('Clientes')
   expect(e['hucha.ampliacion'].actor.equipo).toBe('RRHH')
+  expect(e['banco.ampliacion'].actor.equipo).toBe('RRHH')
+  expect(e['banco.ampliacion'].manager_proyecto?.equipo).toBe('Clientes')
   for (const t of ['hucha.proyecto_nuevo', 'hucha.ampliacion', 'hucha.nivel'] as const) {
     for (const m of e[t].managers) expect(m).toHaveProperty('equipo')
   }

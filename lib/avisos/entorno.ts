@@ -19,6 +19,11 @@ export function enlaceHucha(projectId: string): string {
   return `${appUrl()}/presupuestos/${projectId}`
 }
 
+// Un registro diario (time_log) concreto. Sin sesión, el login devuelve ahí al entrar.
+export function enlaceRegistro(logId: string): string {
+  return `${appUrl()}/registros/${logId}`
+}
+
 // Los usuarios que siembran los E2E nunca generan ni reciben avisos. Cualquier dominio
 // .test (reservado para pruebas), no solo @horas.test: la siembra de HUCHA usa
 // e2e-manager@hucha.test y la de sincronización e2e-sync-mgr-*@hucha.test.
