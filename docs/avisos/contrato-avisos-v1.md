@@ -7,12 +7,14 @@ Versión 1 · 10/09/2026
 
 ## Cómo funciona
 
-Hay dos vías:
+Hay tres vías:
 
 1. **Avisos (webhook).** Cuando pasa algo, la plataforma hace un `POST` con un JSON a tu
    webhook. Es uno solo para todos los avisos; cada aviso trae su `tipo`.
 2. **Consultas.** Para lo que va por calendario, tu flujo hace un `GET` a la plataforma cuando
    quiera (por ejemplo, cada mañana a las 9:00) con una clave, y recibe la lista.
+3. **Entradas.** Tu flujo le manda datos a la plataforma con un `POST` y la misma clave. Por
+   ahora, las vacaciones.
 
 La plataforma solo detecta y manda datos. El canal de Slack, el texto del mensaje y a quién le
 llega se deciden en tu flujo.
@@ -601,6 +603,77 @@ como día registrado.
 Con esto se monta la escalera de recordatorios en el flujo: `dias = 1`, aviso a la persona;
 `dias = 2`, a la persona con un tono más serio; `dias >= 3`, también a `manager_directo`.
 
+## Entradas
+
+Datos que tu flujo le manda a la plataforma. Se autentican igual que las consultas, con la
+misma clave: `Authorization: Bearer <clave>`.
+
+### Vacaciones
+
+```
+POST https://<dominio>/api/avisos/v1/vacaciones
+Content-Type: application/json
+```
+
+Una fila de Airtable por envío. Si la misma fila vuelve a llegar (mismo `id`), se actualiza:
+mandar dos veces lo mismo no duplica nada.
+
+| Campo | Qué es |
+|---|---|
+| `id` | El id de la fila en Airtable. Obligatorio |
+| `slack_id` | ID de miembro de Slack de la persona (`U…`) |
+| `email` | Email de la persona |
+| `desde` | Primer día de vacaciones, `YYYY-MM-DD` |
+| `hasta` | Último día de vacaciones, `YYYY-MM-DD`, incluido |
+| `estado` | `"aprobada"` (cuenta) o `"cancelada"` (no cuenta) |
+
+Tiene que venir al menos uno de `slack_id` o `email`; mejor los dos. Un campo vacío (`""`) o
+`null` cuenta como que no viene. La persona se busca primero por `slack_id` y, si no llega o
+no es de nadie, por `email`.
+
+- Son días completos. `hasta` no puede ser anterior a `desde` y un periodo no puede pasar de
+  90 días.
+- `estado` va tal cual, en minúsculas. Cualquier otro valor da `400`.
+- Si en Airtable hay más estados (pendiente, rechazada…), solo se manda como `"aprobada"`
+  la que está aprobada. Si una fila que ya se mandó aprobada deja de estarlo, mándala como
+  `"cancelada"`.
+- **Para anular unas vacaciones, manda la fila con `estado: "cancelada"`.** Si la fila se
+  borra en Airtable, a la plataforma no le llega nada y las vacaciones siguen contando.
+
+```json
+{
+  "id": "recA1b2C3d4E5f6G7",
+  "slack_id": "U01LAURA001",
+  "email": "laura.gomez@ejemplo.com",
+  "desde": "2026-10-13",
+  "hasta": "2026-10-17",
+  "estado": "aprobada"
+}
+```
+
+Respuesta (`200`):
+
+```json
+{ "ok": true, "id": "recA1b2C3d4E5f6G7", "persona": { "id": "a1b2…", "nombre": "Laura Gómez" }, "cuenta": true }
+```
+
+- `persona`: de quién son, según los usuarios que hay hoy en la plataforma. `null` si no hay
+  nadie con ese `slack_id` o `email`: la fila se guarda igual y contará cuando esa persona
+  tenga usuario.
+- `cuenta`: `true` si el estado es `aprobada`.
+
+Si algo falla, la respuesta es `{ "ok": false, "error": "…" }` con el motivo:
+
+| Código | Cuándo |
+|---|---|
+| `400` | El cuerpo no es JSON o algún campo no es válido. `error` dice cuál |
+| `401` | Falta la clave o no es correcta |
+| `422` | `slack_id` y `email` son de personas distintas, el email es de alguien que tiene otro `slack_id`, o el email está en más de un usuario. No se guarda nada: corrige el dato en Airtable y vuelve a mandarla. Una fila `cancelada` nunca da `422`: se guarda igual |
+| `500` | Error de la plataforma. Se puede reintentar: la misma fila otra vez no duplica |
+
+Con un `400` o un `422` no se guarda nada: si esa fila ya se había mandado antes, sigue
+valiendo la versión anterior.
+
 ## Reglas por defecto
 
 Son las que hay para empezar y se ajustan tras la reunión del lunes 14/09:
@@ -647,3 +720,9 @@ cuatro listas (`con_menos_horas` y `menos_libres` ya llegaban, no es un cambio).
 **18/09/2026** · Se añade `slack_id` a todas las personas del payload (las mismas que
 llevan `equipo`, más la `persona` de `registro` en los avisos de banco). Campo nuevo: nada
 de lo anterior cambia. Llegará `null` hasta que Administración cargue los IDs.
+
+**28/09/2026** · Entrada nueva **vacaciones** (`POST /api/avisos/v1/vacaciones`, ver
+«Entradas»): tu flujo manda las vacaciones de Airtable, una fila por envío. Nada de lo
+anterior cambia. De momento la plataforma las guarda pero todavía no cambian lo que
+recibes; cuando `dias-sin-registrar` y los avisos empiecen a tenerlas en cuenta, se
+anotará aquí.
