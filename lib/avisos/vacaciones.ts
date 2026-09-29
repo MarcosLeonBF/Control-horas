@@ -10,6 +10,7 @@
 // misma resolverPersona y un 'conflicto' como "no cuenta" (ver procesarEnvio).
 import { normalizarSlackId } from '@/lib/slack-id'
 import { addDiasISO } from '@/lib/horas/auditoria-types'
+import { describirCampos, tipoDe } from '@/lib/avisos/entrantes'
 
 // Una errata tipo "2062" dejaría a alguien sin recordatorios durante años sin que nadie se
 // enterara: un periodo más largo se rechaza en vez de guardarse.
@@ -46,12 +47,19 @@ function vacio(v: unknown): boolean {
   return v === undefined || v === null || (typeof v === 'string' && v.trim() === '')
 }
 
-export function validarVacacion(body: unknown): { ok: true; valor: VacacionEntrada } | { ok: false; error: string } {
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-    return { ok: false, error: 'El cuerpo tiene que ser un objeto JSON con una fila de vacaciones.' }
-  }
-  const b = body as Record<string, unknown>
+type Validacion = { ok: true; valor: VacacionEntrada } | { ok: false; error: string }
 
+// Cada error dice además qué campos llegaron y de qué tipo (sin valores): quien manda ve en
+// su flujo, sin preguntar, si el id llegó como número o si todo vino dentro de "fields".
+export function validarVacacion(body: unknown): Validacion {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return { ok: false, error: `El cuerpo tiene que ser un objeto JSON con una fila de vacaciones (llegó: ${tipoDe(body)}).` }
+  }
+  const r = validarFila(body as Record<string, unknown>)
+  return r.ok ? r : { ok: false, error: `${r.error} Campos recibidos: ${describirCampos(body as Record<string, unknown>)}.` }
+}
+
+function validarFila(b: Record<string, unknown>): Validacion {
   if (typeof b.id !== 'string' || !b.id.trim() || b.id.trim().length > ID_MAX) {
     return { ok: false, error: `Falta el id de la fila de Airtable (texto, como mucho ${ID_MAX} caracteres).` }
   }

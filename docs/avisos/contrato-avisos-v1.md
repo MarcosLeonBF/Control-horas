@@ -666,7 +666,7 @@ Si algo falla, la respuesta es `{ "ok": false, "error": "…" }` con el motivo:
 
 | Código | Cuándo |
 |---|---|
-| `400` | El cuerpo no es JSON o algún campo no es válido. `error` dice cuál |
+| `400` | El cuerpo no es JSON o algún campo no es válido. Si es un campo, `error` dice cuál y termina con los campos que llegaron y su tipo (por ejemplo, `Campos recibidos: id (número), fields (objeto).`); si el cuerpo no es un objeto, dice qué llegó |
 | `401` | Falta la clave o no es correcta |
 | `422` | `slack_id` y `email` son de personas distintas, el email es de alguien que tiene otro `slack_id`, o el email está en más de un usuario. No se guarda nada: corrige el dato en Airtable y vuelve a mandarla. Una fila `cancelada` nunca da `422`: se guarda igual |
 | `500` | Error de la plataforma. Se puede reintentar: la misma fila otra vez no duplica |
@@ -726,3 +726,7 @@ de lo anterior cambia. Llegará `null` hasta que Administración cargue los IDs.
 anterior cambia. De momento la plataforma las guarda pero todavía no cambian lo que
 recibes; cuando `dias-sin-registrar` y los avisos empiecen a tenerlas en cuenta, se
 anotará aquí.
+
+**29/09/2026** · En la entrada de vacaciones, el mensaje de un `400` termina con los campos
+que llegaron y su tipo (`Campos recibidos: …`), para ver de un vistazo si el `id` llegó
+como número o si todo vino dentro de otro objeto. Nada más cambia.
