@@ -7,7 +7,8 @@ import { DIAS_REGISTRO_POR_DEFECTO } from '@/lib/horas/ventana-registro'
 import { nivelesActuales } from '@/lib/avisos/detector-bancos'
 import { leerHuchas } from '@/lib/avisos/detector-hucha'
 import { rankingCapacidad, huchasParaRanking, porcentajeDisponible, type NivelBanco } from '@/lib/avisos/capacidad'
-import { perfilesPorId, managerDe, managerPorNombre, type Perfil } from '@/lib/avisos/personas'
+import { perfilesPorId, managerDe, managerPorNombre, sinAvisosPropios, type Perfil } from '@/lib/avisos/personas'
+import { ausenciasPorPersona, type FilaAusencia } from '@/lib/avisos/vacaciones'
 import {
   diasSinRegistrar, diasPendientes, laborablesDesde, diaMes, ultimoAntesDe, dentroDePlazo, TOPE_DIAS,
 } from '@/lib/avisos/calendario'
@@ -75,24 +76,31 @@ export interface PersonaPendiente {
   dias_desde_mas_antiguo: number // laborables desde el pendiente más antiguo (pendientes[0]) hasta ayer
 }
 
-// Registran los operativos y managers activos (los admin no), sin los usuarios de los E2E.
+// Registran los operativos y managers activos (los admin no), sin los usuarios de los E2E
+// ni la gente de Dirección y Administración, que no registra horas.
 function debeRegistrar(p: Perfil): boolean {
-  return p.activo && (p.persona.rol === 'operativo' || p.persona.rol === 'manager') && !esPersonaDePrueba(p.persona.email)
+  return p.activo && (p.persona.rol === 'operativo' || p.persona.rol === 'manager')
+    && !esPersonaDePrueba(p.persona.email) && !sinAvisosPropios(p.persona.equipo)
 }
 
 export async function diasSinRegistrarDe(fecha: string): Promise<{ fecha: string; personas: PersonaPendiente[] }> {
   const db = createAdminClient()
   // 3 × tope en días naturales cubre los 30 laborables con fines de semana y festivos.
   const ventana = addDiasISO(fecha, -TOPE_DIAS * 3)
-  const [perfiles, logs, fest] = await Promise.all([
+  const [perfiles, logs, fest, vac] = await Promise.all([
     perfilesPorId(db),
     fetchAllRows<{ user_id: string; entry_date: string }>((desde, hasta) =>
       db.from('time_logs').select('user_id, entry_date').neq('status', 'anulado')
         .gte('entry_date', ventana).lt('entry_date', fecha).range(desde, hasta)),
     db.from('festivos').select('fecha'),
+    // Las ausencias (vacaciones, festivos… que manda el flujo de Julián, 0054) que tocan la
+    // ventana: las abiertas y las que terminaron dentro de ella.
+    db.from('vacaciones').select('slack_id, desde, hasta, eventos').lte('desde', fecha).or(`hasta.is.null,hasta.gte.${ventana}`),
   ])
   if (fest.error) throw new Error(`festivos: ${fest.error.message}`)
+  if (vac.error) throw new Error(`vacaciones: ${vac.error.message}`)
   const festivos = new Set((fest.data ?? []).map((f) => String(f.fecha)))
+  const ausencias = ausenciasPorPersona((vac.data ?? []) as FilaAusencia[], fecha, ventana)
   // Cualquier registro no anulado cuenta, Departamento incluido (así cuentan las vacaciones).
   const registradosPor = new Map<string, Set<string>>()
   for (const l of logs) {
@@ -104,18 +112,24 @@ export async function diasSinRegistrarDe(fecha: string): Promise<{ fecha: string
   const personas: PersonaPendiente[] = []
   for (const p of perfiles.values()) {
     if (!debeRegistrar(p)) continue
+    // Quien está de ausencia ese día no sale: ni a la persona ni a su manager les llega nada
+    // mientras esté fuera. A la vuelta, sus días de ausencia se saltan como festivos suyos y
+    // vuelven a contar los pendientes de antes de irse. Por slack_id: sin él, no se le ve.
+    const ausencia = p.persona.slack_id ? ausencias.get(p.persona.slack_id) : undefined
+    if (ausencia?.ausenteHoy) continue
+    const libres = ausencia ? new Set([...festivos, ...ausencia.dias]) : festivos
     const registrados = registradosPor.get(p.persona.id) ?? new Set<string>()
     // Sale quien tenga algún día pendiente, aunque ayer registrara (entonces dias es 0).
-    const pendientes = diasPendientes({ fecha, registrados, festivos, alta: p.alta })
+    const pendientes = diasPendientes({ fecha, registrados, festivos: libres, alta: p.alta })
     if (pendientes.length === 0) continue
-    const { dias, desde } = diasSinRegistrar({ fecha, registrados, festivos, alta: p.alta })
+    const { dias, desde } = diasSinRegistrar({ fecha, registrados, festivos: libres, alta: p.alta })
     personas.push({
       persona: p.persona, manager_directo: managerDe(p, perfiles), dias, desde,
       ultimo_registro: ultimoAntesDe(registrados, fecha),
       dentro_de_plazo: desde ? dentroDePlazo(desde, fecha, p.diasAtras ?? DIAS_REGISTRO_POR_DEFECTO) : null,
       pendientes,
       pendientes_dd_mm: pendientes.map(diaMes),
-      dias_desde_mas_antiguo: laborablesDesde(pendientes[0], fecha, festivos),
+      dias_desde_mas_antiguo: laborablesDesde(pendientes[0], fecha, libres),
     })
   }
   personas.sort((a, b) =>

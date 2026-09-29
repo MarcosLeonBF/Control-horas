@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { validarEnvio, planificar, type PerfilIdentificable, type AusenciaActual, type EventoRef } from '../lib/avisos/vacaciones'
+import { validarEnvio, planificar, ausenciasPorPersona, type PerfilIdentificable, type AusenciaActual, type EventoRef } from '../lib/avisos/vacaciones'
 
 // Las ausencias (vacaciones, festivos…) llegan del flujo de Julián como pulsos por persona:
 // `activar` el día que empieza y `desactivar` el día que termina. Lo que cuenta es el
@@ -203,4 +203,40 @@ test('validarEnvio: acepta los nombres de campo tal como vienen de Airtable', ()
   })
   const r = validarEnvio([{ 'Acción': 'desactivar', 'slack-id': 'U096AGWQJN4', Eventos: [{ inicio: '2026-09-29', fin: '2026-09-29' }] }])
   expect(r.ok && r.valor).toEqual([{ slack_id: 'U096AGWQJN4', accion: 'desactivar', eventos: [{ inicio: '2026-09-29', fin: '2026-09-29' }] }])
+})
+
+// --- ausenciasPorPersona: lo que lee "días sin registrar" -------------------
+
+const fila = (slack_id: string, desde: string, hasta: string | null, eventos: unknown = []) => ({ slack_id, desde, hasta, eventos })
+
+test('ausenciasPorPersona: una abierta está fuera hoy y cuenta sus días hasta hoy', () => {
+  const a = ausenciasPorPersona([fila('U096AGWQJN4', '2026-09-25', null)], HOY, '2026-07-01').get('U096AGWQJN4')!
+  expect(a.ausenteHoy).toBe(true)
+  expect([...a.dias]).toEqual(['2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28', '2026-09-29'])
+})
+
+test('ausenciasPorPersona: una cerrada hoy sigue fuera hoy (el desactivar llega el último día)', () => {
+  expect(ausenciasPorPersona([fila('U096AGWQJN4', '2026-09-28', HOY)], HOY, '2026-07-01').get('U096AGWQJN4')!.ausenteHoy).toBe(true)
+})
+
+test('ausenciasPorPersona: una ya terminada no silencia, pero sus días no cuentan como pendientes', () => {
+  const a = ausenciasPorPersona([fila('U096AGWQJN4', '2026-09-21', '2026-09-23')], HOY, '2026-07-01').get('U096AGWQJN4')!
+  expect(a.ausenteHoy).toBe(false)
+  expect([...a.dias]).toEqual(['2026-09-21', '2026-09-22', '2026-09-23'])
+})
+
+test('ausenciasPorPersona: una abierta cuyos eventos ya terminaron se da por cerrada en su fin', () => {
+  // Se perdió el desactivar: sin esto, la persona se quedaría sin recordatorios para siempre.
+  const a = ausenciasPorPersona([fila('U096AGWQJN4', '2026-09-07', null, [{ inicio: '2026-09-07', fin: '2026-09-09' }])], HOY, '2026-07-01')
+    .get('U096AGWQJN4')!
+  expect(a.ausenteHoy).toBe(false)
+  expect([...a.dias]).toEqual(['2026-09-07', '2026-09-08', '2026-09-09'])
+})
+
+test('ausenciasPorPersona: suma varias ausencias de la misma persona y recorta por la ventana', () => {
+  const a = ausenciasPorPersona([
+    fila('U096AGWQJN4', '2026-06-29', '2026-07-02'), fila('U096AGWQJN4', '2026-09-28', null),
+  ], HOY, '2026-07-01').get('U096AGWQJN4')!
+  expect([...a.dias].sort()).toEqual(['2026-07-01', '2026-07-02', '2026-09-28', '2026-09-29'])
+  expect(a.ausenteHoy).toBe(true)
 })

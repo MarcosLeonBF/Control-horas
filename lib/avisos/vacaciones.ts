@@ -244,3 +244,31 @@ export function planificar(
     .join(' · ')
   return { operaciones, respuesta: { ok: true, personas }, resumen }
 }
+
+// --- Lectura: quién está fuera y qué días (para "días sin registrar") -------------
+
+export interface FilaAusencia { slack_id: string; desde: string; hasta: string | null; eventos: unknown }
+
+// Por slack_id: si la persona está fuera `hoy` y los días de ausencia desde `ventana` hasta
+// hoy. Una ausencia va de `desde` a `hasta` (el día del desactivar, que todavía cuenta);
+// abierta, sigue hasta hoy, salvo que sus eventos digan que terminó antes: entonces se
+// perdió el desactivar y se da por cerrada en ese fin (sin esto, la persona se quedaría sin
+// recordatorios para siempre). Mismo criterio que planificar al recibir el siguiente activar.
+export function ausenciasPorPersona(
+  filas: FilaAusencia[],
+  hoy: string,
+  ventana: string,
+): Map<string, { ausenteHoy: boolean; dias: Set<string> }> {
+  const porSlack = new Map<string, { ausenteHoy: boolean; dias: Set<string> }>()
+  for (const f of filas) {
+    if (f.desde > hoy) continue
+    const segunEventos = f.hasta === null ? finSegunEventos(f.eventos) : null
+    const fin = f.hasta ?? (segunEventos && segunEventos < hoy ? segunEventos : hoy)
+    const a = porSlack.get(f.slack_id) ?? { ausenteHoy: false, dias: new Set<string>() }
+    if (f.desde <= hoy && hoy <= fin) a.ausenteHoy = true
+    const hasta = fin < hoy ? fin : hoy
+    for (let d = f.desde > ventana ? f.desde : ventana; d <= hasta; d = addDiasISO(d, 1)) a.dias.add(d)
+    porSlack.set(f.slack_id, a)
+  }
+  return porSlack
+}

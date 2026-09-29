@@ -3,7 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { emitirAviso } from '@/lib/avisos/bandeja'
 import { esProduccion, esPersonaDePrueba, enlaceRegistro } from '@/lib/avisos/entorno'
-import { perfilesPorId, managerDe } from '@/lib/avisos/personas'
+import { perfilesPorId, managerDe, sinAvisosPropios } from '@/lib/avisos/personas'
 import {
   resumirPorDia, motivosLlamativo, claveLlamativo, textoProyectos, descripcionLlamativo, registroPorProyecto,
 } from '@/lib/avisos/reglas'
@@ -65,7 +65,10 @@ export async function alGuardarRegistro(args: { esAlta: boolean; logId: string; 
     const deEste = resumirPorDia(args.lineas
       .map((l) => ({ dia: l.entry_date, proyecto: l.project.trim(), horas: Number(l.hours) })))
 
-    for (const dia of dias) {
+    // Dirección y Administración no reciben avisos sobre sus registros; la evaluación de
+    // bancos del final sí se hace, porque va de los proyectos, no de la persona.
+    const avisosPropios = !sinAvisosPropios(dueno.persona.equipo)
+    for (const dia of avisosPropios ? dias : []) {
       const total = totales.get(dia) ?? { total: 0, porProyecto: new Map<string, number>() }
       const este = deEste.get(dia)
       if (args.esAlta && este) {

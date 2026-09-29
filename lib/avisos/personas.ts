@@ -69,6 +69,20 @@ export async function actorDe(db: SupabaseClient, perfilId: string | null, nombr
   return { nombre, email: p?.email ?? null, equipo: nombreEquipo(p?.equipos ?? null), slack_id: p?.slack_id ?? null }
 }
 
+// Equipos cuya gente no registra horas (Roberto, 2026-09-29): no reciben avisos SOBRE sí
+// mismos (registro.enviado, registro.llamativo, días sin registrar). Como managers siguen
+// apareciendo: las escaladas de su gente les tienen que llegar. Por el nombre del equipo del
+// organigrama (0049), sin mayúsculas ni tildes; si se renombra el equipo, hay que tocar esto.
+const EQUIPOS_SIN_AVISOS_PROPIOS = ['direccion', 'administracion']
+
+function sinTildes(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase()
+}
+
+export function sinAvisosPropios(equipo: string | null): boolean {
+  return equipo !== null && EQUIPOS_SIN_AVISOS_PROPIOS.includes(sinTildes(equipo))
+}
+
 function comoManager(p: Perfil): ManagerAviso {
   return {
     id: p.persona.id, nombre: p.persona.nombre, email: p.persona.email || null,

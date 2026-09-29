@@ -180,7 +180,8 @@ diario, con sus líneas (proyecto, área o departamento, etapa, horas y descripc
 
 Cada vez que alguien da de alta un registro (el pulso): uno por cada alta y día. Si alguien
 registra dos veces el mismo día llegan dos, cada uno con sus horas en `horas_registro` y el
-total acumulado del día en `horas_dia`. Las ediciones no envían pulso.
+total acumulado del día en `horas_dia`. Las ediciones no envían pulso. No llega por la gente
+de Dirección y Administración (tampoco `registro.llamativo`).
 
 | Campo | Qué es |
 |---|---|
@@ -576,6 +577,16 @@ sin festivos) seguidos en los que la persona no ha registrado nada. Solo aparece
 con al menos un día pendiente. Un registro en Departamento (por ejemplo, vacaciones) cuenta
 como día registrado.
 
+- **Ausencias** (las que manda tu flujo a «Entradas → Vacaciones y ausencias»): quien está
+  de ausencia el día `fecha` no aparece, así que ni a la persona ni a su manager les llega
+  nada mientras esté fuera. A la vuelta, sus días de ausencia no cuentan como pendientes
+  (como un festivo, pero solo suyo) y vuelven a contar los que dejó antes de irse. Se
+  reconoce a la persona por su `slack_id`.
+- **Dirección y Administración** (por el equipo del organigrama) no aparecen nunca: no
+  registran horas. Como `manager_directo` de otras personas sí pueden aparecer.
+- El plazo para registrar no se alarga por las vacaciones: si al volver los días que dejó
+  pendientes ya pasaron de su plazo, `dentro_de_plazo` llega en `false`.
+
 | Campo | Qué es |
 |---|---|
 | `dias` | Días laborables seguidos sin registrar |
@@ -756,3 +767,11 @@ flujo: una lista de personas con `slack_id` y `accion` (`activar` el día que em
 ausencia, `desactivar` el día que termina), y `eventos` opcional de referencia. El formato
 del 28/09 (`id`, `desde`, `hasta`, `estado`) deja de existir; no llegó a guardar nada. La
 respuesta trae un `resultado` por persona. Ver «Entradas → Vacaciones y ausencias».
+
+**29/09/2026** · Dos cambios de comportamiento, sin campos nuevos:
+
+- **`dias-sin-registrar` tiene en cuenta las ausencias** que manda tu flujo: quien está fuera
+  ese día no aparece, y a la vuelta sus días de ausencia no cuentan como pendientes.
+- **Dirección y Administración** (por el equipo del organigrama) ya no aparecen en
+  `dias-sin-registrar` ni generan `registro.enviado` ni `registro.llamativo`. Como managers
+  de otras personas siguen apareciendo.

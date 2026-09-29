@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { aPerfil, managerDe, managerPorNombre, type Perfil } from '../lib/avisos/personas'
+import { aPerfil, managerDe, managerPorNombre, sinAvisosPropios, type Perfil } from '../lib/avisos/personas'
 
 type Raw = Parameters<typeof aPerfil>[0]
 const perfil = (id: string, nombre: string, extra: Partial<Raw> = {}): Perfil => aPerfil({
@@ -51,4 +51,15 @@ test('managerPorNombre: sin mayúsculas ni espacios; ambiguo o desconocido sin e
   expect(managerPorNombre('Pilar', todos)).toEqual({ id: null, nombre: 'Pilar', email: null, equipo: null, slack_id: null })
   expect(managerPorNombre('', todos)).toBeNull()
   expect(managerPorNombre(undefined, todos)).toBeNull()
+})
+
+test('sinAvisosPropios: Dirección y Administración no reciben avisos sobre sí mismos', () => {
+  // No registran horas: ni recordatorios de días sin registrar ni avisos de sus registros.
+  expect(sinAvisosPropios('Dirección')).toBe(true)
+  expect(sinAvisosPropios('Administración')).toBe(true)
+  expect(sinAvisosPropios(' direccion ')).toBe(true) // sin tildes ni mayúsculas
+  expect(sinAvisosPropios('ADMINISTRACION')).toBe(true)
+  expect(sinAvisosPropios('Clientes')).toBe(false)
+  expect(sinAvisosPropios('RRHH')).toBe(false)
+  expect(sinAvisosPropios(null)).toBe(false) // sin equipo asignado, sí
 })
