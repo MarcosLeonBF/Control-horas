@@ -106,18 +106,18 @@ function firmaValida(cabecera, cuerpoCrudo, secreto) {
 **Persona**
 
 ```json
-{ "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo", "vacaciones": null }
+{ "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo" }
 ```
 
 **Manager** (`manager_directo`, `manager_proyecto`, cada elemento de `managers`)
 
 ```json
-{ "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01", "vacaciones": null }
+{ "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" }
 ```
 
 - `manager_directo` es `null` si la persona todavía no tiene manager directo asignado.
 - En `manager_proyecto`, si el nombre que viene del Excel no coincide con ningún usuario,
-  llega `{ "id": null, "nombre": "<nombre del Excel>", "email": null, "equipo": null, "slack_id": null, "vacaciones": null }`. Si
+  llega `{ "id": null, "nombre": "<nombre del Excel>", "email": null, "equipo": null, "slack_id": null }`. Si
   el proyecto no tiene manager en el Excel, llega `null`.
 
 **`equipo`: a qué parte de la empresa pertenece esa persona**
@@ -152,24 +152,6 @@ escribirle por mensaje directo, sin tener que buscarla en Slack por su email.
   conviene tener un plan B, por ejemplo mencionar por `email` o avisar al canal sin mención.
 - Lo carga Administración a mano en el panel de usuarios.
 
-**`vacaciones`: si esa persona está de ausencia hoy**
-
-Lo llevan las mismas personas que `slack_id` (todas). Sale de las ausencias que manda tu
-flujo a «Entradas → Vacaciones y ausencias»: sirve, por ejemplo, para no avisar a un manager
-que está fuera y mandárselo a otra persona.
-
-```json
-"vacaciones": { "desde": "2026-09-29", "hasta": null }
-```
-
-- `desde`: el día del `activar`.
-- `hasta`: `null` mientras sigue fuera, porque la vuelta no se sabe hasta que llega el
-  `desactivar`. Ese día, que es el último de la ausencia, llega con la fecha de hoy.
-- `vacaciones: null` = no está de ausencia hoy (o no tiene `slack_id`, o es un manager que
-  viene por nombre del Excel y no se pudo identificar).
-- En `dias-sin-registrar`, la `persona` siempre llega con `null` (quien está fuera no
-  aparece); el `manager_directo` sí puede estar fuera.
-
 **Enlaces a un registro** (`enlace_registro`, y `registro.enlace` en los avisos de banco)
 
 Llevan a `https://<dominio>/registros/<id>`: la ficha de solo lectura de un registro
@@ -199,7 +181,8 @@ diario, con sus líneas (proyecto, área o departamento, etapa, horas y descripc
 Cada vez que alguien da de alta un registro (el pulso): uno por cada alta y día. Si alguien
 registra dos veces el mismo día llegan dos, cada uno con sus horas en `horas_registro` y el
 total acumulado del día en `horas_dia`. Las ediciones no envían pulso. No llega por la gente
-de Dirección y Administración (tampoco `registro.llamativo`).
+de Dirección y Administración ni por quien está de ausencia ese día (tampoco
+`registro.llamativo`): de quien está fuera no se manda nada.
 
 | Campo | Qué es |
 |---|---|
@@ -602,6 +585,8 @@ como día registrado.
   reconoce a la persona por su `slack_id`.
 - **Dirección y Administración** (por el equipo del organigrama) no aparecen nunca: no
   registran horas. Como `manager_directo` de otras personas sí pueden aparecer.
+- **`manager_directo.vacaciones`**: `true` si el manager directo está de ausencia ese día,
+  `false` si no. Sirve para mandar la escalada a otra persona mientras esté fuera.
 - El plazo para registrar no se alarga por las vacaciones: si al volver los días que dejó
   pendientes ya pasaron de su plazo, `dentro_de_plazo` llega en `false`.
 
@@ -611,7 +596,7 @@ como día registrado.
 | `desde` | El día pendiente más antiguo |
 | `ultimo_registro` | Último día que registró dentro de los últimos 90 días (`null` si no hay ninguno en ese periodo) |
 | `dentro_de_plazo` | `true` si todavía puede registrar el día más antiguo por su cuenta (la plataforma deja registrar 7 días hacia atrás salvo ampliación) |
-| `manager_directo` | Su manager directo o `null` |
+| `manager_directo` | Su manager directo o `null`. Lleva además `vacaciones` (`true`/`false`) |
 
 ```json
 {
@@ -619,7 +604,7 @@ como día registrado.
   "personas": [
     {
       "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo" },
-      "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" },
+      "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01", "vacaciones": false },
       "dias": 2,
       "desde": "2026-09-14",
       "ultimo_registro": "2026-09-11",
@@ -685,10 +670,14 @@ Cómo se interpreta:
   - si se perdió el `activar`, el `desactivar` guarda la ausencia desde ese `inicio` (como
     mucho 90 días atrás);
   - si el `activar` llega tarde, la ausencia empieza en ese `inicio`;
-  - si se perdió un `desactivar` y los `eventos` guardados de esa ausencia ya terminaron, el
-    siguiente `activar` la cierra en su `fin` y abre la nueva.
+  - si se perdió un `desactivar` y los `eventos` guardados de esa ausencia ya terminaron, la
+    ausencia se da por terminada en su `fin` (y el siguiente `activar` abre la nueva).
   
   De cada evento solo se guardan `inicio`, `fin` y `tipo`, y como mucho 50 por persona.
+  **Recomendado: manda `eventos` con `inicio` y `fin` en el `activar`.** Con ellos la
+  plataforma sabe cuándo vuelve la persona (se ve en el panel de usuarios) y, si un
+  `desactivar` no llega, la ausencia termina igual en su `fin`. Sin ellos, solo se sabe desde
+  cuándo está fuera, y sigue fuera hasta que llegue su `desactivar`.
 - Todo el envío se valida antes de guardar nada: si una persona está mal, se rechaza entero
   y el error dice cuál. Como mucho 500 personas por envío; una lista vacía da `400`.
 
@@ -794,7 +783,9 @@ respuesta trae un `resultado` por persona. Ver «Entradas → Vacaciones y ausen
   `dias-sin-registrar` ni generan `registro.enviado` ni `registro.llamativo`. Como managers
   de otras personas siguen apareciendo.
 
-**29/09/2026** · Se añade `vacaciones` a todas las personas del payload (las mismas que
-llevan `slack_id`): `{ desde, hasta }` si esa persona está de ausencia hoy, o `null`. Campo
-nuevo: nada de lo anterior cambia. La prueba de `banco.al_tope` lo trae relleno en
-`manager_proyecto`, para ver cómo llega.
+**29/09/2026** · Ausencias en los avisos:
+
+- De quien está de ausencia ese día no se manda nada: tampoco `registro.enviado` ni
+  `registro.llamativo` (en `dias-sin-registrar` ya no aparecía).
+- En `dias-sin-registrar`, `manager_directo` trae un campo nuevo, `vacaciones`: `true` si
+  el manager está de ausencia ese día, `false` si no. Nada de lo anterior cambia.

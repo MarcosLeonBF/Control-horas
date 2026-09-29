@@ -7,7 +7,7 @@ import { DIAS_REGISTRO_POR_DEFECTO } from '@/lib/horas/ventana-registro'
 import { nivelesActuales } from '@/lib/avisos/detector-bancos'
 import { leerHuchas } from '@/lib/avisos/detector-hucha'
 import { rankingCapacidad, huchasParaRanking, porcentajeDisponible, type NivelBanco } from '@/lib/avisos/capacidad'
-import { perfilesPorId, managerDe, managerPorNombre, sinAvisosPropios, type Perfil } from '@/lib/avisos/personas'
+import { perfilesPorId, managerConVacaciones, managerPorNombre, sinAvisosPropios, type Perfil } from '@/lib/avisos/personas'
 import { ausenciasPorPersona, type FilaAusencia } from '@/lib/avisos/vacaciones'
 import {
   diasSinRegistrar, diasPendientes, laborablesDesde, diaMes, ultimoAntesDe, dentroDePlazo, TOPE_DIAS,
@@ -66,7 +66,7 @@ export async function resumenHucha() {
 
 export interface PersonaPendiente {
   persona: PersonaAviso
-  manager_directo: ManagerAviso | null
+  manager_directo: (ManagerAviso & { vacaciones: boolean }) | null // vacaciones: si está de ausencia ese día
   dias: number // laborables seguidos sin registrar hasta ayer (la escalera); 0 si ayer registró
   desde: string | null // el más antiguo de esos seguidos; null si dias es 0
   ultimo_registro: string | null // dentro de la ventana consultada (3 × tope días naturales)
@@ -124,7 +124,7 @@ export async function diasSinRegistrarDe(fecha: string): Promise<{ fecha: string
     if (pendientes.length === 0) continue
     const { dias, desde } = diasSinRegistrar({ fecha, registrados, festivos: libres, alta: p.alta })
     personas.push({
-      persona: p.persona, manager_directo: managerDe(p, perfiles), dias, desde,
+      persona: p.persona, manager_directo: managerConVacaciones(p, perfiles), dias, desde,
       ultimo_registro: ultimoAntesDe(registrados, fecha),
       dentro_de_plazo: desde ? dentroDePlazo(desde, fecha, p.diasAtras ?? DIAS_REGISTRO_POR_DEFECTO) : null,
       pendientes,

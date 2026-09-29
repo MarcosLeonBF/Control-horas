@@ -25,7 +25,7 @@ test('la prueba de registro.llamativo trae un proyecto y la de ampliación, el e
   expect(l.proyecto).toBe('Proyecto Ejemplo')
   expect(l.limite).toBe(LIMITE_PROYECTO_HORAS)
   expect(e['hucha.ampliacion'].actor).toEqual({
-    nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH', slack_id: 'U01MARTA001', vacaciones: null,
+    nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH', slack_id: 'U01MARTA001',
   })
 })
 
@@ -104,18 +104,12 @@ test('las personas que siembran los E2E no cuentan', () => {
   expect(esPersonaDePrueba(null)).toBe(false)
 })
 
-// Las ausencias (0054): toda persona del payload dice si está fuera, para que el flujo
-// decida (no avisarle, mandárselo a otro manager…). El ejemplo de banco.al_tope enseña el
-// caso con el manager del proyecto fuera, que es el que más importa al enrutar.
-test('toda persona del payload trae vacaciones', () => {
+// Las ausencias (0054) no viajan en los avisos: de quien está fuera no se manda nada, y el
+// único sitio donde importa es el manager directo de días sin registrar (true/false).
+test('ninguna persona de los avisos lleva vacaciones', () => {
   const e = ejemplos('https://app.test')
-  expect(e['registro.enviado'].persona.vacaciones).toBe(null)
-  expect(e['registro.enviado'].manager_directo).toHaveProperty('vacaciones', null)
-  expect(e['banco.nivel'].registro?.persona).toHaveProperty('vacaciones')
-  expect(e['banco.al_tope'].manager_proyecto?.vacaciones).toEqual({ desde: '2026-09-14', hasta: null })
-  expect(e['banco.ampliacion'].actor).toHaveProperty('vacaciones', null)
-  expect(e['hucha.ampliacion'].actor).toHaveProperty('vacaciones', null)
-  for (const t of ['hucha.proyecto_nuevo', 'hucha.ampliacion', 'hucha.nivel'] as const) {
-    for (const m of e[t].managers) expect(m).toHaveProperty('vacaciones')
-  }
+  expect(e['registro.enviado'].persona).not.toHaveProperty('vacaciones')
+  expect(e['registro.enviado'].manager_directo).not.toHaveProperty('vacaciones')
+  expect(e['banco.al_tope'].manager_proyecto).not.toHaveProperty('vacaciones')
+  expect(e['hucha.ampliacion'].actor).not.toHaveProperty('vacaciones')
 })

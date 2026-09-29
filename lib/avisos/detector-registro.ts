@@ -65,9 +65,10 @@ export async function alGuardarRegistro(args: { esAlta: boolean; logId: string; 
     const deEste = resumirPorDia(args.lineas
       .map((l) => ({ dia: l.entry_date, proyecto: l.project.trim(), horas: Number(l.hours) })))
 
-    // Dirección y Administración no reciben avisos sobre sus registros; la evaluación de
-    // bancos del final sí se hace, porque va de los proyectos, no de la persona.
-    const avisosPropios = !sinAvisosPropios(dueno.persona.equipo)
+    // Dirección y Administración no reciben avisos sobre sus registros, ni quien está de
+    // ausencia hoy (de quien está fuera no se manda nada). La evaluación de bancos del final
+    // sí se hace, porque va de los proyectos, no de la persona.
+    const avisosPropios = !sinAvisosPropios(dueno.persona.equipo) && !dueno.ausenteHoy
     for (const dia of avisosPropios ? dias : []) {
       const total = totales.get(dia) ?? { total: 0, porProyecto: new Map<string, number>() }
       const este = deEste.get(dia)

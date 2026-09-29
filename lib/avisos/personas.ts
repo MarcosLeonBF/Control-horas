@@ -2,8 +2,8 @@
 // manager del proyecto (el Excel trae un nombre suelto: se casa por nombre, como HUCHA).
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { diaMadrid } from '@/lib/horas/auditoria-types'
-import type { ActorAviso, ManagerAviso, PersonaAviso, VacacionesAviso } from '@/lib/avisos/contrato'
-import { vacacionesHoy, type FilaAusencia } from '@/lib/avisos/vacaciones'
+import type { ActorAviso, ManagerAviso, PersonaAviso } from '@/lib/avisos/contrato'
+import { ausenciasHoy, type FilaAusencia } from '@/lib/avisos/vacaciones'
 
 export interface Perfil {
   persona: PersonaAviso
@@ -11,6 +11,9 @@ export interface Perfil {
   alta: string // día del alta en Madrid (YYYY-MM-DD)
   diasAtras: number | null // ventana de registro ampliada (0043); null = la ventana por defecto
   activo: boolean
+  // De ausencia hoy según los pulsos del flujo (0054). No viaja en el payload: de quien está
+  // fuera no se manda nada, y solo el manager de días sin registrar lo dice (true/false).
+  ausenteHoy: boolean
 }
 
 interface PerfilRaw {
@@ -38,13 +41,6 @@ export function nombreEquipo(e: EquipoRaw): string | null {
 
 const SELECT_PERFIL = 'id, full_name, email, role, status, manager_id, created_at, registro_dias_atras, slack_id, positions(name), equipos(name)'
 
-// Quién está de ausencia `hoy` (0054), por slack_id: la marca `vacaciones` de cada persona
-// del payload. Si la consulta falla, falla el aviso entero, como con los perfiles: sin esto
-// todo el mundo parecería no estar de vacaciones, y el flujo enrutaría mal sin saberlo.
-export async function vacacionesPorSlack(db: SupabaseClient, hoy = diaMadrid(new Date().toISOString())): Promise<Map<string, VacacionesAviso>> {
-  return vacacionesHoy(await filasAusenciaDeHoy(db, hoy), hoy)
-}
-
 // Las ausencias guardadas que pueden cubrir `hoy`: abiertas o terminadas hoy mismo.
 export async function filasAusenciaDeHoy(db: SupabaseClient, hoy: string): Promise<FilaAusencia[]> {
   const { data, error } = await db.from('vacaciones').select('slack_id, desde, hasta, eventos')
@@ -53,27 +49,31 @@ export async function filasAusenciaDeHoy(db: SupabaseClient, hoy: string): Promi
   return (data ?? []) as FilaAusencia[]
 }
 
-export function aPerfil(r: PerfilRaw, vacaciones: VacacionesAviso | null = null): Perfil {
+export function aPerfil(r: PerfilRaw, ausenteHoy = false): Perfil {
   const pos = Array.isArray(r.positions) ? r.positions[0] : r.positions
   return {
     persona: {
       id: r.id, nombre: r.full_name ?? '', email: r.email ?? '', posicion: pos?.name ?? null,
-      equipo: nombreEquipo(r.equipos), slack_id: r.slack_id ?? null, rol: r.role, vacaciones,
+      equipo: nombreEquipo(r.equipos), slack_id: r.slack_id ?? null, rol: r.role,
     },
     managerId: r.manager_id,
     alta: diaMadrid(r.created_at),
     diasAtras: r.registro_dias_atras,
     activo: r.status === 'activo',
+    ausenteHoy,
   }
 }
 
 // Todos los perfiles (son pocas decenas): hacen falta enteros para resolver los managers.
-// `hoy` es el día en que se mira quién está de ausencia (por defecto, hoy en Madrid).
-export async function perfilesPorId(db: SupabaseClient, hoy?: string): Promise<Map<string, Perfil>> {
-  const [{ data, error }, vacaciones] = await Promise.all([db.from('profiles').select(SELECT_PERFIL), vacacionesPorSlack(db, hoy)])
+// `hoy` es el día en que se mira quién está de ausencia (por defecto, hoy en Madrid). Si la
+// consulta de ausencias falla, falla todo, como con los perfiles: sin ella, a quien está
+// fuera le llegarían avisos y su manager saldría como si estuviera trabajando.
+export async function perfilesPorId(db: SupabaseClient, hoy = diaMadrid(new Date().toISOString())): Promise<Map<string, Perfil>> {
+  const [{ data, error }, filas] = await Promise.all([db.from('profiles').select(SELECT_PERFIL), filasAusenciaDeHoy(db, hoy)])
   if (error) throw new Error(`profiles: ${error.message}`)
+  const ausentes = ausenciasHoy(filas, hoy)
   return new Map(((data ?? []) as unknown as PerfilRaw[])
-    .map((r) => [r.id, aPerfil(r, r.slack_id ? vacaciones.get(r.slack_id) ?? null : null)]))
+    .map((r) => [r.id, aPerfil(r, r.slack_id !== null && ausentes.has(r.slack_id))]))
 }
 
 // Quien hizo una ampliación (de HUCHA o de horas), a partir del perfil que la registró.
@@ -81,11 +81,10 @@ export async function perfilesPorId(db: SupabaseClient, hoy?: string): Promise<M
 // completan el email, el equipo y el Slack. Si el perfil no se encuentra (o ya no existe),
 // van a null: el aviso sale igual con el nombre.
 export async function actorDe(db: SupabaseClient, perfilId: string | null, nombre: string): Promise<ActorAviso> {
-  if (!perfilId) return { nombre, email: null, equipo: null, slack_id: null, vacaciones: null }
+  if (!perfilId) return { nombre, email: null, equipo: null, slack_id: null }
   const { data } = await db.from('profiles').select('email, slack_id, equipos(name)').eq('id', perfilId).maybeSingle()
   const p = data as { email: string | null; slack_id: string | null; equipos: EquipoRaw } | null
-  const vacaciones = p?.slack_id ? (await vacacionesPorSlack(db)).get(p.slack_id) ?? null : null
-  return { nombre, email: p?.email ?? null, equipo: nombreEquipo(p?.equipos ?? null), slack_id: p?.slack_id ?? null, vacaciones }
+  return { nombre, email: p?.email ?? null, equipo: nombreEquipo(p?.equipos ?? null), slack_id: p?.slack_id ?? null }
 }
 
 // Equipos cuya gente no registra horas (Roberto, 2026-09-29): no reciben avisos SOBRE sí
@@ -105,7 +104,7 @@ export function sinAvisosPropios(equipo: string | null): boolean {
 function comoManager(p: Perfil): ManagerAviso {
   return {
     id: p.persona.id, nombre: p.persona.nombre, email: p.persona.email || null,
-    equipo: p.persona.equipo, slack_id: p.persona.slack_id, vacaciones: p.persona.vacaciones,
+    equipo: p.persona.equipo, slack_id: p.persona.slack_id,
   }
 }
 
@@ -113,6 +112,14 @@ export function managerDe(perfil: Perfil | undefined, todos: Map<string, Perfil>
   if (!perfil?.managerId) return null
   const m = todos.get(perfil.managerId)
   return m ? comoManager(m) : null
+}
+
+// El manager directo de días sin registrar, con `vacaciones`: si está de ausencia hoy, el
+// flujo puede mandar la escalada a otra persona. Es el único sitio del payload donde viaja.
+export function managerConVacaciones(perfil: Perfil | undefined, todos: Map<string, Perfil>): (ManagerAviso & { vacaciones: boolean }) | null {
+  if (!perfil?.managerId) return null
+  const m = todos.get(perfil.managerId)
+  return m ? { ...comoManager(m), vacaciones: m.ausenteHoy } : null
 }
 
 // Sin coincidencia única (nadie, o dos personas con el mismo nombre) se devuelve el
@@ -124,5 +131,5 @@ export function managerPorNombre(nombre: string | undefined, todos: Map<string, 
   if (!n) return null
   const clave = n.toLowerCase()
   const iguales = [...todos.values()].filter((p) => p.persona.nombre.trim().toLowerCase() === clave)
-  return iguales.length === 1 ? comoManager(iguales[0]) : { id: null, nombre: n, email: null, equipo: null, slack_id: null, vacaciones: null }
+  return iguales.length === 1 ? comoManager(iguales[0]) : { id: null, nombre: n, email: null, equipo: null, slack_id: null }
 }

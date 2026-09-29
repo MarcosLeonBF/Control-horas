@@ -5,7 +5,7 @@ import { getCatalogos } from '@/lib/horas/queries'
 import UsuarioForm from '@/components/horas/UsuarioForm'
 import UsuariosPanel, { type UsuarioRow, type PosicionOpt } from '@/components/horas/UsuariosPanel'
 import { filasAusenciaDeHoy } from '@/lib/avisos/personas'
-import { ausenciasSinUsuario, etiquetaAusencia, vacacionesHoy } from '@/lib/avisos/vacaciones'
+import { ausenciasHoy, ausenciasSinUsuario, etiquetaAusencia } from '@/lib/avisos/vacaciones'
 import { diaMadrid } from '@/lib/horas/auditoria-types'
 
 interface RawUsuario {
@@ -53,14 +53,17 @@ export default async function UsuariosPage() {
   // las que no casan con ningún usuario se listan aparte, debajo del panel.
   const hoy = diaMadrid(new Date().toISOString())
   const filasAusencia = await filasAusenciaDeHoy(admin, hoy)
-  const ausencias = vacacionesHoy(filasAusencia, hoy)
+  const ausencias = ausenciasHoy(filasAusencia, hoy)
   const slacksConUsuario = new Set(((raw ?? []) as RawUsuario[]).flatMap((u) => (u.slack_id ? [u.slack_id] : [])))
   const sinUsuario = ausenciasSinUsuario(filasAusencia, slacksConUsuario, hoy)
   const usuarios: UsuarioRow[] = ((raw ?? []) as RawUsuario[]).map((u) => ({
     id: u.id, full_name: u.full_name, email: u.email, positionId: u.position_id,
     role: u.role, status: u.status, canCreateUsers: u.can_create_users, areaIds: (u.user_areas ?? []).map((a) => a.area_id),
     registroDiasAtras: u.registro_dias_atras, managerId: u.manager_id, equipoId: u.equipo_id, slackId: u.slack_id,
-    ausencia: u.slack_id ? ausencias.get(u.slack_id) ?? null : null,
+    ausencia: (() => {
+      const a = u.slack_id ? ausencias.get(u.slack_id) : undefined
+      return a ? etiquetaAusencia(a, hoy) : null
+    })(),
   }))
 
   // Candidatos a manager directo: managers y admins activos.
@@ -88,7 +91,7 @@ export default async function UsuariosPage() {
               {sinUsuario.map((a) => (
                 <li key={a.slack_id} className="flex gap-3 text-xs">
                   <span className="font-mono">{a.slack_id}</span>
-                  <span className="text-muted-foreground">{etiquetaAusencia(a)}</span>
+                  <span className="text-muted-foreground">{etiquetaAusencia(a, hoy)}</span>
                 </li>
               ))}
             </ul>
