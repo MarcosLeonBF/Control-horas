@@ -668,20 +668,25 @@ Cómo funciona el interruptor:
   la persona todavía sale en ella).
 - Para un festivo de un día, manda el `activar` antes que el `desactivar`: el interruptor
   hace caso al orden en que llegan.
+- Si dentro de unas vacaciones cae otra ausencia (un festivo), su `desactivar` no quita las
+  vacaciones, siempre que los pulsos traigan fechas: se contesta `ya_iniciada` y sigue de
+  vacaciones hasta el `desactivar` de las vacaciones.
+- El `desactivar` tardío de una ausencia anterior no quita la que está en curso ahora.
 
 **Las fechas son la red de seguridad.** No deciden cuándo se activa ni se desactiva, pero
 sirven por si el `desactivar` no llega a tiempo:
 
 - Si pasa la `Fecha fin` y el `desactivar` no ha llegado, la persona se da por vuelta ese
   día, y sale en el panel de usuarios en «No llegó el desactivar a tiempo» para revisarlo.
-- Si el `desactivar` llega tarde, se corrige a su `Fecha fin`.
-- Si en Airtable se alargó la `Fecha fin`, el `desactivar` que llega con la nueva manda.
+- Si el `desactivar` llega tarde, se corrige a la `Fecha fin` que trae (lo último que dice
+  Airtable, también si la alargó o la acortó) o, si no trae, a la del `activar`.
 - Un `activar` cuya `Fecha fin` ya pasó no hace nada: esa ausencia ya terminó.
 - Con fechas, el panel de usuarios muestra cuándo vuelve la persona («Ausente hasta el
   02/10»). Sin fechas, solo desde cuándo está fuera, y sigue fuera hasta su `desactivar`.
 
 Las fechas van en `YYYY-MM-DD` (con hora también vale: si trae zona, cuenta su día en
-Madrid). Una fecha que no se entiende se ignora, no hace fallar el pulso. De cada evento
+Madrid). Una fecha que no se entiende, o una `Fecha fin` anterior a la de inicio, se
+ignora: no hace fallar el pulso ni impide activar. De cada evento
 solo se guardan `inicio`, `fin` y `tipo`, como mucho 50 por persona.
 
 Todo el envío se valida antes de guardar nada: si una persona está mal, se rechaza entero y
@@ -700,7 +705,8 @@ Respuesta (`200`), una línea por persona, en el mismo orden:
 
 - `persona`: a quién corresponde ese `slack_id` en la plataforma. `null` si no tiene
   usuario: se guarda igual y contará cuando lo tenga.
-- `resultado`: `iniciada` (queda de vacaciones), `ya_iniciada` (ya lo estaba), `terminada`
+- `resultado`: `iniciada` (queda de vacaciones), `ya_iniciada` (ya lo estaba, o sigue: el
+  `desactivar` era de otra ausencia dentro de esta), `terminada`
   (deja de estarlo), `ya_terminada` (ya se había desactivado hoy, o el `activar` es de una
   ausencia que ya terminó) o `sin_ausencia` (un `desactivar` de alguien que no estaba de
   vacaciones).

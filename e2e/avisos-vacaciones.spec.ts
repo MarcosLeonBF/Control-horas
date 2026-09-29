@@ -299,3 +299,43 @@ test('red: un activar cuyas fechas ya pasaron no enciende nada', () => {
   expect(r.plan.operaciones).toEqual([])
   expect(r.resultado).toBe('ya_terminada')
 })
+
+// --- verificación del interruptor: las fechas no pueden encender ni apagar a destiempo ---
+
+test('interruptor: un activar el día de inicio con una Fecha fin mal tecleada enciende igual', () => {
+  // Fecha fin anterior a la de inicio (errata de año): se ignora, no bloquea el interruptor.
+  const r = envio([], pulso('activar', fechas('2026-12-22', '2026-01-07')), '2026-12-22')
+  expect(periodos(r.filas)).toEqual([['2026-12-22', null]])
+  expect(r.resultado).toBe('iniciada')
+})
+
+test('interruptor: un festivo dentro de unas vacaciones no las apaga', () => {
+  const vacaciones = fechas('2026-10-05', '2026-10-16')
+  let r = envio([], pulso('activar', vacaciones), '2026-10-05')
+  r = envio(r.filas, pulso('activar', fechas('2026-10-12', '2026-10-12')), '2026-10-12') // ya encendido
+  r = envio(r.filas, pulso('desactivar', fechas('2026-10-12', '2026-10-12')), '2026-10-12')
+  expect(periodos(r.filas)).toEqual([['2026-10-05', null]])
+  expect(r.resultado).toBe('ya_iniciada') // sigue de vacaciones
+  r = envio(r.filas, pulso('desactivar', vacaciones), '2026-10-16')
+  expect(periodos(r.filas)).toEqual([['2026-10-05', '2026-10-16']])
+  expect(r.resultado).toBe('terminada')
+})
+
+test('interruptor: un desactivar tardío de una ausencia anterior no apaga la siguiente', () => {
+  const r = envio([fila(1, '2026-09-21', '2026-09-23', fechas('2026-09-21', '2026-09-23')), fila(2, '2026-10-05', null, fechas('2026-10-05', '2026-10-09'))],
+    pulso('desactivar', fechas('2026-09-21', '2026-09-23')), '2026-10-06')
+  expect(r.plan.operaciones).toEqual([])
+  expect(r.resultado).toBe('ya_terminada')
+})
+
+test('interruptor: un desactivar tardío con la Fecha fin acortada se corrige a la que trae', () => {
+  // Iba hasta el 09/10, volvió el 02/10 (Airtable lo acortó) y el desactivar llega el 05/10.
+  const r = envio([encendidoHasta('2026-10-09')], pulso('desactivar', fechas(HOY, '2026-10-02')), '2026-10-05')
+  expect(periodos(r.filas)).toEqual([[HOY, '2026-10-02']])
+})
+
+test('interruptor: un desactivar tardío repetido, ya apagado, contesta ya_terminada', () => {
+  const r = envio([fila(1, HOY, '2026-10-02', fechas(HOY, '2026-10-02'))], pulso('desactivar', fechas(HOY, '2026-10-02')), '2026-10-05')
+  expect(r.plan.operaciones).toEqual([])
+  expect(r.resultado).toBe('ya_terminada')
+})

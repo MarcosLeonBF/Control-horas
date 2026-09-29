@@ -183,6 +183,13 @@ function finPrevisto(f: { desde: string; eventos: unknown }): string | null {
   return fin
 }
 
+// El periodo del pulso, si sus fechas son coherentes (las dos, fin no anterior a inicio). Una
+// errata (fin antes del inicio, año equivocado) se ignora: no puede bloquear el interruptor.
+function periodoDelPulso(eventos: EventoRef[]): { inicio: string; fin: string } | null {
+  for (const e of eventos) if (esFecha(e.inicio) && esFecha(e.fin) && e.inicio <= e.fin) return { inicio: e.inicio, fin: e.fin }
+  return null
+}
+
 export function planificar(
   pulsos: PulsoPersona[],
   perfiles: PerfilIdentificable[],
@@ -201,8 +208,8 @@ export function planificar(
     let encendida = mias.find((f) => f.hasta === null)
     let resultado: Resultado
 
+    const periodo = periodoDelPulso(eventos)
     if (accion === 'activar') {
-      const finDelPulso = finPrevisto({ desde: '0000-00-00', eventos })
       // Se perdió el desactivar de la anterior: se da por apagada en su Fecha fin.
       if (encendida) {
         const fin = finPrevisto(encendida)
@@ -211,7 +218,7 @@ export function planificar(
           encendida = undefined
         }
       }
-      if (finDelPulso && finDelPulso < hoy) {
+      if (periodo && periodo.fin < hoy) {
         resultado = 'ya_terminada' // un activar muy tardío: esa ausencia ya terminó
       } else if (encendida) {
         conEventos(encendida, eventos)
@@ -224,15 +231,29 @@ export function planificar(
         filas.push({ id: null, slack_id, desde: hoy, hasta: null, eventos: [...eventos], orig: null })
         resultado = 'iniciada'
       }
+    } else if (encendida && periodo && periodo.fin < encendida.desde) {
+      // El desactivar tardío de una ausencia anterior: no apaga la que está encendida ahora.
+      resultado = 'ya_terminada'
     } else if (encendida) {
-      // Apaga hoy. Con las fechas del pulso primero: si Airtable alargó la Fecha fin, manda
-      // la nueva. Si ya había pasado (llega tarde), se corrige a ella.
+      // ¿Sigue en curso otra ausencia dentro de esta? (un festivo en medio de unas
+      // vacaciones: su desactivar no apaga las vacaciones).
+      const otra = periodo !== null && encendida.eventos.some((e) =>
+        esFecha(e.inicio) && esFecha(e.fin) && e.inicio <= e.fin && e.inicio !== periodo.inicio && e.fin > hoy)
       conEventos(encendida, eventos)
-      const fin = finPrevisto(encendida)
-      encendida.hasta = fin && fin < hoy ? fin : hoy
-      resultado = 'terminada'
+      if (otra) {
+        resultado = 'ya_iniciada'
+      } else {
+        // Apaga hoy. Si llega tarde, se corrige a la Fecha fin: la que trae el pulso (lo
+        // último que dice Airtable, también si la alargó o la acortó) o, si no trae, la del
+        // activar.
+        const fin = periodo && periodo.fin >= encendida.desde ? periodo.fin : finPrevisto(encendida)
+        encendida.hasta = fin && fin < hoy ? fin : hoy
+        resultado = 'terminada'
+      }
     } else {
-      resultado = mias.some((f) => f.hasta === hoy) ? 'ya_terminada' : 'sin_ausencia'
+      // Ya estaba apagado: repetido (hoy, o un tardío de la misma ausencia) o sin activar.
+      const repetido = mias.some((f) => f.hasta === hoy || (periodo !== null && f.hasta === periodo.fin))
+      resultado = repetido ? 'ya_terminada' : 'sin_ausencia'
     }
 
     const perfil = porSlack.get(slack_id)
