@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCatalogos } from '@/lib/horas/queries'
 import UsuarioForm from '@/components/horas/UsuarioForm'
 import UsuariosPanel, { type UsuarioRow, type PosicionOpt } from '@/components/horas/UsuariosPanel'
+import DesactivarAusenciaBoton from '@/components/horas/DesactivarAusenciaBoton'
 import { filasAusenciaDeHoy } from '@/lib/avisos/personas'
 import { ausenciasHoy, ausenciasSinDesactivar, ausenciasSinUsuario, etiquetaAusencia } from '@/lib/avisos/vacaciones'
 import { diaMadrid } from '@/lib/horas/auditoria-types'
@@ -56,8 +57,8 @@ export default async function UsuariosPage() {
   const ausencias = ausenciasHoy(filasAusencia, hoy)
   const slacksConUsuario = new Set(((raw ?? []) as RawUsuario[]).flatMap((u) => (u.slack_id ? [u.slack_id] : [])))
   const sinUsuario = ausenciasSinUsuario(filasAusencia, slacksConUsuario, hoy)
-  // La red de las fechas, a la vista: se dan por terminadas en su Fecha fin, pero hay que
-  // revisar por qué no llegó el desactivar (¿se alargó y no se actualizó Airtable?).
+  // La red de las fechas, a la vista: siguen de vacaciones (las fechas no apagan solas) y hay
+  // que revisar por qué no llegó el desactivar; un admin puede desactivarlas aquí.
   const nombrePorSlack = new Map(((raw ?? []) as RawUsuario[]).flatMap((u) => (u.slack_id ? [[u.slack_id, u.full_name] as const] : [])))
   const sinDesactivar = ausenciasSinDesactivar(filasAusencia, hoy)
   const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`
@@ -87,14 +88,15 @@ export default async function UsuariosPage() {
           <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
             <p className="font-medium">No llegó el desactivar a tiempo ({sinDesactivar.length})</p>
             <p className="mt-1 text-xs">
-              Su Fecha fin ya pasó y la plataforma los da por vueltos ese día. Si la ausencia se alargó, hay que
-              actualizarla en Airtable para que el flujo mande el desactivar con la fecha nueva.
+              Su Fecha fin ya pasó y siguen de vacaciones: las fechas no desactivan a nadie solas. Si la ausencia se
+              alargó, no hay que hacer nada (llegará el desactivar con la fecha nueva). Si ya volvió, desactívala aquí.
             </p>
             <ul className="mt-2 space-y-1">
               {sinDesactivar.map((a) => (
-                <li key={a.slack_id + a.desde} className="flex gap-3 text-xs">
+                <li key={a.slack_id + a.desde} className="flex flex-wrap items-center gap-3 text-xs">
                   <span>{nombrePorSlack.get(a.slack_id) || <span className="font-mono">{a.slack_id}</span>}</span>
                   <span>Fecha fin el {ddmm(a.fin)} (desde el {ddmm(a.desde)})</span>
+                  {esAdmin && <DesactivarAusenciaBoton slackId={a.slack_id} desde={a.desde} fin={a.fin} />}
                 </li>
               ))}
             </ul>

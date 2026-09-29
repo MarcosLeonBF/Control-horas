@@ -6,9 +6,10 @@
 // (el día que empieza la ausencia) y `desactivar` lo apaga el día que llega (el último
 // día, que todavía es de vacaciones). Encendido, otro activar no hace nada; apagado, otro
 // desactivar tampoco. Las fechas no deciden cuándo se enciende ni se apaga: son la RED por
-// si el desactivar no llega a tiempo. Si pasa la Fecha fin y sigue encendido, se da por
-// apagado en esa fecha (y sale en la lista del panel para revisarlo); si el desactivar llega
-// tarde, se corrige a esa fecha; si Airtable la alargó, el desactivar trae la nueva.
+// si el desactivar no llega a tiempo, y la red AVISA, no apaga (Roberto, 29/09). Si pasa la
+// Fecha fin y sigue encendido, sigue de vacaciones y sale en el panel («No llegó el
+// desactivar a tiempo», con botón para desactivarlo a mano en su Fecha fin); si el
+// desactivar llega tarde, o llega el activar de otra ausencia, se corrige a esa fecha.
 //
 // Cada encendido es una fila de `vacaciones` (0054): desde el día del activar hasta el del
 // desactivar (`hasta` null = encendido). La persona se busca al leer, por slack_id, para
@@ -284,10 +285,14 @@ export function planificar(
 export interface FilaAusencia { slack_id: string; desde: string; hasta: string | null; eventos: unknown }
 
 // Hasta dónde llega una ausencia vista desde `hoy`: su desactivar si llegó; encendida, hasta
-// hoy, salvo que su Fecha fin ya haya pasado (la red: el desactivar no llegó a tiempo y se
-// da por apagada en esa fecha).
+// hoy aunque su Fecha fin ya haya pasado (las fechas no apagan: solo avisan).
 function finEfectivo(f: FilaAusencia, hoy: string): string {
-  if (f.hasta !== null) return f.hasta
+  return f.hasta ?? hoy
+}
+
+// Desactivar a mano desde el panel (el desactivar no llegó): se apaga en su Fecha fin, que
+// es cuando volvió según Airtable; sin fechas, hoy.
+export function cierreManual(f: FilaAusencia, hoy: string): string {
   const fin = finPrevisto(f)
   return fin && fin < hoy ? fin : hoy
 }
@@ -322,7 +327,9 @@ export function ausenciasHoy(filas: FilaAusencia[], hoy: string): Map<string, Au
   const porSlack = new Map<string, AusenciaHoy>()
   for (const f of filas) {
     if (f.desde > hoy || finEfectivo(f, hoy) < hoy) continue
-    const fin = f.hasta ?? finPrevisto(f)
+    // Para mostrar: el día del desactivar, o la Fecha fin mientras no haya pasado.
+    const previsto = finPrevisto(f)
+    const fin = f.hasta ?? (previsto && previsto >= hoy ? previsto : null)
     const previa = porSlack.get(f.slack_id)
     porSlack.set(f.slack_id, {
       desde: previa && previa.desde < f.desde ? previa.desde : f.desde,
@@ -332,9 +339,9 @@ export function ausenciasHoy(filas: FilaAusencia[], hoy: string): Map<string, Au
   return porSlack
 }
 
-// La red, a la vista: encendidas cuya Fecha fin ya pasó sin que llegara el desactivar. Se
-// dan por apagadas en esa fecha, pero conviene revisarlas (¿se alargó la ausencia y no se
-// actualizó Airtable? ¿falló el flujo?).
+// La red, a la vista: encendidas cuya Fecha fin ya pasó sin que llegara el desactivar. Siguen
+// de vacaciones hasta que llegue o se desactiven a mano: hay que revisarlas (¿se alargó la
+// ausencia? ¿falló el flujo?).
 export function ausenciasSinDesactivar(filas: FilaAusencia[], hoy: string): { slack_id: string; desde: string; fin: string }[] {
   return filas.flatMap((f) => {
     if (f.hasta !== null) return []

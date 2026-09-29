@@ -2,6 +2,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizarSlackId } from '@/lib/slack-id'
+import { cierreManual, type FilaAusencia } from '@/lib/avisos/vacaciones'
+import { diaMadrid } from '@/lib/horas/auditoria-types'
 
 export interface NuevoUsuario {
   full_name: string; email: string; password: string; positionId: string
@@ -203,5 +205,27 @@ export async function cambiarEstadoUsuario(id: string, status: 'activo' | 'inact
   const admin = createAdminClient()
   const { error } = await admin.from('profiles').update({ status }).eq('id', id)
   if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+// Desactivar a mano una ausencia cuyo desactivar no llegó (lista «No llegó el desactivar a
+// tiempo» del panel): se apaga en su Fecha fin, que es cuando volvió según Airtable. Solo
+// admin. Las fechas nunca apagan solas (vacaciones.ts): esto es la corrección a mano.
+export async function desactivarAusencia(slackId: string, desde: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'No autenticado.' }
+  const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (me?.role !== 'admin') return { ok: false, error: 'Solo un administrador puede desactivar una ausencia.' }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin.from('vacaciones').select('slack_id, desde, hasta, eventos')
+    .eq('slack_id', slackId).eq('desde', desde).is('hasta', null).maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  if (!data) return { ok: false, error: 'Esa ausencia ya no está activa: puede que acabe de llegar su desactivar.' }
+  const hasta = cierreManual(data as FilaAusencia, diaMadrid(new Date().toISOString()))
+  const { error: e } = await admin.from('vacaciones').update({ hasta, updated_at: new Date().toISOString() })
+    .eq('slack_id', slackId).eq('desde', desde).is('hasta', null)
+  if (e) return { ok: false, error: e.message }
   return { ok: true }
 }

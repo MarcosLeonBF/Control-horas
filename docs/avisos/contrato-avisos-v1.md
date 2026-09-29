@@ -673,11 +673,15 @@ Cómo funciona el interruptor:
   vacaciones hasta el `desactivar` de las vacaciones.
 - El `desactivar` tardío de una ausencia anterior no quita la que está en curso ahora.
 
-**Las fechas son la red de seguridad.** No deciden cuándo se activa ni se desactiva, pero
-sirven por si el `desactivar` no llega a tiempo:
+**Las fechas son la red de seguridad.** No deciden cuándo se activa ni se desactiva: nunca
+quitan a nadie de vacaciones por su cuenta. Sirven por si el `desactivar` no llega a tiempo:
 
-- Si pasa la `Fecha fin` y el `desactivar` no ha llegado, la persona se da por vuelta ese
-  día, y sale en el panel de usuarios en «No llegó el desactivar a tiempo» para revisarlo.
+- Si pasa la `Fecha fin` y el `desactivar` no ha llegado, la persona **sigue de
+  vacaciones** y sale en el panel de usuarios en «No llegó el desactivar a tiempo». Si la
+  ausencia se alargó, no hay que hacer nada: llegará el `desactivar` con la fecha nueva. Si
+  ya volvió, un admin la desactiva ahí a mano (queda desactivada en su `Fecha fin`).
+- Si llega el `activar` de otra ausencia estando todavía activada una cuya `Fecha fin` ya
+  pasó, aquella se da por terminada en su `Fecha fin`.
 - Si el `desactivar` llega tarde, se corrige a la `Fecha fin` que trae (lo último que dice
   Airtable, también si la alargó o la acortó) o, si no trae, a la del `activar`.
 - Un `activar` cuya `Fecha fin` ya pasó no hace nada: esa ausencia ya terminó.
@@ -808,8 +812,9 @@ quita**: ya no viaja en `persona`, `manager_proyecto`, `managers`, el `actor` ni
 - La entrada de vacaciones funciona como un **interruptor**: `activar` pone a la persona de
   vacaciones y `desactivar` la quita, el día en que llegan. Lee `Fecha inicio` y `Fecha
   fin` sueltas, como las mandas desde Airtable, y las usa de red de seguridad: si pasa la
-  `Fecha fin` sin `desactivar`, la persona se da por vuelta ese día. Una fecha que no se
-  entiende se ignora. Ver «Entradas → Vacaciones y ausencias».
+  `Fecha fin` sin `desactivar`, se avisa en el panel (no se quita a nadie de vacaciones
+  solo por la fecha), y un `desactivar` tardío se corrige a su `Fecha fin`. Una fecha que
+  no se entiende se ignora. Ver «Entradas → Vacaciones y ausencias».
 
 De paso: en `dias-sin-registrar`, `dentro_de_plazo` decía 7 días y son 15 desde el 22/09, y
 se documentan `pendientes`, `pendientes_dd_mm` y `dias_desde_mas_antiguo`, que ya llegaban.

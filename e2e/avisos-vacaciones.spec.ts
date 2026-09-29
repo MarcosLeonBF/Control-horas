@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test'
 import {
-  validarEnvio, planificar, ausenciasPorPersona, ausenciasHoy, ausenciasSinUsuario, ausenciasSinDesactivar, etiquetaAusencia,
+  validarEnvio, planificar, ausenciasPorPersona, ausenciasHoy, ausenciasSinUsuario, ausenciasSinDesactivar, cierreManual, etiquetaAusencia,
   type PerfilIdentificable, type AusenciaActual, type EventoRef, type Operacion,
 } from '../lib/avisos/vacaciones'
 
 // Las ausencias (vacaciones, festivos…) llegan del flujo de Julián como un interruptor por
 // persona: `activar` lo enciende el día que empieza y `desactivar` lo apaga el día que
 // termina (ese día todavía es de vacaciones). Las fechas del pulso no deciden cuándo se
-// enciende ni se apaga: son la red por si el desactivar no llega a tiempo.
+// enciende ni se apaga: son la red por si el desactivar no llega a tiempo, que AVISA (panel)
+// y corrige cuando llega un pulso, pero nunca apaga sola (Roberto, 29/09).
 
 const estefania = { slack_id: 'U096AGWQJN4', accion: 'activar', eventos: [{ inicio: '2026-09-29', fin: '2026-10-02', tipo: 'ausencia' }] }
 const santiago = { slack_id: 'U0A85K6107L', accion: 'activar' }
@@ -208,8 +209,8 @@ test('el pulso real de Julián: activar el día de inicio', () => {
   const r = envio([], v.valor[0])
   expect(periodos(r.filas)).toEqual([[HOY, null]])
   expect(ausenciasHoy(r.filas, HOY).get(S)).toEqual({ desde: HOY, fin: '2026-10-02' }) // se ve cuándo vuelve
-  // Si pasa su Fecha fin sin que llegue el desactivar, se da por apagado en esa fecha.
-  expect(ausenciasHoy(r.filas, '2026-10-05').has(S)).toBe(false)
+  // Si pasa su Fecha fin sin que llegue el desactivar, sigue de vacaciones (la red solo avisa).
+  expect(ausenciasHoy(r.filas, '2026-10-05').get(S)).toEqual({ desde: HOY, fin: null })
 })
 
 // --- lectura: días sin registrar, avisos y panel ------------------------------
@@ -262,13 +263,20 @@ test('etiquetaAusencia: con la fecha de vuelta si se sabe', () => {
 
 const encendidoHasta = (fin: string) => fila(1, HOY, null, fechas(HOY, fin))
 
-test('red: si pasa la Fecha fin y no llegó el desactivar, se da por apagado en su fin', () => {
+test('red: si pasa la Fecha fin y no llegó el desactivar, sigue de vacaciones (solo se avisa)', () => {
+  // Puede que se alargara en Airtable y el desactivar llegue con la fecha nueva: las fechas
+  // nunca apagan el interruptor por su cuenta.
   const filas = [encendidoHasta('2026-10-02')]
   expect(ausenciasHoy(filas, '2026-10-02').get(S)).toEqual({ desde: HOY, fin: '2026-10-02' })
-  expect(ausenciasHoy(filas, '2026-10-03').has(S)).toBe(false)
+  expect(ausenciasHoy(filas, '2026-10-03').get(S)).toEqual({ desde: HOY, fin: null }) // la vuelta ya no se sabe
   const a = ausenciasPorPersona(filas, '2026-10-06', '2026-07-01').get(S)!
-  expect(a.ausenteHoy).toBe(false)
-  expect([...a.dias]).toEqual([HOY, '2026-09-30', '2026-10-01', '2026-10-02'])
+  expect(a.ausenteHoy).toBe(true)
+  expect(ausenciasSinDesactivar(filas, '2026-10-06')).toEqual([{ slack_id: S, desde: HOY, fin: '2026-10-02' }])
+})
+
+test('red: desactivar a mano desde el panel lo apaga en su Fecha fin (o hoy si no la tiene)', () => {
+  expect(cierreManual(encendidoHasta('2026-10-02'), '2026-10-06')).toBe('2026-10-02')
+  expect(cierreManual(fila(1, HOY, null), '2026-10-06')).toBe('2026-10-06')
 })
 
 test('red: la lista de a quién no le llegó el desactivar a tiempo', () => {
