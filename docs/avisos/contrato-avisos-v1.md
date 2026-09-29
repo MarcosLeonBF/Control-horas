@@ -14,7 +14,7 @@ Hay tres vías:
 2. **Consultas.** Para lo que va por calendario, tu flujo hace un `GET` a la plataforma cuando
    quiera (por ejemplo, cada mañana a las 9:00) con una clave, y recibe la lista.
 3. **Entradas.** Tu flujo le manda datos a la plataforma con un `POST` y la misma clave. Por
-   ahora, las vacaciones.
+   ahora, las vacaciones y ausencias.
 
 La plataforma solo detecta y manda datos. El canal de Slack, el texto del mensaje y a quién le
 llega se deciden en tu flujo.
@@ -608,71 +608,77 @@ Con esto se monta la escalera de recordatorios en el flujo: `dias = 1`, aviso a 
 Datos que tu flujo le manda a la plataforma. Se autentican igual que las consultas, con la
 misma clave: `Authorization: Bearer <clave>`.
 
-### Vacaciones
+### Vacaciones y ausencias
 
 ```
 POST https://<dominio>/api/avisos/v1/vacaciones
 Content-Type: application/json
 ```
 
-Una fila de Airtable por envío. Si la misma fila vuelve a llegar (mismo `id`), se actualiza:
-mandar dos veces lo mismo no duplica nada.
+Por cada persona, una acción: **`activar`** el día que empieza su ausencia (vacaciones,
+festivo, ausencia…) y **`desactivar`** el día que termina. Se pueden mandar varias personas
+en un mismo envío, en una lista, o una sola como objeto.
 
 | Campo | Qué es |
 |---|---|
-| `id` | El id de la fila en Airtable. Obligatorio |
-| `slack_id` | ID de miembro de Slack de la persona (`U…`) |
-| `email` | Email de la persona |
-| `desde` | Primer día de vacaciones, `YYYY-MM-DD` |
-| `hasta` | Último día de vacaciones, `YYYY-MM-DD`, incluido |
-| `estado` | `"aprobada"` (cuenta) o `"cancelada"` (no cuenta) |
+| `slack_id` | ID de miembro de Slack de la persona (`U…`). Obligatorio |
+| `accion` | `"activar"` o `"desactivar"`, en minúsculas. Obligatorio |
+| `eventos` | Opcional. Lista con las fechas de la ausencia (`inicio`, `fin`, `tipo`), de referencia |
 
-Tiene que venir al menos uno de `slack_id` o `email`; mejor los dos. Un campo vacío (`""`) o
-`null` cuenta como que no viene. La persona se busca primero por `slack_id` y, si no llega o
-no es de nadie, por `email`.
+```json
+[
+  {
+    "slack_id": "U01LAURA001",
+    "accion": "activar",
+    "eventos": [{ "inicio": "2026-09-29", "fin": "2026-10-02", "tipo": "vacaciones" }]
+  },
+  { "slack_id": "U01CARLOS01", "accion": "desactivar" }
+]
+```
 
-- Son días completos. `hasta` no puede ser anterior a `desde` y un periodo no puede pasar de
-  90 días.
-- `estado` va tal cual, en minúsculas. Cualquier otro valor da `400`.
-- Si en Airtable hay más estados (pendiente, rechazada…), solo se manda como `"aprobada"`
-  la que está aprobada. Si una fila que ya se mandó aprobada deja de estarlo, mándala como
-  `"cancelada"`.
-- **Para anular unas vacaciones, manda la fila con `estado: "cancelada"`.** Si la fila se
-  borra en Airtable, a la plataforma no le llega nada y las vacaciones siguen contando.
+Cómo se interpreta:
+
+- La ausencia va **del día del `activar` al día del `desactivar`, los dos incluidos**: el
+  `desactivar` llega el último día, que todavía cuenta como ausencia.
+- Mientras no llegue su `desactivar`, la persona sigue de ausencia.
+- Un `activar` repetido, estando ya de ausencia, no cambia nada. Un `desactivar` repetido el
+  mismo día, tampoco. Reintentar un envío es seguro.
+- Si se perdió el `activar` y llega el `desactivar` con `eventos`, la ausencia se guarda
+  desde el `inicio` más antiguo de `eventos` que ya haya pasado (como mucho 90 días atrás).
+  Sin `eventos` útiles, ese `desactivar` no tiene nada que cerrar.
+- Todo el envío se valida antes de guardar nada: si una persona está mal, se rechaza entero
+  y el error dice cuál.
+
+Respuesta (`200`), una línea por persona, en el mismo orden:
 
 ```json
 {
-  "id": "recA1b2C3d4E5f6G7",
-  "slack_id": "U01LAURA001",
-  "email": "laura.gomez@ejemplo.com",
-  "desde": "2026-10-13",
-  "hasta": "2026-10-17",
-  "estado": "aprobada"
+  "ok": true,
+  "personas": [
+    { "slack_id": "U01LAURA001", "accion": "activar", "persona": { "id": "a1b2…", "nombre": "Laura Gómez" }, "resultado": "iniciada" },
+    { "slack_id": "U01CARLOS01", "accion": "desactivar", "persona": null, "resultado": "sin_ausencia" }
+  ]
 }
 ```
 
-Respuesta (`200`):
-
-```json
-{ "ok": true, "id": "recA1b2C3d4E5f6G7", "persona": { "id": "a1b2…", "nombre": "Laura Gómez" }, "cuenta": true }
-```
-
-- `persona`: de quién son, según los usuarios que hay hoy en la plataforma. `null` si no hay
-  nadie con ese `slack_id` o `email`: la fila se guarda igual y contará cuando esa persona
-  tenga usuario.
-- `cuenta`: `true` si el estado es `aprobada`.
+- `persona`: a quién corresponde ese `slack_id` en la plataforma. `null` si no tiene
+  usuario: se guarda igual y contará cuando lo tenga.
+- `resultado`: `iniciada`, `ya_iniciada` (ya estaba de ausencia), `terminada`,
+  `ya_terminada` (ya se había cerrado hoy) o `sin_ausencia` (un `desactivar` sin ausencia que
+  cerrar).
 
 Si algo falla, la respuesta es `{ "ok": false, "error": "…" }` con el motivo:
 
 | Código | Cuándo |
 |---|---|
-| `400` | El cuerpo no es JSON o algún campo no es válido. Si es un campo, `error` dice cuál y termina con los campos que llegaron y su tipo (por ejemplo, `Campos recibidos: id (número), fields (objeto).`); si el cuerpo no es un objeto, dice qué llegó |
+| `400` | El cuerpo no es JSON o una persona no es válida. `error` dice cuál (`Persona 2 (U0…): …`) y termina con los campos que traía y su tipo (por ejemplo, `Campos recibidos: accion (texto).`) |
 | `401` | Falta la clave o no es correcta |
-| `422` | `slack_id` y `email` son de personas distintas, el email es de alguien que tiene otro `slack_id`, o el email está en más de un usuario. No se guarda nada: corrige el dato en Airtable y vuelve a mandarla. Una fila `cancelada` nunca da `422`: se guarda igual |
-| `500` | Error de la plataforma. Se puede reintentar: la misma fila otra vez no duplica |
+| `500` | Error de la plataforma. Se puede reintentar: repetir un envío no duplica nada |
 
-Con un `400` o un `422` no se guarda nada: si esa fila ya se había mandado antes, sigue
-valiendo la versión anterior.
+Con un `400` no se guarda nada de ese envío.
+
+Todo lo que llega con la clave correcta, aceptado o no, se ve en la plataforma en
+**Administración → Avisos → Recibidos**.
 
 ## Reglas por defecto
 
@@ -730,3 +736,9 @@ anotará aquí.
 **29/09/2026** · En la entrada de vacaciones, el mensaje de un `400` termina con los campos
 que llegaron y su tipo (`Campos recibidos: …`), para ver de un vistazo si el `id` llegó
 como número o si todo vino dentro de otro objeto. Nada más cambia.
+
+**29/09/2026** · **La entrada de vacaciones cambia de formato** para seguir el que ya manda tu
+flujo: una lista de personas con `slack_id` y `accion` (`activar` el día que empieza la
+ausencia, `desactivar` el día que termina), y `eventos` opcional de referencia. El formato
+del 28/09 (`id`, `desde`, `hasta`, `estado`) deja de existir; no llegó a guardar nada. La
+respuesta trae un `resultado` por persona. Ver «Entradas → Vacaciones y ausencias».

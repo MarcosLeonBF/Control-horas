@@ -15,7 +15,7 @@ export default async function AvisosPage() {
 
   const admin = createAdminClient()
   const hace30Dias = new Date(Date.now() - 30 * 86_400_000).toISOString()
-  const COLUMNAS_RECIBIDO = 'id, created_at, tipo, status, error, airtable_id, persona_nombre, cuerpo, cuerpo_texto'
+  const COLUMNAS_RECIBIDO = 'id, created_at, tipo, status, error, resumen, cuerpo, cuerpo_texto'
   const [cfg, envios, recibidos, rechazos] = await Promise.all([
     admin.from('avisos_config').select('url, tipos_activos').eq('id', true).single(),
     admin.from('avisos_salientes')

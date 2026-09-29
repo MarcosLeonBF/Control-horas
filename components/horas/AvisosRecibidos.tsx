@@ -11,8 +11,7 @@ export interface RecibidoRow {
   tipo: string
   status: number
   error: string | null
-  airtable_id: string | null
-  persona_nombre: string | null
+  resumen: string | null // qué pasó con cada persona, si se aceptó
   cuerpo: unknown
   cuerpo_texto: string | null
 }
@@ -50,16 +49,14 @@ export default function AvisosRecibidos({ recibidos, url }: { recibidos: Recibid
               <TableRow className="bg-(--muted-surface) hover:bg-(--muted-surface)">
                 <TableHead>Fecha</TableHead>
                 <TableHead>Resultado</TableHead>
-                <TableHead>Fila de Airtable</TableHead>
-                <TableHead>Persona</TableHead>
-                <TableHead>Motivo</TableHead>
+                <TableHead>Detalle</TableHead>
                 <TableHead>Lo que llegó</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {recibidos.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
                     Todavía no ha llegado nada.
                   </TableCell>
                 </TableRow>
@@ -73,13 +70,10 @@ export default function AvisosRecibidos({ recibidos, url }: { recibidos: Recibid
                     <TableCell className="py-2.5">
                       <Badge className={cn(res.clase)}>{res.texto}</Badge>
                     </TableCell>
-                    <TableCell className="py-2.5 font-mono text-xs">{r.airtable_id ?? '—'}</TableCell>
-                    <TableCell className="py-2.5 text-sm">
-                      {r.status !== 200
-                        ? <span className="text-muted-foreground">—</span>
-                        : r.persona_nombre || <span className="text-muted-foreground">Sin usuario en la plataforma</span>}
+                    {/* Aceptado: qué pasó con cada persona. Rechazado: el motivo que se le contestó. */}
+                    <TableCell className={cn('max-w-lg whitespace-normal py-2.5 text-xs', r.status === 200 ? 'text-foreground/80' : 'text-muted-foreground')}>
+                      {(r.status === 200 ? r.resumen : r.error) || '—'}
                     </TableCell>
-                    <TableCell className="max-w-md whitespace-normal py-2.5 text-xs text-muted-foreground">{r.error ?? '—'}</TableCell>
                     <TableCell className="py-2.5 text-xs">
                       {llego === null ? <span className="text-muted-foreground">—</span> : (
                         <details>

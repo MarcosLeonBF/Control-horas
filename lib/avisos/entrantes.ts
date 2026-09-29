@@ -30,28 +30,16 @@ export function describirCampos(obj: Record<string, unknown>): string {
 }
 
 export interface FilaEntrante {
-  tipo: string; status: number; error: string | null
-  airtable_id: string | null; persona_id: string | null; persona_nombre: string | null
+  tipo: string; status: number; error: string | null; resumen: string | null
   cuerpo: unknown; cuerpo_texto: string | null
 }
 
-type RespuestaEntrante =
-  | { ok: true; id: string; persona: { id: string; nombre: string } | null }
-  | { ok: false; error: string }
-
-// El id de la fila tal como venga, aunque sea un número: sirve para encontrarla en Airtable.
-function idDe(cuerpo: unknown): string | null {
-  if (typeof cuerpo !== 'object' || cuerpo === null || Array.isArray(cuerpo)) return null
-  const id = (cuerpo as Record<string, unknown>).id
-  if (typeof id === 'number') return String(id)
-  return typeof id === 'string' && id.trim() ? id.trim().slice(0, 200) : null
-}
-
-const ERROR_MAX = 1_000
+const TEXTO_CORTO_MAX = 1_000
 
 export function anotacionEntrante(tipo: string, a: {
   status: number
-  respuesta: RespuestaEntrante
+  error?: string | null // el motivo que se contestó, si no fue 200
+  resumen?: string | null // qué pasó, en una línea (p. ej. por persona), si fue 200
   cuerpo?: unknown // el JSON recibido; undefined si no era JSON
   crudo?: string // el texto recibido, solo si no era JSON
   interno?: string // detalle de un 500: se guarda para el admin en vez del mensaje público
@@ -65,13 +53,11 @@ export function anotacionEntrante(tipo: string, a: {
       cuerpo = null
     }
   }
-  const r = a.respuesta
-  const error = a.interno ?? (r.ok ? null : r.error)
+  const error = a.interno ?? a.error ?? null
   return {
-    tipo, status: a.status, error: error === null ? null : error.slice(0, ERROR_MAX),
-    airtable_id: r.ok ? r.id : idDe(a.cuerpo),
-    persona_id: r.ok ? r.persona?.id ?? null : null,
-    persona_nombre: r.ok ? r.persona?.nombre ?? null : null,
+    tipo, status: a.status,
+    error: error === null ? null : error.slice(0, TEXTO_CORTO_MAX),
+    resumen: a.resumen ? a.resumen.slice(0, TEXTO_CORTO_MAX) : null,
     cuerpo, cuerpo_texto: texto,
   }
 }
