@@ -13,7 +13,7 @@ import {
   planificar, validarEnvio, type AusenciaActual, type EnvioAceptado, type EnvioRechazado, type Operacion,
   type PerfilIdentificable,
 } from '@/lib/avisos/vacaciones'
-import { addDiasISO, diaMadrid } from '@/lib/horas/auditoria-types'
+import { diaMadrid } from '@/lib/horas/auditoria-types'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const PLAZO_MS = 5_000 // cada operación de la anotación: sin plazo, una base colgada la dejaría viva
@@ -22,23 +22,23 @@ const RETENCION_DIAS = 90
 type Db = ReturnType<typeof createAdminClient>
 interface PerfilRaw { id: string; full_name: string | null; slack_id: string | null }
 
-// Primero los cierres y después las altas: una persona que en el mismo envío termina una
-// ausencia y empieza otra no puede tener dos abiertas ni un momento (índice único).
+// Primero los cambios y después las altas: una persona que en el mismo envío termina una
+// ausencia abierta y empieza otra no puede tener dos abiertas ni un momento (índice único
+// de una abierta por persona). Si dos envíos a la vez dan de alta el mismo periodo, el
+// índice persona + día de inicio (0055) hace fallar al segundo con un 500; el flujo reintenta
+// y ya ve la fila.
 async function ejecutar(db: Db, operaciones: Operacion[]): Promise<void> {
   const ahora = new Date().toISOString()
   for (const o of operaciones) {
-    if (o.op === 'cerrar') {
-      const { error } = await db.from('vacaciones').update({ hasta: o.hasta, updated_at: ahora }).eq('id', o.id).is('hasta', null)
-      if (error) throw new Error(`vacaciones (cerrar): ${error.message}`)
-    } else if (o.op === 'eventos') {
-      const { error } = await db.from('vacaciones').update({ eventos: o.eventos, updated_at: ahora }).eq('id', o.id)
-      if (error) throw new Error(`vacaciones (eventos): ${error.message}`)
-    }
+    if (o.op !== 'cambio') continue
+    const cambio: Record<string, unknown> = { updated_at: ahora }
+    if (o.hasta !== undefined) cambio.hasta = o.hasta
+    if (o.eventos !== undefined) cambio.eventos = o.eventos
+    const { error } = await db.from('vacaciones').update(cambio).eq('id', o.id)
+    if (error) throw new Error(`vacaciones (cambio): ${error.message}`)
   }
   const altas = operaciones.flatMap((o) =>
-    o.op === 'abrir' ? [{ slack_id: o.slack_id, desde: o.desde, eventos: o.eventos }]
-      : o.op === 'cerrada' ? [{ slack_id: o.slack_id, desde: o.desde, hasta: o.hasta, eventos: o.eventos }]
-        : [])
+    o.op === 'alta' ? [{ slack_id: o.slack_id, desde: o.desde, hasta: o.hasta, eventos: o.eventos }] : [])
   if (altas.length) {
     const { error } = await db.from('vacaciones').insert(altas)
     if (error) throw new Error(`vacaciones (alta): ${error.message}`)
@@ -102,11 +102,12 @@ export async function POST(req: Request) {
   try {
     const db = cliente()
     const hoy = diaMadrid(new Date().toISOString())
+    // Todas las ausencias de las personas del envío (son pocas por persona): un pulso con
+    // fechas puede apuntar a un periodo de hace días, y hay que encontrar su fila.
+    const slacks = [...new Set(v.valor.map((x) => x.slack_id))]
     const [perfiles, actuales] = await Promise.all([
       db.from('profiles').select('id, full_name, slack_id').not('slack_id', 'is', null),
-      // Solo importan las abiertas y las cerradas hoy o ayer: para no cerrar dos veces, ni
-      // crear otra con un desactivar reintentado pasada la medianoche.
-      db.from('vacaciones').select('id, slack_id, desde, hasta, eventos').or(`hasta.is.null,hasta.gte.${addDiasISO(hoy, -1)}`),
+      db.from('vacaciones').select('id, slack_id, desde, hasta, eventos').in('slack_id', slacks),
     ])
     if (perfiles.error) throw new Error(`profiles: ${perfiles.error.message}`)
     if (actuales.error) throw new Error(`vacaciones: ${actuales.error.message}`)

@@ -637,56 +637,52 @@ Content-Type: application/json
 ```
 
 Por cada persona, una acción: **`activar`** el día que empieza su ausencia (vacaciones,
-festivo, ausencia…) y **`desactivar`** el día que termina. Se pueden mandar varias personas
-en un mismo envío, en una lista, o una sola como objeto.
+festivo, ausencia…) y **`desactivar`** el día que termina, con las fechas de esa ausencia.
+Se pueden mandar varias personas en un mismo envío, en una lista, o una sola como objeto.
 
 | Campo | Qué es |
 |---|---|
 | `Slack ID` (o `slack_id`) | ID de miembro de Slack de la persona (`U…`). Obligatorio |
 | `Accion` (o `accion`) | `"activar"` o `"desactivar"`, en minúsculas. Obligatorio |
-| `Fecha inicio` (o `inicio`) | Opcional. Primer día de la ausencia, `YYYY-MM-DD` |
-| `Fecha fin` (o `fin`) | Opcional. Último día de la ausencia, `YYYY-MM-DD` |
-| `eventos` | Opcional. Lista de fechas (`inicio`, `fin`, `tipo`), por si una persona tiene varias |
+| `Fecha inicio` (o `inicio`) | Primer día de la ausencia, `YYYY-MM-DD`. Muy recomendado |
+| `Fecha fin` (o `fin`) | Último día de la ausencia, `YYYY-MM-DD`. Muy recomendado |
+| `eventos` | Opcional. Lista de fechas (`inicio`, `fin`, `tipo`), por si una persona trae varias |
 
 Los nombres de campo valen como vienen de Airtable o en minúsculas: no se distinguen
-mayúsculas, tildes, espacios, guiones ni guiones bajos. Las fechas van en `YYYY-MM-DD` (con
-hora también vale, se toma el día); en otro formato se ignoran sin error, así que conviene
-comprobarlas en **Recibidos**.
+mayúsculas, tildes, espacios, guiones ni guiones bajos.
 
 ```json
 { "Accion": "activar", "Slack ID": "U01LAURA001", "Fecha inicio": "2026-09-29", "Fecha fin": "2026-10-02" }
 ```
 
-Cómo se interpreta:
+**Con fechas (lo normal).** Mandan las fechas: cada pulso apunta a la ausencia de esa
+persona que empieza en su `Fecha inicio`.
 
-- La ausencia va **del día del `activar` al día del `desactivar`, los dos incluidos**: el
-  `desactivar` llega el último día, que todavía cuenta como ausencia.
-- Mientras no llegue su `desactivar`, la persona sigue de ausencia, salvo que las fechas
-  digan que ya terminó (ver abajo).
-- El día es el de Madrid en el momento de recibir el pulso: mándalos durante el día (un
-  pulso que llegue pasada la medianoche cuenta para el día siguiente).
-- Pulsos repetidos o fuera de orden no cambian nada, lleguen en el mismo envío o en envíos
-  separados: un `activar` estando ya de ausencia, un `desactivar` repetido (también
-  reintentado pasada la medianoche) o un `activar` que llega después del `desactivar` de ese
-  mismo día. Reintentar un envío es seguro.
-- Un `desactivar` sin su `activar` (se perdió, o llegó antes que él) guarda la ausencia de
-  ese día, o desde la `Fecha inicio` si la trae y la ausencia sigue en curso (como mucho 90
-  días atrás). Si sus fechas dicen que la ausencia no es hoy, no guarda nada (`sin_ausencia`).
+- El `activar` la guarda entera, de `Fecha inicio` a `Fecha fin`: la persona queda de
+  ausencia esos días y **termina sola en su `Fecha fin`**, aunque el `desactivar` no llegue.
+- El `desactivar` la termina ese día (si la persona vuelve antes de lo previsto) o en su
+  `Fecha fin` (si el pulso llega tarde). Si llega antes de que empiece, no hace nada
+  (`sin_ausencia`). Si llega sin que haya llegado su `activar`, guarda la ausencia hasta
+  ese día.
+- El `activar` y el `desactivar` de una misma ausencia son la misma: **da igual el orden en
+  que lleguen, que se repitan o que lleguen a la vez**. Reintentar un envío es seguro.
+- Las fechas van en `YYYY-MM-DD` (con hora también vale: si trae zona, cuenta su día en
+  Madrid). Tienen que venir las dos, la de fin no puede ser anterior a la de inicio y una
+  ausencia no puede pasar de un año: si no, `400`. Vacías (`""`) cuentan como que no vienen.
 
-**Las fechas.** **Recomendado: manda `Fecha inicio` y `Fecha fin` en el `activar`.** Solo
-cuentan las fechas de esa ausencia: las que incluyen el día en que empezó. Con ellas:
+**Sin fechas (respaldo).** El `activar` deja a la persona de ausencia desde ese día y hasta
+que llegue su `desactivar`, que la termina ese día. Aquí el orden sí importa: si se pierde
+un `desactivar`, la persona sigue de ausencia (se ve en el panel de usuarios como «Ausente
+desde…»). Un `desactivar` sin nada que terminar guarda una ausencia de ese día. Un `activar`
+el día después de terminar otra ausencia se toma por repetido. Por todo esto, **manda
+siempre las fechas**.
 
-- la plataforma sabe cuándo vuelve la persona, y se ve en el panel de usuarios;
-- si un `desactivar` no llega, la ausencia termina igual en su `Fecha fin`;
-- si el `activar` llega tarde, la ausencia empieza en su `Fecha inicio`.
+Otros detalles:
 
-Sin fechas, solo se sabe desde cuándo está fuera, y sigue fuera hasta que llegue su
-`desactivar`. Un `activar` siempre abre la ausencia el día que llega: si trae fechas
-futuras, no se adelanta ni se programa nada. De cada evento solo se guardan `inicio`, `fin`
-y `tipo`, como mucho 50 por persona.
-
-Todo el envío se valida antes de guardar nada: si una persona está mal, se rechaza entero y
-el error dice cuál. Como mucho 500 personas por envío; una lista vacía da `400`.
+- El día es el de Madrid en el momento de recibir el pulso: mándalos durante el día.
+- De cada evento solo se guardan `inicio`, `fin` y `tipo`, como mucho 50 por persona.
+- Todo el envío se valida antes de guardar nada: si una persona está mal, se rechaza entero
+  y el error dice cuál. Como mucho 500 personas por envío; una lista vacía da `400`.
 
 Respuesta (`200`), una línea por persona, en el mismo orden:
 
@@ -701,9 +697,9 @@ Respuesta (`200`), una línea por persona, en el mismo orden:
 
 - `persona`: a quién corresponde ese `slack_id` en la plataforma. `null` si no tiene
   usuario: se guarda igual y contará cuando lo tenga.
-- `resultado`: `iniciada`, `ya_iniciada` (ya estaba de ausencia), `terminada`,
-  `ya_terminada` (ya se había cerrado hoy o ayer: un pulso repetido) o `sin_ausencia` (un
-  `desactivar` cuyas fechas dicen que la ausencia no es hoy).
+- `resultado`: `iniciada`, `ya_iniciada` (ya estaba guardada), `terminada`, `ya_terminada`
+  (ya estaba terminada: un pulso repetido) o `sin_ausencia` (un `desactivar` de una ausencia
+  que todavía no ha empezado).
 
 Si algo falla, la respuesta es `{ "ok": false, "error": "…" }` con el motivo:
 
@@ -799,9 +795,12 @@ quita**: ya no viaja en `persona`, `manager_proyecto`, `managers`, el `actor` ni
 - De quien está de ausencia no se manda nada: tampoco `registro.enviado` ni
   `registro.llamativo` si está fuera el día en que guarda (en `dias-sin-registrar` ya no
   aparecía).
-- La entrada de vacaciones lee también `Fecha inicio` y `Fecha fin` sueltas, como las
-  mandas desde Airtable (antes solo dentro de `eventos`). Ver «Entradas → Vacaciones y
-  ausencias».
+- La entrada de vacaciones lee `Fecha inicio` y `Fecha fin` sueltas, como las mandas desde
+  Airtable (antes se ignoraban), y **mandan las fechas**: cada pulso apunta a la ausencia
+  que empieza en su `Fecha inicio`, da igual el orden, las repeticiones o que lleguen a la
+  vez, y la ausencia termina sola en su `Fecha fin`. Si las fechas están mal escritas, falta
+  una o la de fin es anterior, la respuesta es `400` (antes se ignoraban). Ver «Entradas →
+  Vacaciones y ausencias».
 
 De paso: en `dias-sin-registrar`, `dentro_de_plazo` decía 7 días y son 15 desde el 22/09, y
 se documentan `pendientes`, `pendientes_dd_mm` y `dias_desde_mas_antiguo`, que ya llegaban.
