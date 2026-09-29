@@ -41,9 +41,9 @@ export type Operacion =
   | { op: 'alta'; slack_id: string; desde: string; hasta: string | null; eventos: EventoRef[] }
 
 // Lo que pasó con cada persona, para quien manda:
-// iniciada / ya_iniciada (ya estaba guardada) / terminada / ya_terminada (ya estaba
-// terminada: un pulso repetido) / sin_ausencia (un desactivar de una ausencia que aún no
-// ha empezado).
+// iniciada / ya_iniciada (ya estaba guardada) / terminada / ya_terminada (ya había
+// terminado antes de hoy: un desactivar tardío repetido) / sin_ausencia (un desactivar de
+// una ausencia que aún no ha empezado).
 export type Resultado = 'iniciada' | 'ya_iniciada' | 'terminada' | 'ya_terminada' | 'sin_ausencia'
 export interface ResultadoPersona {
   slack_id: string; accion: Accion; persona: { id: string; nombre: string } | null; resultado: Resultado
@@ -64,7 +64,10 @@ function esFecha(v: unknown): v is string {
 // la medianoche de Madrid), por su día en Madrid; sin zona, por el día que pone.
 function aDia(t: string): string {
   if (!/^\d{4}-\d{2}-\d{2}T/.test(t)) return t
-  if (/(Z|[+-]\d{2}:?\d{2})$/.test(t) && !Number.isNaN(Date.parse(t))) return diaMadrid(t)
+  if (/(Z|[+-]\d{2}:?\d{2})$/.test(t)) {
+    const ms = t.replace(/(\.\d{3})\d+/, '$1') // Date solo entiende milisegundos
+    if (!Number.isNaN(Date.parse(ms))) return diaMadrid(ms)
+  }
   return t.slice(0, 10)
 }
 
@@ -74,8 +77,8 @@ function limpiarEvento(e: unknown): EventoRef | null {
   for (const k of ['inicio', 'fin', 'tipo'] as const) {
     const v = e[k]
     if (typeof v !== 'string') continue
-    const t = v.replace(/\u0000/g, '').trim().slice(0, k === 'tipo' ? 50 : 30)
-    if (t) limpio[k] = k === 'tipo' ? t : aDia(t)
+    const t = v.replace(/\u0000/g, '').trim()
+    if (t) limpio[k] = k === 'tipo' ? t.slice(0, 50) : aDia(t).slice(0, 30)
   }
   return Object.keys(limpio).length ? limpio : null
 }
@@ -141,7 +144,14 @@ function validarPersona(bruto: unknown): { ok: true; valor: PulsoPersona } | { o
   let eventos: EventoRef[] = sueltas.evento ? [sueltas.evento] : []
   if (p.eventos !== undefined && p.eventos !== null) {
     if (!Array.isArray(p.eventos)) return { ok: false, error: 'eventos, si viene, tiene que ser una lista.' }
-    eventos = [...eventos, ...p.eventos.map(limpiarEvento).filter((e): e is EventoRef => e !== null)].slice(0, MAX_EVENTOS)
+    const lista = p.eventos.map(limpiarEvento)
+    // Un evento con fechas mal escritas no se ignora: el pulso acabaría tratado como si no
+    // trajera fechas, y la ausencia sin fin.
+    const malo = lista.findIndex((e) => e !== null && (e.inicio !== undefined || e.fin !== undefined) && !periodoDe(e))
+    if (malo >= 0) {
+      return { ok: false, error: `evento ${malo + 1}: las fechas tienen que ser YYYY-MM-DD, venir las dos, en orden y como mucho un año.` }
+    }
+    eventos = [...eventos, ...lista.filter((e): e is EventoRef => e !== null)].slice(0, MAX_EVENTOS)
   }
   return { ok: true, valor: { slack_id: n.valor, accion: p.accion, eventos } }
 }
@@ -210,14 +220,19 @@ export function planificar(
   }
 
   const personas: ResultadoPersona[] = []
+  const sinFechas: boolean[] = []
   for (const { slack_id, accion, eventos } of pulsos) {
     const mias = () => deLaPersona(slack_id)
     const periodos = eventos.map(periodoDe).filter((x): x is { inicio: string; fin: string } => x !== null)
+    sinFechas.push(periodos.length === 0)
     const resultados: Resultado[] = []
 
     if (periodos.length) {
       // Con fechas: cada periodo es la fila de esa persona con ese día de inicio.
       for (const { inicio, fin } of periodos) {
+        // Una abierta sin fechas que empezó antes: se perdió su desactivar. Si empieza otra
+        // ausencia, aquella terminó como tarde la víspera.
+        for (const o of mias()) if (o.hasta === null && o.desde < inicio) o.hasta = addDiasISO(inicio, -1)
         const f = mias().find((x) => x.desde === inicio)
         if (accion === 'activar') {
           if (f) {
@@ -234,16 +249,15 @@ export function planificar(
         } else if (hoy < inicio) {
           resultados.push('sin_ausencia') // todavía no ha empezado: no se guarda nada
         } else {
-          // Termina hoy, o en su fin si el desactivar llega tarde.
+          // Termina hoy, o en su fin si el desactivar llega tarde. Fija el final en los dos
+          // sentidos: si Airtable alargó la Fecha fin después del activar, el desactivar (que
+          // sale ese nuevo último día) trae la definitiva; si la acortó, también.
           const termina = fin < hoy ? fin : hoy
           if (f) {
             conEventos(f, eventos)
-            if (f.hasta === null || f.hasta > termina) {
-              f.hasta = termina
-              resultados.push('terminada')
-            } else {
-              resultados.push('ya_terminada')
-            }
+            const cambia = f.hasta !== termina
+            f.hasta = termina
+            resultados.push(!cambia && termina < hoy ? 'ya_terminada' : 'terminada')
           } else {
             for (const o of mias()) if (o.hasta === null && o.desde >= inicio && o.desde <= termina) o.hasta = termina
             alta(slack_id, inicio, termina, eventos) // sin su activar: se perdió o llegó antes
@@ -264,13 +278,13 @@ export function planificar(
     } else {
       // Sin fechas: termina hoy la ausencia en curso (la abierta si la hay). Sin ninguna, es
       // un desactivar sin su activar: al menos hoy es ausencia (llega el último día).
-      const actual = mias().find((x) => x.hasta === null && x.desde <= hoy) ?? mias().find((x) => cubre(x, hoy))
+      // Si hay varias en curso (un festivo dentro de unas vacaciones), la que empezó más
+      // tarde: es la que termina hoy.
+      const enCurso = mias().filter((x) => cubre(x, hoy)).sort((a, b) => b.desde.localeCompare(a.desde))
+      const actual = enCurso.find((x) => x.hasta === null) ?? enCurso[0]
       if (actual) {
-        if (actual.hasta === hoy) resultados.push('ya_terminada')
-        else {
-          actual.hasta = hoy
-          resultados.push('terminada')
-        }
+        actual.hasta = hoy
+        resultados.push('terminada')
       } else {
         alta(slack_id, hoy, hoy, eventos)
         resultados.push('terminada')
@@ -299,7 +313,7 @@ export function planificar(
   }
 
   const resumen = personas
-    .map((p) => `${p.persona ? p.persona.nombre || p.slack_id : `${p.slack_id} (sin usuario)`}: ${p.resultado}`)
+    .map((p, i) => `${p.persona ? p.persona.nombre || p.slack_id : `${p.slack_id} (sin usuario)`}: ${p.resultado}${sinFechas[i] ? ' (sin fechas)' : ''}`)
     .join(' · ')
   return { operaciones, respuesta: { ok: true, personas }, resumen }
 }

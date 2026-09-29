@@ -251,9 +251,10 @@ test('varias personas y pulsos en un envío, en orden; sin usuario se guarda igu
   ], perfiles, [], HOY)
   const filas = aplicar([], plan.operaciones)
   expect(filas.map((f) => [f.slack_id, f.desde, f.hasta])).toEqual([[S, HOY, HOY], ['U0A85K6107L', HOY, null]])
-  expect(plan.respuesta.personas.map((p) => p.resultado)).toEqual(['iniciada', 'ya_terminada', 'iniciada'])
+  expect(plan.respuesta.personas.map((p) => p.resultado)).toEqual(['iniciada', 'terminada', 'iniciada'])
   expect(plan.respuesta.personas[2].persona).toBe(null)
-  expect(plan.resumen).toBe('Estefanía García: iniciada · Estefanía García: ya_terminada · U0A85K6107L (sin usuario): iniciada')
+  // En Recibidos se nota qué pulsos llegaron sin fechas.
+  expect(plan.resumen).toBe('Estefanía García: iniciada · Estefanía García: terminada · U0A85K6107L (sin usuario): iniciada (sin fechas)')
 })
 
 test('el pulso real de Julián: activar el día de inicio con sus fechas', () => {
@@ -318,4 +319,46 @@ test('etiquetaAusencia: con la fecha de vuelta si se sabe', () => {
   expect(etiquetaAusencia({ desde: HOY, fin: '2026-10-02' }, HOY)).toBe('Ausente hasta el 02/10')
   expect(etiquetaAusencia({ desde: '2026-09-25', fin: HOY }, HOY)).toBe('Ausente hasta hoy')
   expect(etiquetaAusencia({ desde: HOY, fin: null }, HOY)).toBe('Ausente desde el 29/09')
+})
+
+// --- ronda 3: fechas que cambian en Airtable, abiertas sin fechas, ISO, resultados -----
+
+test('con fechas: si Airtable alarga la Fecha fin, el desactivar con la nueva la alarga', () => {
+  const filas = envio([], pulso('activar', fechas(HOY, '2026-10-02'))).filas
+  const r = envio(filas, pulso('desactivar', fechas(HOY, '2026-10-09')), '2026-10-09')
+  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([[HOY, '2026-10-09']])
+  expect(r.resultado).toBe('terminada')
+})
+
+test('con fechas: el desactivar normal (el día de fin) contesta terminada; repetido días después, ya_terminada', () => {
+  const filas = envio([], pulso('activar', fechas(HOY, '2026-10-02'))).filas
+  const normal = envio(filas, pulso('desactivar', fechas(HOY, '2026-10-02')), '2026-10-02')
+  expect(normal.resultado).toBe('terminada')
+  const tarde = envio(normal.filas, pulso('desactivar', fechas(HOY, '2026-10-02')), '2026-10-05')
+  expect(tarde.plan.operaciones).toEqual([])
+  expect(tarde.resultado).toBe('ya_terminada')
+})
+
+test('con fechas: una ausencia nueva cierra la abierta sin fechas de antes el día anterior a su inicio', () => {
+  // Se perdió el desactivar de una sin fechas: la siguiente con fechas le pone límite.
+  const r = envio([fila(1, '2026-09-10', null)], pulso('activar', fechas(HOY, '2026-10-02')))
+  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([['2026-09-10', '2026-09-28'], [HOY, '2026-10-02']])
+})
+
+test('sin fechas: el desactivar termina la ausencia que empezó más tarde (el festivo, no las vacaciones)', () => {
+  const vacaciones = fila(1, '2026-09-20', '2026-10-12', fechas('2026-09-20', '2026-10-12'))
+  const festivo = fila(2, HOY, HOY, fechas(HOY, HOY))
+  const r = envio([vacaciones, festivo], pulso('desactivar'))
+  expect(r.plan.operaciones).toEqual([])
+  expect(r.filas.find((f) => f.id === 1)!.hasta).toBe('2026-10-12')
+})
+
+test('validarEnvio: una fecha ISO con microsegundos y zona cuenta por su día en Madrid', () => {
+  const r = validarEnvio({ Accion: 'activar', 'Slack ID': S, 'Fecha inicio': '2026-09-28T22:00:00.123456+00:00', 'Fecha fin': '2026-10-02' })
+  expect(r.ok && r.valor[0].eventos).toEqual([{ inicio: HOY, fin: '2026-10-02' }])
+})
+
+test('validarEnvio: un evento de la lista con fechas mal escritas da 400, no se ignora', () => {
+  expect(errorDe({ ...santiago, eventos: [{ inicio: '29/09/2026', fin: '2026-10-02' }] })).toMatch(/evento 1/)
+  expect(errorDe({ ...santiago, eventos: [{ inicio: '2026-09-29' }] })).toMatch(/evento 1/)
 })

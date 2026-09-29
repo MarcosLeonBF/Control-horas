@@ -660,18 +660,26 @@ persona que empieza en su `Fecha inicio`.
 
 - El `activar` la guarda entera, de `Fecha inicio` a `Fecha fin`: la persona queda de
   ausencia esos días y **termina sola en su `Fecha fin`**, aunque el `desactivar` no llegue.
-- El `desactivar` la termina ese día (si la persona vuelve antes de lo previsto) o en su
-  `Fecha fin` (si el pulso llega tarde). Si llega antes de que empiece, no hace nada
-  (`sin_ausencia`). Si llega sin que haya llegado su `activar`, guarda la ausencia hasta
-  ese día.
+- El `desactivar` la termina ese día o en su `Fecha fin` si el pulso llega tarde. Fija el
+  final con las fechas que trae: si en Airtable se alargó o se acortó la `Fecha fin` después
+  del `activar`, el `desactivar` trae la definitiva. (Mientras no llegue, cuenta la del
+  `activar`.) Si llega antes de que empiece, no hace nada (`sin_ausencia`). Si llega sin
+  que haya llegado su `activar`, guarda la ausencia hasta ese día.
+- Una ausencia con fechas pone fin a una anterior de esa persona que llegó sin fechas y se
+  quedó abierta: termina como tarde la víspera.
 - El `activar` y el `desactivar` de una misma ausencia son la misma: **da igual el orden en
   que lleguen, que se repitan o que lleguen a la vez**. Reintentar un envío es seguro.
 - Las fechas van en `YYYY-MM-DD` (con hora también vale: si trae zona, cuenta su día en
   Madrid). Tienen que venir las dos, la de fin no puede ser anterior a la de inicio y una
-  ausencia no puede pasar de un año: si no, `400`. Vacías (`""`) cuentan como que no vienen.
+  ausencia no puede pasar de un año: si no, `400`; también dentro de `eventos`. Vacías
+  (`""`) cuentan como que no vienen.
+- Límites: dos ausencias de la misma persona que empiezan el mismo día cuentan como una sola
+  (con las fechas del último pulso). Si se corrige la `Fecha inicio` en Airtable, la de la
+  fecha nueva es otra ausencia: la vieja sigue hasta su fin.
 
 **Sin fechas (respaldo).** El `activar` deja a la persona de ausencia desde ese día y hasta
-que llegue su `desactivar`, que la termina ese día. Aquí el orden sí importa: si se pierde
+que llegue su `desactivar`, que la termina ese día (si tiene dos en curso, la que empezó
+más tarde). Aquí el orden sí importa: si se pierde
 un `desactivar`, la persona sigue de ausencia (se ve en el panel de usuarios como «Ausente
 desde…»). Un `desactivar` sin nada que terminar guarda una ausencia de ese día. Un `activar`
 el día después de terminar otra ausencia se toma por repetido. Por todo esto, **manda
@@ -679,7 +687,10 @@ siempre las fechas**.
 
 Otros detalles:
 
-- El día es el de Madrid en el momento de recibir el pulso: mándalos durante el día.
+- El día es el de Madrid en el momento de recibir el pulso: mándalos durante el día, y el
+  `activar` antes de tu consulta diaria de `dias-sin-registrar` (si no, el primer día de
+  la ausencia la persona todavía sale en ella).
+- En **Recibidos**, los pulsos que llegan sin fechas se marcan «(sin fechas)».
 - De cada evento solo se guardan `inicio`, `fin` y `tipo`, como mucho 50 por persona.
 - Todo el envío se valida antes de guardar nada: si una persona está mal, se rechaza entero
   y el error dice cuál. Como mucho 500 personas por envío; una lista vacía da `400`.
@@ -698,8 +709,8 @@ Respuesta (`200`), una línea por persona, en el mismo orden:
 - `persona`: a quién corresponde ese `slack_id` en la plataforma. `null` si no tiene
   usuario: se guarda igual y contará cuando lo tenga.
 - `resultado`: `iniciada`, `ya_iniciada` (ya estaba guardada), `terminada`, `ya_terminada`
-  (ya estaba terminada: un pulso repetido) o `sin_ausencia` (un `desactivar` de una ausencia
-  que todavía no ha empezado).
+  (ya había terminado antes de hoy: un `desactivar` tardío repetido) o `sin_ausencia` (un
+  `desactivar` de una ausencia que todavía no ha empezado).
 
 Si algo falla, la respuesta es `{ "ok": false, "error": "…" }` con el motivo:
 
@@ -709,7 +720,8 @@ Si algo falla, la respuesta es `{ "ok": false, "error": "…" }` con el motivo:
 | `401` | Falta la clave o no es correcta |
 | `500` | Error de la plataforma. Se puede reintentar: repetir un envío no duplica nada |
 
-Con un `400` no se guarda nada de ese envío.
+Con un `400` no se guarda nada de ese envío. Si dos envíos del mismo periodo llegan a la
+vez, la plataforma los ordena sola.
 
 Todo lo que llega con la clave correcta, aceptado o no, se ve en la plataforma en
 **Administración → Avisos → Recibidos**.

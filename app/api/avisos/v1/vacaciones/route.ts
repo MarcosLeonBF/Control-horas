@@ -15,11 +15,13 @@ import {
 } from '@/lib/avisos/vacaciones'
 import { diaMadrid } from '@/lib/horas/auditoria-types'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 const PLAZO_MS = 5_000 // cada operación de la anotación: sin plazo, una base colgada la dejaría viva
 const RETENCION_DIAS = 90
 
 type Db = ReturnType<typeof createAdminClient>
+class ChoqueDeIndice extends Error {}
 interface PerfilRaw { id: string; full_name: string | null; slack_id: string | null }
 
 // Primero los cambios y después las altas: una persona que en el mismo envío termina una
@@ -41,6 +43,7 @@ async function ejecutar(db: Db, operaciones: Operacion[]): Promise<void> {
     o.op === 'alta' ? [{ slack_id: o.slack_id, desde: o.desde, hasta: o.hasta, eventos: o.eventos }] : [])
   if (altas.length) {
     const { error } = await db.from('vacaciones').insert(altas)
+    if (error?.code === '23505') throw new ChoqueDeIndice(error.message)
     if (error) throw new Error(`vacaciones (alta): ${error.message}`)
   }
 }
@@ -105,20 +108,27 @@ export async function POST(req: Request) {
     // Todas las ausencias de las personas del envío (son pocas por persona): un pulso con
     // fechas puede apuntar a un periodo de hace días, y hay que encontrar su fila.
     const slacks = [...new Set(v.valor.map((x) => x.slack_id))]
+    // Paginada: con muchas personas en un envío, el historial podría pasar de 1.000 filas.
+    const leerActuales = () => fetchAllRows<AusenciaActual>((desde, hasta) =>
+      db.from('vacaciones').select('id, slack_id, desde, hasta, eventos').in('slack_id', slacks).order('id').range(desde, hasta))
     const [perfiles, actuales] = await Promise.all([
       db.from('profiles').select('id, full_name, slack_id').not('slack_id', 'is', null),
-      db.from('vacaciones').select('id, slack_id, desde, hasta, eventos').in('slack_id', slacks),
+      leerActuales(),
     ])
     if (perfiles.error) throw new Error(`profiles: ${perfiles.error.message}`)
-    if (actuales.error) throw new Error(`vacaciones: ${actuales.error.message}`)
+    const conUsuario = ((perfiles.data ?? []) as PerfilRaw[])
+      .map((p): PerfilIdentificable => ({ id: p.id, nombre: p.full_name ?? '', slack_id: p.slack_id }))
 
-    const plan = planificar(
-      v.valor,
-      ((perfiles.data ?? []) as PerfilRaw[]).map((p): PerfilIdentificable => ({ id: p.id, nombre: p.full_name ?? '', slack_id: p.slack_id })),
-      (actuales.data ?? []) as AusenciaActual[],
-      hoy,
-    )
-    await ejecutar(db, plan.operaciones)
+    let plan = planificar(v.valor, conUsuario, actuales, hoy)
+    try {
+      await ejecutar(db, plan.operaciones)
+    } catch (e) {
+      // Dos envíos a la vez del mismo periodo: el segundo choca en el índice persona + día
+      // de inicio. Se vuelve a leer y a planificar una vez: ya ve la fila del primero.
+      if (!(e instanceof ChoqueDeIndice)) throw e
+      plan = planificar(v.valor, conUsuario, await leerActuales(), hoy)
+      await ejecutar(db, plan.operaciones)
+    }
     return contestar(200, plan.respuesta, { cuerpo: body, resumen: plan.resumen })
   } catch (e) {
     const detalle = e instanceof Error ? e.message : String(e)
