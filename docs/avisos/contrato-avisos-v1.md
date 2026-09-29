@@ -625,6 +625,9 @@ en un mismo envío, en una lista, o una sola como objeto.
 | `accion` | `"activar"` o `"desactivar"`, en minúsculas. Obligatorio |
 | `eventos` | Opcional. Lista con las fechas de la ausencia (`inicio`, `fin`, `tipo`), de referencia |
 
+Los nombres de campo valen también como vienen de Airtable (`Slack ID`, `Accion`,
+`Acción`…): no se distinguen mayúsculas, tildes, espacios, guiones ni guiones bajos.
+
 ```json
 [
   {
@@ -641,13 +644,24 @@ Cómo se interpreta:
 - La ausencia va **del día del `activar` al día del `desactivar`, los dos incluidos**: el
   `desactivar` llega el último día, que todavía cuenta como ausencia.
 - Mientras no llegue su `desactivar`, la persona sigue de ausencia.
-- Un `activar` repetido, estando ya de ausencia, no cambia nada. Un `desactivar` repetido el
-  mismo día, tampoco. Reintentar un envío es seguro.
-- Si se perdió el `activar` y llega el `desactivar` con `eventos`, la ausencia se guarda
-  desde el `inicio` más antiguo de `eventos` que ya haya pasado (como mucho 90 días atrás).
-  Sin `eventos` útiles, ese `desactivar` no tiene nada que cerrar.
+- El día es el de Madrid en el momento de recibir el pulso: mándalos durante el día (un
+  pulso que llegue pasada la medianoche cuenta para el día siguiente).
+- Pulsos repetidos no cambian nada: un `activar` estando ya de ausencia, un `desactivar`
+  repetido el mismo día o un `activar` que llega después del `desactivar` de ese mismo día.
+  Reintentar un envío es seguro.
+- En un mismo envío, `desactivar` y `activar` de la misma persona, en cualquier orden, dejan
+  una ausencia de un día.
+- `eventos` es opcional; solo se usa como respaldo, con los eventos **en curso hoy**
+  (`inicio` ≤ hoy ≤ `fin`):
+  - si se perdió el `activar`, el `desactivar` guarda la ausencia desde ese `inicio` (como
+    mucho 90 días atrás);
+  - si el `activar` llega tarde, la ausencia empieza en ese `inicio`;
+  - si se perdió un `desactivar` y los `eventos` guardados de esa ausencia ya terminaron, el
+    siguiente `activar` la cierra en su `fin` y abre la nueva.
+  
+  De cada evento solo se guardan `inicio`, `fin` y `tipo`, y como mucho 50 por persona.
 - Todo el envío se valida antes de guardar nada: si una persona está mal, se rechaza entero
-  y el error dice cuál.
+  y el error dice cuál. Como mucho 500 personas por envío; una lista vacía da `400`.
 
 Respuesta (`200`), una línea por persona, en el mismo orden:
 
@@ -671,7 +685,7 @@ Si algo falla, la respuesta es `{ "ok": false, "error": "…" }` con el motivo:
 
 | Código | Cuándo |
 |---|---|
-| `400` | El cuerpo no es JSON o una persona no es válida. `error` dice cuál (`Persona 2 (U0…): …`) y termina con los campos que traía y su tipo (por ejemplo, `Campos recibidos: accion (texto).`) |
+| `400` | El cuerpo no es JSON o una persona no es válida. `error` dice cuál (`Persona 2 (U0…): …`) y, si era un objeto, termina con los campos que traía y su tipo (por ejemplo, `Campos recibidos: accion (texto).`) |
 | `401` | Falta la clave o no es correcta |
 | `500` | Error de la plataforma. Se puede reintentar: repetir un envío no duplica nada |
 

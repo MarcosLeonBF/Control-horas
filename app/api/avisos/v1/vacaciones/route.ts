@@ -101,7 +101,7 @@ export async function POST(req: Request) {
     const [perfiles, actuales] = await Promise.all([
       db.from('profiles').select('id, full_name, slack_id').not('slack_id', 'is', null),
       // Solo importan las abiertas y las cerradas hoy (para no cerrar dos veces).
-      db.from('vacaciones').select('id, slack_id, desde, hasta').or(`hasta.is.null,hasta.eq.${hoy}`),
+      db.from('vacaciones').select('id, slack_id, desde, hasta, eventos').or(`hasta.is.null,hasta.eq.${hoy}`),
     ])
     if (perfiles.error) throw new Error(`profiles: ${perfiles.error.message}`)
     if (actuales.error) throw new Error(`vacaciones: ${actuales.error.message}`)

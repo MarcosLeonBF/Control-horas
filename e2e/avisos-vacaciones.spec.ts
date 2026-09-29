@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { validarEnvio, planificar, type PerfilIdentificable, type AusenciaActual } from '../lib/avisos/vacaciones'
+import { validarEnvio, planificar, type PerfilIdentificable, type AusenciaActual, type EventoRef } from '../lib/avisos/vacaciones'
 
 // Las ausencias (vacaciones, festivos…) llegan del flujo de Julián como pulsos por persona:
 // `activar` el día que empieza y `desactivar` el día que termina. Lo que cuenta es el
@@ -63,7 +63,7 @@ test('validarEnvio: como mucho 500 personas por envío', () => {
 
 const HOY = '2026-09-29'
 const perfiles: PerfilIdentificable[] = [{ id: 'p-estefania', nombre: 'Estefanía García', slack_id: 'U096AGWQJN4' }]
-const pulso = (accion: 'activar' | 'desactivar', slack_id = 'U096AGWQJN4', eventos: unknown[] = []) => ({ slack_id, accion, eventos })
+const pulso = (accion: 'activar' | 'desactivar', slack_id = 'U096AGWQJN4', eventos: EventoRef[] = []) => ({ slack_id, accion, eventos })
 
 test('planificar: activar abre una ausencia desde hoy', () => {
   const p = planificar([pulso('activar', 'U096AGWQJN4', estefania.eventos)], perfiles, [], HOY)
@@ -75,21 +75,20 @@ test('planificar: activar abre una ausencia desde hoy', () => {
 })
 
 test('planificar: un activar repetido no abre otra ausencia', () => {
-  const abierta: AusenciaActual = { id: 7, slack_id: 'U096AGWQJN4', desde: '2026-09-28', hasta: null }
+  const abierta: AusenciaActual = { id: 7, slack_id: 'U096AGWQJN4', desde: '2026-09-28', hasta: null, eventos: [] }
   const p = planificar([pulso('activar')], perfiles, [abierta], HOY)
   expect(p.operaciones).toEqual([])
   expect(p.respuesta.personas[0].resultado).toBe('ya_iniciada')
 })
 
 test('planificar: desactivar cierra la ausencia abierta hoy (hoy todavía cuenta)', () => {
-  const abierta: AusenciaActual = { id: 7, slack_id: 'U096AGWQJN4', desde: '2026-09-25', hasta: null }
+  const abierta: AusenciaActual = { id: 7, slack_id: 'U096AGWQJN4', desde: '2026-09-25', hasta: null, eventos: [] }
   const p = planificar([pulso('desactivar')], perfiles, [abierta], HOY)
   expect(p.operaciones).toEqual([{ op: 'cerrar', id: 7, hasta: HOY }])
   expect(p.respuesta.personas[0].resultado).toBe('terminada')
 })
 
 test('planificar: un desactivar repetido el mismo día no hace nada', () => {
-  const cerradaHoy: AusenciaActual = { id: 7, slack_id: 'U096AGWQJN4', desde: '2026-09-25', hasta: HOY }
   const p = planificar([pulso('desactivar')], perfiles, [cerradaHoy], HOY)
   expect(p.operaciones).toEqual([])
   expect(p.respuesta.personas[0].resultado).toBe('ya_terminada')
@@ -130,4 +129,78 @@ test('planificar: sin usuario en la plataforma se guarda igual, con persona null
 test('planificar: el resumen para Recibidos nombra a cada persona y lo que pasó', () => {
   const p = planificar([pulso('activar'), pulso('activar', 'U0A85K6107L')], perfiles, [], HOY)
   expect(p.resumen).toBe('Estefanía García: iniciada · U0A85K6107L (sin usuario): iniciada')
+})
+
+// --- casos de la revisión: reintentos, orden y pulsos perdidos ---------------
+
+const cerradaHoy: AusenciaActual = { id: 7, slack_id: 'U096AGWQJN4', desde: '2026-09-25', hasta: HOY, eventos: [] }
+
+test('planificar: un activar reintentado después del desactivar de hoy no reabre nada', () => {
+  const p = planificar([pulso('activar', 'U096AGWQJN4', [{ inicio: '2026-09-25', fin: HOY }])], perfiles, [cerradaHoy], HOY)
+  expect(p.operaciones).toEqual([])
+  expect(p.respuesta.personas[0].resultado).toBe('ya_terminada')
+})
+
+test('planificar: tras cerrar hoy, un activar cuyo evento sigue mañana sí abre otra ausencia', () => {
+  const p = planificar([pulso('activar', 'U096AGWQJN4', [{ inicio: HOY, fin: '2026-10-05', tipo: 'vacaciones' }])], perfiles, [cerradaHoy], HOY)
+  expect(p.operaciones).toEqual([{ op: 'abrir', slack_id: 'U096AGWQJN4', desde: HOY, eventos: [{ inicio: HOY, fin: '2026-10-05', tipo: 'vacaciones' }] }])
+  expect(p.respuesta.personas[0].resultado).toBe('iniciada')
+})
+
+test('planificar: desactivar y activar al revés en el mismo envío = ausencia de un día', () => {
+  const p = planificar([pulso('desactivar'), pulso('activar')], perfiles, [], HOY)
+  expect(p.operaciones).toEqual([{ op: 'cerrada', slack_id: 'U096AGWQJN4', desde: HOY, hasta: HOY, eventos: [] }])
+  expect(p.respuesta.personas.map((x) => x.resultado)).toEqual(['sin_ausencia', 'iniciada'])
+})
+
+test('planificar: reenviar [activar, desactivar] ya aplicado no crea otra fila', () => {
+  const p = planificar([pulso('activar'), pulso('desactivar')], perfiles, [cerradaHoy], HOY)
+  expect(p.operaciones).toEqual([])
+  expect(p.respuesta.personas.map((x) => x.resultado)).toEqual(['ya_terminada', 'ya_terminada'])
+})
+
+test('planificar: sin su activar, solo cuentan los eventos que siguen en curso hoy', () => {
+  // Un evento viejo (agosto) no puede convertir en ausencia todo lo que hay en medio.
+  const ev = [{ inicio: '2026-08-01', fin: '2026-08-05' }, { inicio: '2026-09-28', fin: HOY }]
+  const p = planificar([pulso('desactivar', 'U096AGWQJN4', ev)], perfiles, [], HOY)
+  expect(p.operaciones).toEqual([{ op: 'cerrada', slack_id: 'U096AGWQJN4', desde: '2026-09-28', hasta: HOY, eventos: ev }])
+})
+
+test('planificar: un desactivar reintentado al día siguiente no crea otra ausencia', () => {
+  const p = planificar([pulso('desactivar', 'U096AGWQJN4', [{ inicio: '2026-09-24', fin: '2026-09-28' }])], perfiles, [], HOY)
+  expect(p.operaciones).toEqual([])
+  expect(p.respuesta.personas[0].resultado).toBe('sin_ausencia')
+})
+
+test('planificar: un activar que llega tarde empieza en el inicio de su evento en curso', () => {
+  const p = planificar([pulso('activar', 'U096AGWQJN4', [{ inicio: '2026-09-28', fin: '2026-10-02' }])], perfiles, [], HOY)
+  expect(p.operaciones).toEqual([{ op: 'abrir', slack_id: 'U096AGWQJN4', desde: '2026-09-28', eventos: [{ inicio: '2026-09-28', fin: '2026-10-02' }] }])
+})
+
+test('planificar: si se perdió el desactivar, el siguiente activar cierra la vieja en su fin', () => {
+  const vieja: AusenciaActual = { id: 3, slack_id: 'U096AGWQJN4', desde: '2026-08-03', hasta: null, eventos: [{ inicio: '2026-08-03', fin: '2026-08-14' }] }
+  const p = planificar([pulso('activar')], perfiles, [vieja], HOY)
+  expect(p.operaciones).toEqual([
+    { op: 'cerrar', id: 3, hasta: '2026-08-14' },
+    { op: 'abrir', slack_id: 'U096AGWQJN4', desde: HOY, eventos: [] },
+  ])
+  expect(p.respuesta.personas[0].resultado).toBe('iniciada')
+})
+
+test('validarEnvio: de cada evento solo se guarda inicio, fin y tipo, en texto y limpio', () => {
+  const r = validarEnvio([{ ...santiago, eventos: [{ inicio: ' 2026-10-02 ', fin: '2026-10-02', tipo: 'ausencia', nota: 'x', id: 9 }, { tipo: 'fes\u0000tivo' }, 42] }])
+  expect(r.ok && r.valor[0].eventos).toEqual([{ inicio: '2026-10-02', fin: '2026-10-02', tipo: 'ausencia' }, { tipo: 'festivo' }])
+})
+
+test('validarEnvio: un slack_id que no es texto lo dice', () => {
+  expect(errorDe([{ slack_id: 12345, accion: 'activar' }])).toMatch(/slack_id tiene que ser texto/)
+})
+
+test('validarEnvio: acepta los nombres de campo tal como vienen de Airtable', () => {
+  // Lo que manda el flujo de Julián: los nombres de las columnas de Airtable.
+  expect(validarEnvio({ Accion: 'activar', 'Slack ID': 'U0A85K6107L' })).toEqual({
+    ok: true, valor: [{ slack_id: 'U0A85K6107L', accion: 'activar', eventos: [] }],
+  })
+  const r = validarEnvio([{ 'Acción': 'desactivar', 'slack-id': 'U096AGWQJN4', Eventos: [{ inicio: '2026-09-29', fin: '2026-09-29' }] }])
+  expect(r.ok && r.valor).toEqual([{ slack_id: 'U096AGWQJN4', accion: 'desactivar', eventos: [{ inicio: '2026-09-29', fin: '2026-09-29' }] }])
 })
