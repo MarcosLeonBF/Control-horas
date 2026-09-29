@@ -26,7 +26,7 @@ interface PerfilRaw { id: string; full_name: string | null; slack_id: string | n
 
 // Primero los cambios y después las altas: una persona que en el mismo envío termina una
 // ausencia abierta y empieza otra no puede tener dos abiertas ni un momento (índice único
-// de una abierta por persona). Si dos envíos a la vez dan de alta el mismo periodo, el
+// de una encendida por persona). Si dos envíos a la vez dan de alta la misma ausencia, el
 // índice persona + día de inicio (0055) hace fallar al segundo con un 500; el flujo reintenta
 // y ya ve la fila.
 async function ejecutar(db: Db, operaciones: Operacion[]): Promise<void> {
@@ -105,8 +105,8 @@ export async function POST(req: Request) {
   try {
     const db = cliente()
     const hoy = diaMadrid(new Date().toISOString())
-    // Todas las ausencias de las personas del envío (son pocas por persona): un pulso con
-    // fechas puede apuntar a un periodo de hace días, y hay que encontrar su fila.
+    // Todas las ausencias de las personas del envío (son pocas por persona): hace falta la
+    // encendida, la apagada hoy y las fechas de cada una.
     const slacks = [...new Set(v.valor.map((x) => x.slack_id))]
     // Paginada: con muchas personas en un envío, el historial podría pasar de 1.000 filas.
     const leerActuales = () => fetchAllRows<AusenciaActual>((desde, hasta) =>
@@ -123,7 +123,7 @@ export async function POST(req: Request) {
     try {
       await ejecutar(db, plan.operaciones)
     } catch (e) {
-      // Dos envíos a la vez del mismo periodo: el segundo choca en el índice persona + día
+      // Dos envíos a la vez de la misma persona: el segundo choca en un índice (persona + día
       // de inicio. Se vuelve a leer y a planificar una vez: ya ve la fila del primero.
       if (!(e instanceof ChoqueDeIndice)) throw e
       plan = planificar(v.valor, conUsuario, await leerActuales(), hoy)

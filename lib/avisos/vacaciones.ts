@@ -1,30 +1,25 @@
 // Ausencias (vacaciones, festivos, ausencias) que manda el flujo de Julián a
 // POST /api/avisos/v1/vacaciones: una lista de personas (o una sola), cada una con su
-// slack_id, una acción y las fechas de la ausencia. `activar` llega el día que empieza y
-// `desactivar` el día que termina (el último día, que todavía es de ausencia).
+// slack_id y una acción, y opcionalmente las fechas de la ausencia.
 //
-// Mandan las FECHAS. Con "Fecha inicio" y "Fecha fin", cada pulso apunta a un periodo
-// concreto: la fila de esa persona con ese día de inicio (índice único en la 0055). El
-// activar y el desactivar de una misma ausencia son la misma fila, lleguen en el orden que
-// lleguen, repetidos o a la vez; y termina en su fin aunque el desactivar no llegue. El
-// desactivar la termina ese día (si la persona vuelve antes) o en su fin (si llega tarde).
+// Es un INTERRUPTOR por persona (Roberto, 29/09): `activar` lo enciende el día que llega
+// (el día que empieza la ausencia) y `desactivar` lo apaga el día que llega (el último
+// día, que todavía es de vacaciones). Encendido, otro activar no hace nada; apagado, otro
+// desactivar tampoco. Las fechas no deciden cuándo se enciende ni se apaga: son la RED por
+// si el desactivar no llega a tiempo. Si pasa la Fecha fin y sigue encendido, se da por
+// apagado en esa fecha (y sale en la lista del panel para revisarlo); si el desactivar llega
+// tarde, se corrige a esa fecha; si Airtable la alargó, el desactivar trae la nueva.
 //
-// Sin fechas (respaldo): activar abre una ausencia desde hoy sin fin conocido y desactivar
-// la cierra hoy. Ahí el orden sí importa y una ausencia abierta dura hasta su desactivar;
-// por eso el contrato pide mandar siempre las fechas.
-//
-// Se guardan en `vacaciones` (0054) y la persona se busca al leer, por slack_id, para que
-// cuente sola el día que se le dé de alta. Puro, sin IO: la ruta autentica, lee perfiles y
-// ausencias, y ejecuta lo que esto decide.
+// Cada encendido es una fila de `vacaciones` (0054): desde el día del activar hasta el del
+// desactivar (`hasta` null = encendido). La persona se busca al leer, por slack_id, para
+// que cuente sola el día que se le dé de alta. Puro, sin IO: la ruta autentica, lee perfiles
+// y ausencias, y ejecuta lo que esto decide.
 import { normalizarSlackId } from '@/lib/slack-id'
 import { addDiasISO, diaMadrid } from '@/lib/horas/auditoria-types'
 import { describirCampos, tipoDe } from '@/lib/avisos/entrantes'
 
 export const MAX_PERSONAS = 500
 const MAX_EVENTOS = 50
-// Una ausencia de más de un año es una errata (tipo 2062) que dejaría a alguien sin
-// recordatorios durante décadas sin que nadie lo notara.
-const MAX_DIAS_PERIODO = 366
 
 export type Accion = 'activar' | 'desactivar'
 // De cada evento solo se guarda esto, en texto: lo demás que traiga se descarta (y con ello
@@ -71,6 +66,8 @@ function aDia(t: string): string {
   return t.slice(0, 10)
 }
 
+// De un evento se queda lo que se entiende: las fechas válidas y el tipo. Una fecha mal
+// escrita se descarta, no hace fallar el pulso: el interruptor no depende de ella.
 function limpiarEvento(e: unknown): EventoRef | null {
   if (!esObjeto(e)) return null
   const limpio: EventoRef = {}
@@ -78,16 +75,14 @@ function limpiarEvento(e: unknown): EventoRef | null {
     const v = e[k]
     if (typeof v !== 'string') continue
     const t = v.replace(/\u0000/g, '').trim()
-    if (t) limpio[k] = k === 'tipo' ? t.slice(0, 50) : aDia(t).slice(0, 30)
+    if (!t) continue
+    if (k === 'tipo') limpio.tipo = t.slice(0, 50)
+    else {
+      const dia = aDia(t)
+      if (esFecha(dia)) limpio[k] = dia
+    }
   }
   return Object.keys(limpio).length ? limpio : null
-}
-
-// Un periodo que se puede usar: las dos fechas, en orden y de como mucho un año.
-function periodoDe(e: EventoRef): { inicio: string; fin: string } | null {
-  if (!esFecha(e.inicio) || !esFecha(e.fin) || e.fin < e.inicio) return null
-  if (e.fin > addDiasISO(e.inicio, MAX_DIAS_PERIODO - 1)) return null
-  return { inicio: e.inicio, fin: e.fin }
 }
 
 // Los nombres de campo se aceptan tal como vienen de Airtable ("Slack ID", "Acción", "Fecha
@@ -109,23 +104,6 @@ function camposConocidos(p: Record<string, unknown>): Partial<Record<Campo, unkn
   return campos
 }
 
-function vacio(v: unknown): boolean {
-  return v === undefined || v === null || (typeof v === 'string' && v.trim() === '')
-}
-
-// Las fechas sueltas mandan, así que se validan: una fecha mal escrita tiene que fallar, no
-// ignorarse (la ausencia quedaría sin fin, o no contaría).
-function fechasSueltas(p: Partial<Record<Campo, unknown>>): { ok: true; evento: EventoRef | null } | { ok: false; error: string } {
-  if (vacio(p.inicio) && vacio(p.fin)) return { ok: true, evento: null }
-  if (vacio(p.inicio) || vacio(p.fin)) return { ok: false, error: 'si manda fechas, tienen que venir las dos (Fecha inicio y Fecha fin).' }
-  const e = limpiarEvento({ inicio: p.inicio, fin: p.fin, tipo: p.tipo })
-  if (!e || !esFecha(e.inicio)) return { ok: false, error: 'Fecha inicio tiene que ser una fecha YYYY-MM-DD.' }
-  if (!esFecha(e.fin)) return { ok: false, error: 'Fecha fin tiene que ser una fecha YYYY-MM-DD.' }
-  if (e.fin < e.inicio) return { ok: false, error: 'Fecha fin no puede ser anterior a Fecha inicio.' }
-  if (!periodoDe(e)) return { ok: false, error: 'una ausencia no puede durar más de un año.' }
-  return { ok: true, evento: e }
-}
-
 function validarPersona(bruto: unknown): { ok: true; valor: PulsoPersona } | { ok: false; error: string } {
   if (!esObjeto(bruto)) return { ok: false, error: `tiene que ser un objeto con slack_id y accion (llegó: ${tipoDe(bruto)}).` }
   const p = camposConocidos(bruto)
@@ -139,19 +117,11 @@ function validarPersona(bruto: unknown): { ok: true; valor: PulsoPersona } | { o
   if (p.accion !== 'activar' && p.accion !== 'desactivar') {
     return { ok: false, error: 'accion tiene que ser "activar" o "desactivar", en minúsculas.' }
   }
-  const sueltas = fechasSueltas(p)
-  if (!sueltas.ok) return sueltas
-  let eventos: EventoRef[] = sueltas.evento ? [sueltas.evento] : []
+  const suelto = limpiarEvento({ inicio: p.inicio, fin: p.fin, tipo: p.tipo })
+  let eventos: EventoRef[] = suelto && (suelto.inicio || suelto.fin) ? [suelto] : []
   if (p.eventos !== undefined && p.eventos !== null) {
     if (!Array.isArray(p.eventos)) return { ok: false, error: 'eventos, si viene, tiene que ser una lista.' }
-    const lista = p.eventos.map(limpiarEvento)
-    // Un evento con fechas mal escritas no se ignora: el pulso acabaría tratado como si no
-    // trajera fechas, y la ausencia sin fin.
-    const malo = lista.findIndex((e) => e !== null && (e.inicio !== undefined || e.fin !== undefined) && !periodoDe(e))
-    if (malo >= 0) {
-      return { ok: false, error: `evento ${malo + 1}: las fechas tienen que ser YYYY-MM-DD, venir las dos, en orden y como mucho un año.` }
-    }
-    eventos = [...eventos, ...lista.filter((e): e is EventoRef => e !== null)].slice(0, MAX_EVENTOS)
+    eventos = [...eventos, ...p.eventos.map(limpiarEvento).filter((e): e is EventoRef => e !== null)].slice(0, MAX_EVENTOS)
   }
   return { ok: true, valor: { slack_id: n.valor, accion: p.accion, eventos } }
 }
@@ -180,7 +150,7 @@ export function validarEnvio(body: unknown): { ok: true; valor: PulsoPersona[] }
   return { ok: true, valor }
 }
 
-// --- planificar: qué hacer con cada pulso --------------------------------------------
+// --- planificar: el interruptor --------------------------------------------------------
 
 // Una fila tal como la va dejando el envío: las guardadas (con id) y las que da de alta.
 interface FilaPlan {
@@ -200,7 +170,18 @@ function conEventos(f: FilaPlan, nuevos: EventoRef[]): void {
   if (añadir.length) f.eventos = [...f.eventos, ...añadir].slice(0, MAX_EVENTOS)
 }
 
-const cubre = (f: FilaPlan, dia: string) => f.desde <= dia && (f.hasta === null || f.hasta >= dia)
+// La Fecha fin que dicen sus eventos (la más tardía que no sea anterior a cuando se
+// encendió), o null si no trajo fechas. Es la red: si pasa y sigue encendido, el
+// desactivar no llegó a tiempo.
+function finPrevisto(f: { desde: string; eventos: unknown }): string | null {
+  if (!Array.isArray(f.eventos)) return null
+  let fin: string | null = null
+  for (const e of f.eventos) {
+    if (!esObjeto(e) || !esFecha(e.fin) || e.fin < f.desde) continue
+    if (fin === null || e.fin > fin) fin = e.fin
+  }
+  return fin
+}
 
 export function planificar(
   pulsos: PulsoPersona[],
@@ -209,92 +190,51 @@ export function planificar(
   hoy: string,
 ): { operaciones: Operacion[]; respuesta: EnvioAceptado; resumen: string } {
   const porSlack = new Map(perfiles.filter((p) => p.slack_id).map((p) => [p.slack_id as string, p]))
-  const ayer = addDiasISO(hoy, -1)
   const filas: FilaPlan[] = actuales.map((a) => {
     const eventos = Array.isArray(a.eventos) ? (a.eventos as EventoRef[]) : []
     return { id: a.id, slack_id: a.slack_id, desde: a.desde, hasta: a.hasta, eventos, orig: { hasta: a.hasta, eventos: JSON.stringify(eventos) } }
   })
-  const deLaPersona = (s: string) => filas.filter((f) => f.slack_id === s)
-  const alta = (slack_id: string, desde: string, hasta: string | null, eventos: EventoRef[]) => {
-    filas.push({ id: null, slack_id, desde, hasta, eventos: [...eventos], orig: null })
-  }
 
   const personas: ResultadoPersona[] = []
-  const sinFechas: boolean[] = []
   for (const { slack_id, accion, eventos } of pulsos) {
-    const mias = () => deLaPersona(slack_id)
-    const periodos = eventos.map(periodoDe).filter((x): x is { inicio: string; fin: string } => x !== null)
-    sinFechas.push(periodos.length === 0)
-    const resultados: Resultado[] = []
+    const mias = filas.filter((f) => f.slack_id === slack_id)
+    let encendida = mias.find((f) => f.hasta === null)
+    let resultado: Resultado
 
-    if (periodos.length) {
-      // Con fechas: cada periodo es la fila de esa persona con ese día de inicio.
-      for (const { inicio, fin } of periodos) {
-        // Una abierta sin fechas que empezó antes: se perdió su desactivar. Si empieza otra
-        // ausencia, aquella terminó como tarde la víspera.
-        for (const o of mias()) if (o.hasta === null && o.desde < inicio) o.hasta = addDiasISO(inicio, -1)
-        const f = mias().find((x) => x.desde === inicio)
-        if (accion === 'activar') {
-          if (f) {
-            if (f.hasta === null) f.hasta = fin // estaba abierta sin fechas: ahora se sabe su fin
-            conEventos(f, eventos)
-            resultados.push('ya_iniciada')
-          } else {
-            // Una abierta sin fechas que empezó dentro de este periodo es esta misma ausencia
-            // (su primer pulso llegó sin fechas): se termina en su fin.
-            for (const o of mias()) if (o.hasta === null && o.desde >= inicio && o.desde <= fin) o.hasta = fin
-            alta(slack_id, inicio, fin, eventos)
-            resultados.push('iniciada')
-          }
-        } else if (hoy < inicio) {
-          resultados.push('sin_ausencia') // todavía no ha empezado: no se guarda nada
-        } else {
-          // Termina hoy, o en su fin si el desactivar llega tarde. Fija el final en los dos
-          // sentidos: si Airtable alargó la Fecha fin después del activar, el desactivar (que
-          // sale ese nuevo último día) trae la definitiva; si la acortó, también.
-          const termina = fin < hoy ? fin : hoy
-          if (f) {
-            conEventos(f, eventos)
-            const cambia = f.hasta !== termina
-            f.hasta = termina
-            resultados.push(!cambia && termina < hoy ? 'ya_terminada' : 'terminada')
-          } else {
-            for (const o of mias()) if (o.hasta === null && o.desde >= inicio && o.desde <= termina) o.hasta = termina
-            alta(slack_id, inicio, termina, eventos) // sin su activar: se perdió o llegó antes
-            resultados.push('terminada')
-          }
+    if (accion === 'activar') {
+      const finDelPulso = finPrevisto({ desde: '0000-00-00', eventos })
+      // Se perdió el desactivar de la anterior: se da por apagada en su Fecha fin.
+      if (encendida) {
+        const fin = finPrevisto(encendida)
+        if (fin && fin < hoy) {
+          encendida.hasta = fin
+          encendida = undefined
         }
       }
-    } else if (accion === 'activar') {
-      // Sin fechas: abre desde hoy, salvo que ya esté de ausencia. Un activar el día después
-      // de terminar otra se toma por repetido (reintento pasada la medianoche): sin fechas
-      // no se distingue de una ausencia nueva, y es preferible a dejar a alguien fuera sin fin.
-      if (mias().some((x) => cubre(x, hoy))) resultados.push('ya_iniciada')
-      else if (mias().some((x) => x.hasta === ayer)) resultados.push('ya_terminada')
-      else {
-        alta(slack_id, hoy, null, eventos)
-        resultados.push('iniciada')
-      }
-    } else {
-      // Sin fechas: termina hoy la ausencia en curso (la abierta si la hay). Sin ninguna, es
-      // un desactivar sin su activar: al menos hoy es ausencia (llega el último día).
-      // Si hay varias en curso (un festivo dentro de unas vacaciones), la que empezó más
-      // tarde: es la que termina hoy.
-      const enCurso = mias().filter((x) => cubre(x, hoy)).sort((a, b) => b.desde.localeCompare(a.desde))
-      const actual = enCurso.find((x) => x.hasta === null) ?? enCurso[0]
-      if (actual) {
-        actual.hasta = hoy
-        resultados.push('terminada')
+      if (finDelPulso && finDelPulso < hoy) {
+        resultado = 'ya_terminada' // un activar muy tardío: esa ausencia ya terminó
+      } else if (encendida) {
+        conEventos(encendida, eventos)
+        resultado = 'ya_iniciada'
+      } else if (mias.some((f) => f.hasta === hoy)) {
+        // Se apagó hoy: un activar después solo puede ser un reintento del de esta mañana.
+        // Volver a encender dejaría a la persona de vacaciones sin fin.
+        resultado = 'ya_terminada'
       } else {
-        alta(slack_id, hoy, hoy, eventos)
-        resultados.push('terminada')
+        filas.push({ id: null, slack_id, desde: hoy, hasta: null, eventos: [...eventos], orig: null })
+        resultado = 'iniciada'
       }
+    } else if (encendida) {
+      // Apaga hoy. Con las fechas del pulso primero: si Airtable alargó la Fecha fin, manda
+      // la nueva. Si ya había pasado (llega tarde), se corrige a ella.
+      conEventos(encendida, eventos)
+      const fin = finPrevisto(encendida)
+      encendida.hasta = fin && fin < hoy ? fin : hoy
+      resultado = 'terminada'
+    } else {
+      resultado = mias.some((f) => f.hasta === hoy) ? 'ya_terminada' : 'sin_ausencia'
     }
 
-    const orden: Resultado[] = accion === 'activar'
-      ? ['iniciada', 'ya_iniciada', 'ya_terminada']
-      : ['terminada', 'ya_terminada', 'sin_ausencia']
-    const resultado = orden.find((r) => resultados.includes(r)) ?? resultados[0]
     const perfil = porSlack.get(slack_id)
     personas.push({ slack_id, accion, persona: perfil ? { id: perfil.id, nombre: perfil.nombre } : null, resultado })
   }
@@ -313,7 +253,7 @@ export function planificar(
   }
 
   const resumen = personas
-    .map((p, i) => `${p.persona ? p.persona.nombre || p.slack_id : `${p.slack_id} (sin usuario)`}: ${p.resultado}${sinFechas[i] ? ' (sin fechas)' : ''}`)
+    .map((p) => `${p.persona ? p.persona.nombre || p.slack_id : `${p.slack_id} (sin usuario)`}: ${p.resultado}`)
     .join(' · ')
   return { operaciones, respuesta: { ok: true, personas }, resumen }
 }
@@ -322,10 +262,17 @@ export function planificar(
 
 export interface FilaAusencia { slack_id: string; desde: string; hasta: string | null; eventos: unknown }
 
+// Hasta dónde llega una ausencia vista desde `hoy`: su desactivar si llegó; encendida, hasta
+// hoy, salvo que su Fecha fin ya haya pasado (la red: el desactivar no llegó a tiempo y se
+// da por apagada en esa fecha).
+function finEfectivo(f: FilaAusencia, hoy: string): string {
+  if (f.hasta !== null) return f.hasta
+  const fin = finPrevisto(f)
+  return fin && fin < hoy ? fin : hoy
+}
+
 // Por slack_id: si la persona está fuera `hoy` y sus días de ausencia desde `ventana` hasta
-// hoy (para "días sin registrar"). Una ausencia va de `desde` a `hasta`, los dos incluidos;
-// sin `hasta` (llegó sin fechas y todavía no hay desactivar), sigue hasta hoy. Las que
-// empiezan después de hoy no cuentan todavía.
+// hoy (para "días sin registrar"). El día del desactivar todavía cuenta.
 export function ausenciasPorPersona(
   filas: FilaAusencia[],
   hoy: string,
@@ -334,7 +281,7 @@ export function ausenciasPorPersona(
   const porSlack = new Map<string, { ausenteHoy: boolean; dias: Set<string> }>()
   for (const f of filas) {
     if (f.desde > hoy) continue
-    const fin = f.hasta ?? hoy
+    const fin = finEfectivo(f, hoy)
     const a = porSlack.get(f.slack_id) ?? { ausenteHoy: false, dias: new Set<string>() }
     if (hoy <= fin) a.ausenteHoy = true
     const hasta = fin < hoy ? fin : hoy
@@ -344,24 +291,35 @@ export function ausenciasPorPersona(
   return porSlack
 }
 
-// Quién está de ausencia `hoy`, por slack_id, desde cuándo y hasta cuándo si se sabe (`fin`
-// null = llegó sin fechas y todavía no hay desactivar). Lo usan los avisos (de quien está
-// fuera no se manda nada) y la etiqueta del panel. Con dos ausencias a la vez se juntan: la
-// vuelta es la más tardía, y desconocida si alguna no la dice.
+// Quién está de ausencia `hoy`, por slack_id, desde cuándo y, para mostrar, hasta cuándo si
+// se sabe: el día del desactivar si ya llegó (hoy es su último día) o la Fecha fin que
+// trajeron sus pulsos; null si no trajeron fechas. Lo usan los avisos (de quien está fuera no
+// se manda nada) y la etiqueta del panel. Con dos a la vez se juntan.
 export interface AusenciaHoy { desde: string; fin: string | null }
 
 export function ausenciasHoy(filas: FilaAusencia[], hoy: string): Map<string, AusenciaHoy> {
   const porSlack = new Map<string, AusenciaHoy>()
   for (const f of filas) {
-    if (f.desde > hoy || (f.hasta !== null && f.hasta < hoy)) continue
+    if (f.desde > hoy || finEfectivo(f, hoy) < hoy) continue
+    const fin = f.hasta ?? finPrevisto(f)
     const previa = porSlack.get(f.slack_id)
-    const fin = f.hasta
     porSlack.set(f.slack_id, {
       desde: previa && previa.desde < f.desde ? previa.desde : f.desde,
       fin: !previa ? fin : previa.fin === null || fin === null ? null : previa.fin > fin ? previa.fin : fin,
     })
   }
   return porSlack
+}
+
+// La red, a la vista: encendidas cuya Fecha fin ya pasó sin que llegara el desactivar. Se
+// dan por apagadas en esa fecha, pero conviene revisarlas (¿se alargó la ausencia y no se
+// actualizó Airtable? ¿falló el flujo?).
+export function ausenciasSinDesactivar(filas: FilaAusencia[], hoy: string): { slack_id: string; desde: string; fin: string }[] {
+  return filas.flatMap((f) => {
+    if (f.hasta !== null) return []
+    const fin = finPrevisto(f)
+    return fin && fin < hoy ? [{ slack_id: f.slack_id, desde: f.desde, fin }] : []
+  }).sort((a, b) => a.fin.localeCompare(b.fin) || a.slack_id.localeCompare(b.slack_id))
 }
 
 // Las ausencias de hoy cuyo slack_id no es de ningún usuario: gente de Slack sin usuario en

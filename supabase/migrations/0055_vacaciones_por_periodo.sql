@@ -1,15 +1,14 @@
 -- ============================================================
 -- 0055 VACACIONES: una fila por persona y día de inicio
 -- ------------------------------------------------------------
--- El flujo de Julián manda ya las fechas de cada ausencia ("Fecha inicio", "Fecha fin") en
--- sus pulsos. Con ellas, cada pulso apunta a un periodo concreto: el activar y el desactivar
--- de una misma ausencia son la MISMA fila (persona + día de inicio), lleguen en el orden que
--- lleguen, repetidos o a la vez. Este índice lo garantiza en la base: dos envíos simultáneos
--- no pueden crear dos filas del mismo periodo; el segundo falla, el flujo reintenta y ya ve
--- la fila.
+-- Cada ausencia empieza el día de su activar, y una persona no puede tener dos que empiecen
+-- el mismo día. Este índice lo garantiza en la base: si dos envíos a la vez de la misma
+-- persona intentan dar de alta una ausencia, el segundo falla; la ruta vuelve a leer y a
+-- planificar una vez, y ya ve la fila del primero.
 --
--- Sigue el de una sola ausencia abierta (sin fecha de fin) por persona, que solo usan los
--- pulsos que llegan sin fechas.
+-- (Se escribió para un modelo en que mandaban las fechas; se quedó con el interruptor de
+-- activar/desactivar porque sigue siendo cierto y protege de las carreras.) Sigue el de una
+-- sola ausencia encendida por persona.
 -- ============================================================
 
 create unique index if not exists vacaciones_persona_desde on public.vacaciones (slack_id, desde);

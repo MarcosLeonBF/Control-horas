@@ -1,14 +1,13 @@
 import { test, expect } from '@playwright/test'
 import {
-  validarEnvio, planificar, ausenciasPorPersona, ausenciasHoy, ausenciasSinUsuario, etiquetaAusencia,
+  validarEnvio, planificar, ausenciasPorPersona, ausenciasHoy, ausenciasSinUsuario, ausenciasSinDesactivar, etiquetaAusencia,
   type PerfilIdentificable, type AusenciaActual, type EventoRef, type Operacion,
 } from '../lib/avisos/vacaciones'
 
-// Las ausencias (vacaciones, festivos…) llegan del flujo de Julián como pulsos por persona:
-// `activar` el día que empieza y `desactivar` el día que termina, con sus fechas ("Fecha
-// inicio", "Fecha fin"). Con fechas, cada pulso apunta a un periodo (persona + día de
-// inicio) y da igual el orden, las repeticiones o que lleguen a la vez. Sin fechas, se
-// interpreta por el pulso: activar abre desde hoy, desactivar cierra hoy.
+// Las ausencias (vacaciones, festivos…) llegan del flujo de Julián como un interruptor por
+// persona: `activar` lo enciende el día que empieza y `desactivar` lo apaga el día que
+// termina (ese día todavía es de vacaciones). Las fechas del pulso no deciden cuándo se
+// enciende ni se apaga: son la red por si el desactivar no llega a tiempo.
 
 const estefania = { slack_id: 'U096AGWQJN4', accion: 'activar', eventos: [{ inicio: '2026-09-29', fin: '2026-10-02', tipo: 'ausencia' }] }
 const santiago = { slack_id: 'U0A85K6107L', accion: 'activar' }
@@ -90,13 +89,13 @@ test('validarEnvio: fechas con hora: en UTC valen por su día en Madrid; sin zon
   expect(r.ok && r.valor[0].eventos).toEqual([{ inicio: '2026-09-29', fin: '2026-10-02' }])
 })
 
-test('validarEnvio: las fechas sueltas se validan: formato, las dos, orden y como mucho un año', () => {
-  // Son las que mandan: una fecha mal escrita tiene que fallar, no ignorarse.
+test('validarEnvio: las fechas no hacen fallar un pulso: se guardan si se entienden', () => {
+  // Son de referencia: una fecha mal escrita no puede impedir encender o apagar el interruptor.
   const base = { Accion: 'activar', 'Slack ID': 'U096AGWQJN4' }
-  expect(errorDe({ ...base, 'Fecha inicio': '29/09/2026', 'Fecha fin': '2026-10-02' })).toMatch(/Fecha inicio.*YYYY-MM-DD/)
-  expect(errorDe({ ...base, 'Fecha inicio': '2026-09-29' })).toMatch(/las dos/)
-  expect(errorDe({ ...base, 'Fecha inicio': '2026-10-02', 'Fecha fin': '2026-09-29' })).toMatch(/fin.*anterior/)
-  expect(errorDe({ ...base, 'Fecha inicio': '2026-09-29', 'Fecha fin': '2062-09-29' })).toMatch(/año/)
+  const r = validarEnvio({ ...base, 'Fecha inicio': '29/09/2026', 'Fecha fin': '2026-10-02' })
+  expect(r.ok && r.valor[0].eventos).toEqual([{ fin: '2026-10-02' }])
+  expect(validarEnvio({ ...base, 'Fecha inicio': '2026-10-02', 'Fecha fin': '2026-09-29' }).ok).toBe(true)
+  expect(validarEnvio({ ...base, eventos: [{ inicio: 'mal' }] }).ok).toBe(true)
 })
 
 test('validarEnvio: de cada evento de la lista solo se guarda inicio, fin y tipo, en texto y limpio', () => {
@@ -104,7 +103,7 @@ test('validarEnvio: de cada evento de la lista solo se guarda inicio, fin y tipo
   expect(r.ok && r.valor[0].eventos).toEqual([{ inicio: '2026-10-02', fin: '2026-10-02', tipo: 'ausencia' }, { tipo: 'festivo' }])
 })
 
-// --- planificar -----------------------------------------------------------
+// --- planificar: el interruptor ------------------------------------------------
 
 const HOY = '2026-09-29'
 const MANANA = '2026-09-30'
@@ -115,8 +114,8 @@ const fechas = (inicio: string, fin: string): EventoRef[] => [{ inicio, fin }]
 const fila = (id: number, desde: string, hasta: string | null, eventos: EventoRef[] = [], slack_id = S): AusenciaActual =>
   ({ id, slack_id, desde, hasta, eventos })
 
-// Aplica las operaciones sobre las filas, como la ruta sobre la base (con el índice único
-// persona + día de inicio): así los tests encadenan envíos como llegan de verdad.
+// Aplica las operaciones sobre las filas, como la ruta sobre la base (índices únicos:
+// persona + día de inicio, y una encendida por persona).
 function aplicar(filas: AusenciaActual[], ops: Operacion[]): AusenciaActual[] {
   let id = Math.max(0, ...filas.map((f) => f.id))
   const r = filas.map((f) => ({ ...f }))
@@ -127,6 +126,7 @@ function aplicar(filas: AusenciaActual[], ops: Operacion[]): AusenciaActual[] {
       if (o.eventos !== undefined) f.eventos = o.eventos
     } else {
       if (r.some((x) => x.slack_id === o.slack_id && x.desde === o.desde)) throw new Error('índice único persona + desde')
+      if (o.hasta === null && r.some((x) => x.slack_id === o.slack_id && x.hasta === null)) throw new Error('índice de una encendida')
       r.push({ id: ++id, slack_id: o.slack_id, desde: o.desde, hasta: o.hasta, eventos: o.eventos })
     }
   }
@@ -136,177 +136,114 @@ const envio = (filas: AusenciaActual[], p: ReturnType<typeof pulso>, hoy = HOY) 
   const plan = planificar([p], perfiles, filas, hoy)
   return { filas: aplicar(filas, plan.operaciones), resultado: plan.respuesta.personas[0].resultado, plan }
 }
+const periodos = (filas: AusenciaActual[]) => filas.map((f) => [f.desde, f.hasta])
 
-test('con fechas: activar guarda el periodo entero', () => {
-  const r = envio([], pulso('activar', fechas(HOY, '2026-10-02')))
-  expect(r.plan.operaciones).toEqual([{ op: 'alta', slack_id: S, desde: HOY, hasta: '2026-10-02', eventos: fechas(HOY, '2026-10-02') }])
+test('interruptor: activar lo enciende desde hoy; desactivar lo apaga ese día (que todavía cuenta)', () => {
+  let r = envio([], pulso('activar'))
+  expect(r.plan.operaciones).toEqual([{ op: 'alta', slack_id: S, desde: HOY, hasta: null, eventos: [] }])
   expect(r.resultado).toBe('iniciada')
   expect(r.plan.respuesta.personas[0].persona).toEqual({ id: 'p-estefania', nombre: 'Estefanía García' })
-})
-
-test('con fechas: activar y desactivar de un periodo son la misma fila, en cualquier orden', () => {
-  const ev = fechas(HOY, HOY) // festivo de un día
-  const enOrden = envio(envio([], pulso('activar', ev)).filas, pulso('desactivar', ev))
-  const alReves = envio(envio([], pulso('desactivar', ev)).filas, pulso('activar', ev))
-  for (const r of [enOrden, alReves]) expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([[HOY, HOY]])
-  expect(alReves.resultado).toBe('ya_iniciada')
-})
-
-test('con fechas: repetidos, también pasada la medianoche, no cambian nada', () => {
-  const ev = fechas('2026-09-28', HOY)
-  let filas = envio([], pulso('activar', ev), '2026-09-28').filas
-  filas = envio(filas, pulso('desactivar', ev)).filas
-  const antes = JSON.stringify(filas)
-  for (const [p, dia] of [[pulso('activar', ev), HOY], [pulso('desactivar', ev), HOY], [pulso('activar', ev), MANANA], [pulso('desactivar', ev), MANANA]] as const) {
-    const r = envio(filas, p, dia)
-    expect(r.plan.operaciones).toEqual([])
-    expect(JSON.stringify(r.filas)).toBe(antes)
-  }
-})
-
-test('con fechas: el desactivar termina el periodo hoy (vuelta anticipada) o en su fin (si llega tarde)', () => {
-  const ev = fechas('2026-09-28', '2026-10-02')
-  const filas = envio([], pulso('activar', ev), '2026-09-28').filas
-  expect(envio(filas, pulso('desactivar', ev)).filas[0].hasta).toBe(HOY) // vuelve antes
-  expect(envio(filas, pulso('desactivar', ev), '2026-10-05').filas[0].hasta).toBe('2026-10-02') // llegó tarde
-})
-
-test('con fechas: un desactivar antes de que empiece no guarda nada', () => {
-  const r = envio([], pulso('desactivar', fechas('2026-10-05', '2026-10-06')))
-  expect(r.plan.operaciones).toEqual([])
-  expect(r.resultado).toBe('sin_ausencia')
-})
-
-test('con fechas: sin su activar, el desactivar guarda el periodo hasta hoy', () => {
-  const r = envio([], pulso('desactivar', fechas('2026-09-24', HOY)))
-  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([['2026-09-24', HOY]])
-  expect(r.resultado).toBe('terminada')
-})
-
-test('con fechas: un activar tardío o con fechas ya pasadas guarda el periodo tal cual', () => {
-  // Sus días cuentan como ausencia en días sin registrar; no deja a nadie ausente hoy.
-  const r = envio([], pulso('activar', fechas('2026-09-21', '2026-09-23')))
-  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([['2026-09-21', '2026-09-23']])
-})
-
-test('con fechas: dos periodos seguidos de la misma persona son dos filas', () => {
-  let filas = envio([], pulso('activar', fechas('2026-12-07', '2026-12-07')), '2026-12-07').filas
-  filas = envio(filas, pulso('desactivar', fechas('2026-12-07', '2026-12-07')), '2026-12-07').filas
-  filas = envio(filas, pulso('desactivar', fechas('2026-12-08', '2026-12-08')), '2026-12-08').filas // al revés
-  filas = envio(filas, pulso('activar', fechas('2026-12-08', '2026-12-08')), '2026-12-08').filas
-  expect(filas.map((f) => [f.desde, f.hasta])).toEqual([['2026-12-07', '2026-12-07'], ['2026-12-08', '2026-12-08']])
-})
-
-test('con fechas: si ya había una abierta sin fechas de ese periodo, la cierra en su fin', () => {
-  // El primer pulso llegó sin fechas (abrió desde hoy) y el siguiente las trae.
-  const abierta = fila(1, HOY, null)
-  const r = envio([abierta], pulso('activar', fechas(HOY, '2026-10-02')))
-  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([[HOY, '2026-10-02']])
-  expect(r.resultado).toBe('ya_iniciada')
-})
-
-test('con fechas: una abierta sin fechas que empezó dentro del periodo se cierra en su fin', () => {
-  const abierta = fila(1, '2026-09-30', null)
-  const r = envio([abierta], pulso('activar', fechas(HOY, '2026-10-02')), '2026-09-30')
-  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([['2026-09-30', '2026-10-02'], [HOY, '2026-10-02']])
-})
-
-test('sin fechas: activar abre desde hoy y desactivar la cierra hoy', () => {
-  let r = envio([], pulso('activar'))
-  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([[HOY, null]])
   r = envio(r.filas, pulso('desactivar'), '2026-10-02')
-  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([[HOY, '2026-10-02']])
+  expect(periodos(r.filas)).toEqual([[HOY, '2026-10-02']])
   expect(r.resultado).toBe('terminada')
 })
 
-test('sin fechas: repetidos no abren otra; al revés en envíos separados queda un día', () => {
-  expect(envio([fila(1, HOY, null)], pulso('activar')).plan.operaciones).toEqual([])
-  const alReves = envio(envio([], pulso('desactivar')).filas, pulso('activar'))
-  expect(alReves.filas.map((f) => [f.desde, f.hasta])).toEqual([[HOY, HOY]])
-  expect(alReves.resultado).toBe('ya_iniciada')
+test('interruptor: las fechas no deciden cuándo se enciende ni se apaga', () => {
+  // Aunque digan otra cosa, se enciende hoy y se apaga cuando llega el desactivar.
+  let r = envio([], pulso('activar', fechas('2026-10-05', '2026-10-09')))
+  expect(periodos(r.filas)).toEqual([[HOY, null]])
+  expect(r.filas[0].eventos).toEqual(fechas('2026-10-05', '2026-10-09'))
+  r = envio(r.filas, pulso('desactivar', fechas('2026-10-05', '2026-10-09')), MANANA)
+  expect(periodos(r.filas)).toEqual([[HOY, MANANA]])
 })
 
-test('sin fechas: desactivar cuando lo que hay es un periodo con fechas lo termina hoy', () => {
-  const r = envio([fila(1, '2026-09-28', '2026-10-02', fechas('2026-09-28', '2026-10-02'))], pulso('desactivar'))
-  expect(r.filas[0].hasta).toBe(HOY)
+test('interruptor: encendido, otro activar no hace nada (guarda sus fechas si trae nuevas)', () => {
+  const r = envio([fila(1, '2026-09-28', null)], pulso('activar', fechas('2026-09-28', '2026-10-02')))
+  expect(r.plan.operaciones).toEqual([{ op: 'cambio', id: 1, eventos: fechas('2026-09-28', '2026-10-02') }])
+  expect(periodos(r.filas)).toEqual([['2026-09-28', null]])
+  expect(r.resultado).toBe('ya_iniciada')
+  expect(envio(r.filas, pulso('activar', fechas('2026-09-28', '2026-10-02'))).plan.operaciones).toEqual([])
 })
 
-test('sin fechas: un activar el día después de terminar otra ausencia se toma por repetido', () => {
-  // Pasada la medianoche no se puede distinguir un reintento de una ausencia nueva sin
-  // fechas: se prefiere no dejar a nadie ausente sin fin.
-  const r = envio([fila(1, '2026-09-28', HOY)], pulso('activar'), MANANA)
+test('interruptor: apagado, un desactivar no hace nada', () => {
+  const repetido = envio([fila(1, '2026-09-25', HOY)], pulso('desactivar'))
+  expect(repetido.plan.operaciones).toEqual([])
+  expect(repetido.resultado).toBe('ya_terminada')
+  const sinActivar = envio([], pulso('desactivar'))
+  expect(sinActivar.plan.operaciones).toEqual([])
+  expect(sinActivar.resultado).toBe('sin_ausencia')
+})
+
+test('interruptor: un activar el mismo día en que se apagó no lo vuelve a encender', () => {
+  // Solo puede ser un reintento del activar de esa mañana: volver a encender dejaría a la
+  // persona de vacaciones sin fin.
+  const r = envio([fila(1, '2026-09-25', HOY)], pulso('activar'))
   expect(r.plan.operaciones).toEqual([])
   expect(r.resultado).toBe('ya_terminada')
 })
 
-test('sin fechas: activar cuando ya hay un periodo con fechas en curso no abre otra', () => {
-  const r = envio([fila(1, '2026-09-28', '2026-10-02')], pulso('activar'))
-  expect(r.plan.operaciones).toEqual([])
-  expect(r.resultado).toBe('ya_iniciada')
+test('interruptor: un festivo de un día, activar y desactivar el mismo día', () => {
+  let r = envio([], pulso('activar'))
+  r = envio(r.filas, pulso('desactivar'))
+  expect(periodos(r.filas)).toEqual([[HOY, HOY]])
+})
+
+test('interruptor: se enciende de nuevo otro día para otras vacaciones', () => {
+  const r = envio([fila(1, '2026-09-01', '2026-09-05')], pulso('activar'))
+  expect(periodos(r.filas)).toEqual([['2026-09-01', '2026-09-05'], [HOY, null]])
 })
 
 test('varias personas y pulsos en un envío, en orden; sin usuario se guarda igual', () => {
-  const plan = planificar([
-    pulso('activar', fechas(HOY, HOY)), pulso('desactivar', fechas(HOY, HOY)), pulso('activar', [], 'U0A85K6107L'),
-  ], perfiles, [], HOY)
+  const plan = planificar([pulso('activar'), pulso('desactivar'), pulso('activar', [], 'U0A85K6107L')], perfiles, [], HOY)
   const filas = aplicar([], plan.operaciones)
   expect(filas.map((f) => [f.slack_id, f.desde, f.hasta])).toEqual([[S, HOY, HOY], ['U0A85K6107L', HOY, null]])
   expect(plan.respuesta.personas.map((p) => p.resultado)).toEqual(['iniciada', 'terminada', 'iniciada'])
   expect(plan.respuesta.personas[2].persona).toBe(null)
-  // En Recibidos se nota qué pulsos llegaron sin fechas.
-  expect(plan.resumen).toBe('Estefanía García: iniciada · Estefanía García: terminada · U0A85K6107L (sin usuario): iniciada (sin fechas)')
+  expect(plan.resumen).toBe('Estefanía García: iniciada · Estefanía García: terminada · U0A85K6107L (sin usuario): iniciada')
 })
 
-test('el pulso real de Julián: activar el día de inicio con sus fechas', () => {
+test('el pulso real de Julián: activar el día de inicio', () => {
   const v = validarEnvio({ Accion: 'activar', 'Slack ID': S, 'Fecha inicio': HOY, 'Fecha fin': '2026-10-02' })
   if (!v.ok) throw new Error(v.error)
   const r = envio([], v.valor[0])
-  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([[HOY, '2026-10-02']])
-  expect(ausenciasHoy(r.filas, HOY).get(S)).toEqual({ desde: HOY, fin: '2026-10-02' })
-  expect(ausenciasHoy(r.filas, '2026-10-03').has(S)).toBe(false) // termina sola aunque no llegue el desactivar
+  expect(periodos(r.filas)).toEqual([[HOY, null]])
+  expect(ausenciasHoy(r.filas, HOY).get(S)).toEqual({ desde: HOY, fin: '2026-10-02' }) // se ve cuándo vuelve
+  // Si pasa su Fecha fin sin que llegue el desactivar, se da por apagado en esa fecha.
+  expect(ausenciasHoy(r.filas, '2026-10-05').has(S)).toBe(false)
 })
 
 // --- lectura: días sin registrar, avisos y panel ------------------------------
 
-test('ausenciasPorPersona: fuera hoy si hoy cae en el periodo; sus días, hasta hoy', () => {
-  const a = ausenciasPorPersona([fila(1, '2026-09-25', '2026-10-02')], HOY, '2026-07-01').get(S)!
+test('ausenciasPorPersona: encendido, fuera hoy; sus días, hasta hoy', () => {
+  const a = ausenciasPorPersona([fila(1, '2026-09-25', null)], HOY, '2026-07-01').get(S)!
   expect(a.ausenteHoy).toBe(true)
   expect([...a.dias]).toEqual(['2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28', HOY])
 })
 
-test('ausenciasPorPersona: una abierta sin fechas sigue hasta hoy; una ya terminada no silencia', () => {
-  expect(ausenciasPorPersona([fila(1, '2026-09-25', null)], HOY, '2026-07-01').get(S)!.ausenteHoy).toBe(true)
+test('ausenciasPorPersona: apagado hoy, todavía fuera hoy; apagado antes, no silencia pero sus días no cuentan', () => {
+  expect(ausenciasPorPersona([fila(1, '2026-09-25', HOY)], HOY, '2026-07-01').get(S)!.ausenteHoy).toBe(true)
   const pasada = ausenciasPorPersona([fila(1, '2026-09-21', '2026-09-23')], HOY, '2026-07-01').get(S)!
   expect(pasada.ausenteHoy).toBe(false)
   expect([...pasada.dias]).toEqual(['2026-09-21', '2026-09-22', '2026-09-23'])
 })
 
-test('ausenciasPorPersona: suma varias ausencias, recorta por la ventana e ignora las futuras', () => {
-  const a = ausenciasPorPersona([
-    fila(1, '2026-06-29', '2026-07-02'), fila(2, '2026-09-28', null), fila(3, '2026-10-05', '2026-10-06'),
-  ], HOY, '2026-07-01').get(S)!
+test('ausenciasPorPersona: suma varias ausencias y recorta por la ventana', () => {
+  const a = ausenciasPorPersona([fila(1, '2026-06-29', '2026-07-02'), fila(2, '2026-09-28', null)], HOY, '2026-07-01').get(S)!
   expect([...a.dias].sort()).toEqual(['2026-07-01', '2026-07-02', '2026-09-28', HOY])
   expect(a.ausenteHoy).toBe(true)
 })
 
-test('ausenciasHoy: desde cuándo y hasta cuándo si se sabe; las pasadas y futuras no', () => {
+test('ausenciasHoy: desde cuándo y, para mostrar, hasta cuándo si las fechas lo dicen', () => {
   const m = ausenciasHoy([
-    fila(1, '2026-09-25', null), // sin fechas: vuelta desconocida
-    fila(2, HOY, '2026-10-02', [], 'U0B999D77AN'),
-    fila(3, '2026-09-28', HOY, [], 'U09L2RSD2S1'), // hoy es su último día
-    fila(4, '2026-09-21', '2026-09-23', [], 'U0APJJT2811'),
-    fila(5, '2026-10-05', '2026-10-06', [], 'U07TUQRL4TT'),
+    fila(1, '2026-09-25', null), // encendido sin fechas
+    fila(2, HOY, null, fechas(HOY, '2026-10-02'), 'U0B999D77AN'), // encendido; sus fechas dicen el 02/10
+    fila(3, '2026-09-28', HOY, [], 'U09L2RSD2S1'), // apagado hoy: hoy es su último día
+    fila(4, '2026-09-21', '2026-09-23', [], 'U0APJJT2811'), // apagado antes
   ], HOY)
   expect(m.get(S)).toEqual({ desde: '2026-09-25', fin: null })
   expect(m.get('U0B999D77AN')).toEqual({ desde: HOY, fin: '2026-10-02' })
   expect(m.get('U09L2RSD2S1')).toEqual({ desde: '2026-09-28', fin: HOY })
   expect(m.has('U0APJJT2811')).toBe(false)
-  expect(m.has('U07TUQRL4TT')).toBe(false)
-})
-
-test('ausenciasHoy: dos ausencias a la vez de la misma persona se juntan', () => {
-  expect(ausenciasHoy([fila(1, '2026-09-28', HOY), fila(2, HOY, '2026-10-05')], HOY).get(S)).toEqual({ desde: '2026-09-28', fin: '2026-10-05' })
-  expect(ausenciasHoy([fila(1, '2026-09-28', HOY), fila(2, HOY, null)], HOY).get(S)).toEqual({ desde: '2026-09-28', fin: null })
 })
 
 test('ausenciasSinUsuario: las de hoy cuyo slack_id no es de ningún usuario', () => {
@@ -321,44 +258,44 @@ test('etiquetaAusencia: con la fecha de vuelta si se sabe', () => {
   expect(etiquetaAusencia({ desde: HOY, fin: null }, HOY)).toBe('Ausente desde el 29/09')
 })
 
-// --- ronda 3: fechas que cambian en Airtable, abiertas sin fechas, ISO, resultados -----
+// --- las fechas como red: si el desactivar no llega a tiempo ---------------------------
 
-test('con fechas: si Airtable alarga la Fecha fin, el desactivar con la nueva la alarga', () => {
-  const filas = envio([], pulso('activar', fechas(HOY, '2026-10-02'))).filas
-  const r = envio(filas, pulso('desactivar', fechas(HOY, '2026-10-09')), '2026-10-09')
-  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([[HOY, '2026-10-09']])
+const encendidoHasta = (fin: string) => fila(1, HOY, null, fechas(HOY, fin))
+
+test('red: si pasa la Fecha fin y no llegó el desactivar, se da por apagado en su fin', () => {
+  const filas = [encendidoHasta('2026-10-02')]
+  expect(ausenciasHoy(filas, '2026-10-02').get(S)).toEqual({ desde: HOY, fin: '2026-10-02' })
+  expect(ausenciasHoy(filas, '2026-10-03').has(S)).toBe(false)
+  const a = ausenciasPorPersona(filas, '2026-10-06', '2026-07-01').get(S)!
+  expect(a.ausenteHoy).toBe(false)
+  expect([...a.dias]).toEqual([HOY, '2026-09-30', '2026-10-01', '2026-10-02'])
+})
+
+test('red: la lista de a quién no le llegó el desactivar a tiempo', () => {
+  const filas = [encendidoHasta('2026-10-02'), fila(2, HOY, null, fechas(HOY, '2026-10-09'), 'U0B999D77AN'), fila(3, HOY, null, [], 'U09L2RSD2S1')]
+  expect(ausenciasSinDesactivar(filas, '2026-10-05')).toEqual([{ slack_id: S, desde: HOY, fin: '2026-10-02' }])
+})
+
+test('red: un desactivar que llega tarde se corrige a su Fecha fin', () => {
+  const r = envio([encendidoHasta('2026-10-02')], pulso('desactivar'), '2026-10-05')
+  expect(periodos(r.filas)).toEqual([[HOY, '2026-10-02']])
+})
+
+test('red: si Airtable alarga la Fecha fin, el desactivar con la nueva manda', () => {
+  const r = envio([encendidoHasta('2026-10-02')], pulso('desactivar', fechas(HOY, '2026-10-09')), '2026-10-09')
+  expect(periodos(r.filas)).toEqual([[HOY, '2026-10-09']])
   expect(r.resultado).toBe('terminada')
 })
 
-test('con fechas: el desactivar normal (el día de fin) contesta terminada; repetido días después, ya_terminada', () => {
-  const filas = envio([], pulso('activar', fechas(HOY, '2026-10-02'))).filas
-  const normal = envio(filas, pulso('desactivar', fechas(HOY, '2026-10-02')), '2026-10-02')
-  expect(normal.resultado).toBe('terminada')
-  const tarde = envio(normal.filas, pulso('desactivar', fechas(HOY, '2026-10-02')), '2026-10-05')
-  expect(tarde.plan.operaciones).toEqual([])
-  expect(tarde.resultado).toBe('ya_terminada')
+test('red: un activar nuevo tras un desactivar perdido cierra la vieja en su Fecha fin', () => {
+  const r = envio([encendidoHasta('2026-10-02')], pulso('activar', fechas('2026-10-20', '2026-10-23')), '2026-10-20')
+  expect(periodos(r.filas)).toEqual([[HOY, '2026-10-02'], ['2026-10-20', null]])
+  expect(r.resultado).toBe('iniciada')
 })
 
-test('con fechas: una ausencia nueva cierra la abierta sin fechas de antes el día anterior a su inicio', () => {
-  // Se perdió el desactivar de una sin fechas: la siguiente con fechas le pone límite.
-  const r = envio([fila(1, '2026-09-10', null)], pulso('activar', fechas(HOY, '2026-10-02')))
-  expect(r.filas.map((f) => [f.desde, f.hasta])).toEqual([['2026-09-10', '2026-09-28'], [HOY, '2026-10-02']])
-})
-
-test('sin fechas: el desactivar termina la ausencia que empezó más tarde (el festivo, no las vacaciones)', () => {
-  const vacaciones = fila(1, '2026-09-20', '2026-10-12', fechas('2026-09-20', '2026-10-12'))
-  const festivo = fila(2, HOY, HOY, fechas(HOY, HOY))
-  const r = envio([vacaciones, festivo], pulso('desactivar'))
+test('red: un activar cuyas fechas ya pasaron no enciende nada', () => {
+  // Un reintento muy tardío: esa ausencia ya terminó.
+  const r = envio([], pulso('activar', fechas('2026-09-21', '2026-09-23')))
   expect(r.plan.operaciones).toEqual([])
-  expect(r.filas.find((f) => f.id === 1)!.hasta).toBe('2026-10-12')
-})
-
-test('validarEnvio: una fecha ISO con microsegundos y zona cuenta por su día en Madrid', () => {
-  const r = validarEnvio({ Accion: 'activar', 'Slack ID': S, 'Fecha inicio': '2026-09-28T22:00:00.123456+00:00', 'Fecha fin': '2026-10-02' })
-  expect(r.ok && r.valor[0].eventos).toEqual([{ inicio: HOY, fin: '2026-10-02' }])
-})
-
-test('validarEnvio: un evento de la lista con fechas mal escritas da 400, no se ignora', () => {
-  expect(errorDe({ ...santiago, eventos: [{ inicio: '29/09/2026', fin: '2026-10-02' }] })).toMatch(/evento 1/)
-  expect(errorDe({ ...santiago, eventos: [{ inicio: '2026-09-29' }] })).toMatch(/evento 1/)
+  expect(r.resultado).toBe('ya_terminada')
 })
