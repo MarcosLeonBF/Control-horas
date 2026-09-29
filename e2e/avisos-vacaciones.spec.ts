@@ -150,7 +150,7 @@ test('planificar: tras cerrar hoy, un activar cuyo evento sigue mañana sí abre
 test('planificar: desactivar y activar al revés en el mismo envío = ausencia de un día', () => {
   const p = planificar([pulso('desactivar'), pulso('activar')], perfiles, [], HOY)
   expect(p.operaciones).toEqual([{ op: 'cerrada', slack_id: 'U096AGWQJN4', desde: HOY, hasta: HOY, eventos: [] }])
-  expect(p.respuesta.personas.map((x) => x.resultado)).toEqual(['sin_ausencia', 'iniciada'])
+  expect(p.respuesta.personas.map((x) => x.resultado)).toEqual(['terminada', 'ya_terminada'])
 })
 
 test('planificar: reenviar [activar, desactivar] ya aplicado no crea otra fila', () => {
@@ -273,4 +273,88 @@ test('etiquetaAusencia: con la fecha de vuelta si se sabe', () => {
   expect(etiquetaAusencia({ desde: '2026-09-29', fin: '2026-10-02' }, HOY)).toBe('Ausente hasta el 02/10')
   expect(etiquetaAusencia({ desde: '2026-09-25', fin: HOY }, HOY)).toBe('Ausente hasta hoy')
   expect(etiquetaAusencia({ desde: '2026-09-29', fin: null }, HOY)).toBe('Ausente desde el 29/09')
+})
+
+// --- revisión 2: pulsos al revés en envíos separados, carreras y eventos ajenos ------
+
+test('planificar: un desactivar sin su activar y sin fechas guarda una ausencia de hoy', () => {
+  // Los pulsos llegan de uno en uno: si el desactivar de un festivo llega antes que su
+  // activar, tiene que quedar el día, y el activar que llegue después no reabre nada.
+  const p = planificar([pulso('desactivar')], perfiles, [], HOY)
+  expect(p.operaciones).toEqual([{ op: 'cerrada', slack_id: 'U096AGWQJN4', desde: HOY, hasta: HOY, eventos: [] }])
+  expect(p.respuesta.personas[0].resultado).toBe('terminada')
+  const despues = planificar([pulso('activar')], perfiles, [{ id: 1, slack_id: 'U096AGWQJN4', desde: HOY, hasta: HOY, eventos: [] }], HOY)
+  expect(despues.operaciones).toEqual([])
+  expect(despues.respuesta.personas[0].resultado).toBe('ya_terminada')
+})
+
+test('planificar: un desactivar repetido pasada la medianoche no crea otra ausencia', () => {
+  const ayer: AusenciaActual = { id: 4, slack_id: 'U096AGWQJN4', desde: '2026-09-24', hasta: '2026-09-28', eventos: [] }
+  const p = planificar([pulso('desactivar')], perfiles, [ayer], HOY)
+  expect(p.operaciones).toEqual([])
+  expect(p.respuesta.personas[0].resultado).toBe('ya_terminada')
+})
+
+test('planificar: si dos envíos a la vez dejaron una abierta y una cerrada hoy, la abierta se cierra', () => {
+  const abierta: AusenciaActual = { id: 9, slack_id: 'U096AGWQJN4', desde: HOY, hasta: null, eventos: [] }
+  const cerrada: AusenciaActual = { id: 10, slack_id: 'U096AGWQJN4', desde: HOY, hasta: HOY, eventos: [] }
+  const p = planificar([pulso('activar')], perfiles, [abierta, cerrada], HOY)
+  expect(p.operaciones).toEqual([{ op: 'cerrar', id: 9, hasta: HOY }])
+  expect(p.respuesta.personas[0].resultado).toBe('ya_terminada')
+})
+
+test('planificar: eventos de otra ausencia (viejos o futuros) no cuentan para esta', () => {
+  // Un evento de hace un año: la ausencia abre hoy igual y un reintento no la cierra (antes,
+  // cerrarla en ese fin anterior a su inicio daba 500 en cada reintento).
+  const viejo = [{ inicio: '2025-09-29', fin: '2025-10-03' }]
+  const abre = planificar([pulso('activar', 'U096AGWQJN4', viejo)], perfiles, [], HOY)
+  expect(abre.operaciones).toEqual([{ op: 'abrir', slack_id: 'U096AGWQJN4', desde: HOY, eventos: viejo }])
+  const reintento = planificar([pulso('activar', 'U096AGWQJN4', viejo)], perfiles, [{ id: 5, slack_id: 'U096AGWQJN4', desde: HOY, hasta: null, eventos: viejo }], HOY)
+  expect(reintento.operaciones).toEqual([])
+  expect(reintento.respuesta.personas[0].resultado).toBe('ya_iniciada')
+  // Tras cerrar hoy, un activar con solo eventos futuros es el mismo pulso repetido.
+  const futuros = [{ inicio: '2026-10-09', fin: '2026-10-09' }]
+  const repetido = planificar([pulso('activar', 'U096AGWQJN4', futuros)], perfiles, [cerradaHoy], HOY)
+  expect(repetido.operaciones).toEqual([])
+  expect(repetido.respuesta.personas[0].resultado).toBe('ya_terminada')
+})
+
+test('ausenciasHoy: el fin sale solo de los eventos de esa ausencia, no de uno futuro ni de uno viejo', () => {
+  const m = ausenciasHoy([
+    fila('U096AGWQJN4', HOY, null, [{ inicio: '2026-10-02', fin: '2026-10-02' }, { inicio: '2026-10-09', fin: '2026-10-09' }]),
+    fila('U0B999D77AN', HOY, null, [{ inicio: '2025-09-29', fin: '2025-10-03' }]),
+  ], HOY)
+  expect(m.get('U096AGWQJN4')).toEqual({ desde: HOY, fin: null })
+  expect(m.get('U0B999D77AN')).toEqual({ desde: HOY, fin: null }) // un evento viejo no la da por terminada
+})
+
+test('ausenciasHoy y ausenciasPorPersona: una abierta y una cerrada del mismo día (carrera) = ausencia de un día', () => {
+  const carrera = [fila('U096AGWQJN4', HOY, null), fila('U096AGWQJN4', HOY, HOY)]
+  expect(ausenciasHoy(carrera, HOY).get('U096AGWQJN4')).toEqual({ desde: HOY, fin: HOY })
+  const manana = '2026-09-30'
+  expect(ausenciasHoy(carrera, manana).has('U096AGWQJN4')).toBe(false)
+  const a = ausenciasPorPersona(carrera, manana, '2026-07-01').get('U096AGWQJN4')!
+  expect(a.ausenteHoy).toBe(false)
+  expect([...a.dias]).toEqual([HOY])
+})
+
+test('validarEnvio: las fechas sueltas de Airtable ("Fecha inicio", "Fecha fin") son el evento de ese pulso', () => {
+  // Lo que manda el flujo de Julián desde el 29/09: las fechas como columnas, no en eventos.
+  const r = validarEnvio({ Accion: 'activar', 'Slack ID': 'U096AGWQJN4', 'Fecha fin': '2026-10-02', 'Fecha inicio': '2026-09-29' })
+  expect(r.ok && r.valor).toEqual([{ slack_id: 'U096AGWQJN4', accion: 'activar', eventos: [{ inicio: '2026-09-29', fin: '2026-10-02' }] }])
+  // Vacías, como llegaron en una prueba: no hay evento.
+  const vacias = validarEnvio({ Accion: 'activar', 'Slack ID': 'U096AGWQJN4', 'Fecha inicio': '' })
+  expect(vacias.ok && vacias.valor[0].eventos).toEqual([])
+})
+
+test('planificar: un activar repetido que trae fechas nuevas las guarda en la ausencia abierta', () => {
+  // Lo que pasó el 29/09: primero pulsos sin fechas, luego los mismos con "Fecha fin".
+  const abierta: AusenciaActual = { id: 1, slack_id: 'U096AGWQJN4', desde: HOY, hasta: null, eventos: [] }
+  const ev = [{ inicio: HOY, fin: '2026-10-02' }]
+  const p = planificar([pulso('activar', 'U096AGWQJN4', ev)], perfiles, [abierta], HOY)
+  expect(p.operaciones).toEqual([{ op: 'eventos', id: 1, eventos: ev }])
+  expect(p.respuesta.personas[0].resultado).toBe('ya_iniciada')
+  // Si ya las tenía, no hace nada.
+  const igual = planificar([pulso('activar', 'U096AGWQJN4', ev)], perfiles, [{ ...abierta, eventos: ev }], HOY)
+  expect(igual.operaciones).toEqual([])
 })

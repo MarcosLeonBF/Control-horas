@@ -13,7 +13,7 @@ import {
   planificar, validarEnvio, type AusenciaActual, type EnvioAceptado, type EnvioRechazado, type Operacion,
   type PerfilIdentificable,
 } from '@/lib/avisos/vacaciones'
-import { diaMadrid } from '@/lib/horas/auditoria-types'
+import { addDiasISO, diaMadrid } from '@/lib/horas/auditoria-types'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const PLAZO_MS = 5_000 // cada operación de la anotación: sin plazo, una base colgada la dejaría viva
@@ -27,9 +27,13 @@ interface PerfilRaw { id: string; full_name: string | null; slack_id: string | n
 async function ejecutar(db: Db, operaciones: Operacion[]): Promise<void> {
   const ahora = new Date().toISOString()
   for (const o of operaciones) {
-    if (o.op !== 'cerrar') continue
-    const { error } = await db.from('vacaciones').update({ hasta: o.hasta, updated_at: ahora }).eq('id', o.id).is('hasta', null)
-    if (error) throw new Error(`vacaciones (cerrar): ${error.message}`)
+    if (o.op === 'cerrar') {
+      const { error } = await db.from('vacaciones').update({ hasta: o.hasta, updated_at: ahora }).eq('id', o.id).is('hasta', null)
+      if (error) throw new Error(`vacaciones (cerrar): ${error.message}`)
+    } else if (o.op === 'eventos') {
+      const { error } = await db.from('vacaciones').update({ eventos: o.eventos, updated_at: ahora }).eq('id', o.id)
+      if (error) throw new Error(`vacaciones (eventos): ${error.message}`)
+    }
   }
   const altas = operaciones.flatMap((o) =>
     o.op === 'abrir' ? [{ slack_id: o.slack_id, desde: o.desde, eventos: o.eventos }]
@@ -100,8 +104,9 @@ export async function POST(req: Request) {
     const hoy = diaMadrid(new Date().toISOString())
     const [perfiles, actuales] = await Promise.all([
       db.from('profiles').select('id, full_name, slack_id').not('slack_id', 'is', null),
-      // Solo importan las abiertas y las cerradas hoy (para no cerrar dos veces).
-      db.from('vacaciones').select('id, slack_id, desde, hasta, eventos').or(`hasta.is.null,hasta.eq.${hoy}`),
+      // Solo importan las abiertas y las cerradas hoy o ayer: para no cerrar dos veces, ni
+      // crear otra con un desactivar reintentado pasada la medianoche.
+      db.from('vacaciones').select('id, slack_id, desde, hasta, eventos').or(`hasta.is.null,hasta.gte.${addDiasISO(hoy, -1)}`),
     ])
     if (perfiles.error) throw new Error(`profiles: ${perfiles.error.message}`)
     if (actuales.error) throw new Error(`vacaciones: ${actuales.error.message}`)

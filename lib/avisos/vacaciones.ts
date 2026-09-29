@@ -33,6 +33,7 @@ export interface AusenciaActual { id: number; slack_id: string; desde: string; h
 export type Operacion =
   | { op: 'abrir'; slack_id: string; desde: string; eventos: EventoRef[] }
   | { op: 'cerrar'; id: number; hasta: string }
+  | { op: 'eventos'; id: number; eventos: EventoRef[] }
   | { op: 'cerrada'; slack_id: string; desde: string; hasta: string; eventos: EventoRef[] }
 
 // Lo que pasó con cada persona, para quien manda:
@@ -59,17 +60,27 @@ function limpiarEvento(e: unknown): EventoRef | null {
   const limpio: EventoRef = {}
   for (const k of ['inicio', 'fin', 'tipo'] as const) {
     const v = e[k]
-    if (typeof v === 'string') limpio[k] = v.replace(/\u0000/g, '').trim().slice(0, k === 'tipo' ? 50 : 30)
+    if (typeof v !== 'string') continue
+    let t = v.replace(/\u0000/g, '').trim().slice(0, k === 'tipo' ? 50 : 30)
+    // Una fecha con hora ("2026-10-02T00:00:00.000Z", como la serializan a veces Airtable o
+    // n8n) vale por su día.
+    if (k !== 'tipo' && /^\d{4}-\d{2}-\d{2}T/.test(t)) t = t.slice(0, 10)
+    if (t) limpio[k] = t
   }
   return Object.keys(limpio).length ? limpio : null
 }
 
-// Los nombres de campo se aceptan tal como vienen de Airtable ("Slack ID", "Acción"): se
-// comparan sin mayúsculas, tildes, espacios, guiones ni guiones bajos. Si un campo viene
-// dos veces con nombres distintos, vale el primero.
-const CAMPOS: Record<string, 'slack_id' | 'accion' | 'eventos'> = { slackid: 'slack_id', accion: 'accion', eventos: 'eventos' }
+// Los nombres de campo se aceptan tal como vienen de Airtable ("Slack ID", "Acción", "Fecha
+// inicio"): se comparan sin mayúsculas, tildes, espacios, guiones ni guiones bajos. Si un
+// campo viene dos veces con nombres distintos, vale el primero. Las fechas sueltas (inicio,
+// fin, tipo) son el evento de ese pulso, que es como las manda el flujo de Julián.
+type Campo = 'slack_id' | 'accion' | 'eventos' | 'inicio' | 'fin' | 'tipo'
+const CAMPOS: Record<string, Campo> = {
+  slackid: 'slack_id', accion: 'accion', eventos: 'eventos',
+  fechainicio: 'inicio', inicio: 'inicio', fechafin: 'fin', fin: 'fin', tipo: 'tipo',
+}
 
-function camposConocidos(p: Record<string, unknown>): { slack_id?: unknown; accion?: unknown; eventos?: unknown } {
+function camposConocidos(p: Record<string, unknown>): Partial<Record<Campo, unknown>> {
   const campos: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(p)) {
     const c = CAMPOS[k.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[\s_-]/g, '')]
@@ -91,10 +102,11 @@ function validarPersona(bruto: unknown): { ok: true; valor: PulsoPersona } | { o
   if (p.accion !== 'activar' && p.accion !== 'desactivar') {
     return { ok: false, error: 'accion tiene que ser "activar" o "desactivar", en minúsculas.' }
   }
-  let eventos: EventoRef[] = []
+  const suelto = limpiarEvento({ inicio: p.inicio, fin: p.fin, tipo: p.tipo })
+  let eventos: EventoRef[] = suelto && (suelto.inicio || suelto.fin) ? [suelto] : []
   if (p.eventos !== undefined && p.eventos !== null) {
     if (!Array.isArray(p.eventos)) return { ok: false, error: 'eventos, si viene, tiene que ser una lista.' }
-    eventos = p.eventos.slice(0, MAX_EVENTOS).map(limpiarEvento).filter((e): e is EventoRef => e !== null)
+    eventos = [...eventos, ...p.eventos.map(limpiarEvento).filter((e): e is EventoRef => e !== null)].slice(0, MAX_EVENTOS)
   }
   return { ok: true, valor: { slack_id: n.valor, accion: p.accion, eventos } }
 }
@@ -141,18 +153,39 @@ function inicioEnCurso(eventos: unknown, hoy: string): string | null {
   return inicios[0] < tope ? tope : inicios[0]
 }
 
-// ¿Algún evento sigue después de hoy? Distingue una ausencia nueva de un pulso repetido.
+// ¿Hay un evento en curso hoy que sigue después? Distingue una ausencia nueva (que empieza el
+// día que acaba otra) de un pulso repetido. Uno futuro no cuenta: es otra ausencia.
 function sigueDespues(eventos: unknown, hoy: string): boolean {
-  return fechasDe(eventos).some((e) => e.fin > hoy)
+  return fechasDe(eventos).some((e) => e.inicio <= hoy && hoy < e.fin)
 }
 
-// El último día según los eventos guardados de una ausencia abierta, si lo dicen.
-function finSegunEventos(eventos: unknown): string | null {
-  const fines = fechasDe(eventos).map((e) => e.fin).sort()
+// El último día de una ausencia según SUS eventos: los que contienen su primer día. Uno viejo
+// o uno futuro de otra ausencia no dice nada de esta (y cerrarla en un fin anterior a su
+// inicio la rompería).
+function finSegunEventos(eventos: unknown, desde: string): string | null {
+  const fines = fechasDe(eventos).filter((e) => e.inicio <= desde && desde <= e.fin).map((e) => e.fin).sort()
   return fines.length ? fines[fines.length - 1] : null
 }
 
-type Abierta = { id: number; eventos: unknown } | { nueva: Extract<Operacion, { op: 'abrir' }> }
+// Carreras: si dos envíos a la vez dejaron a una persona con una ausencia abierta y otra ya
+// cerrada que la alcanza (el activar y el desactivar de un festivo, a la vez), la abierta es
+// esa misma ausencia: se da por cerrada donde acaba la otra. No si sus eventos dicen que
+// sigue después (una ausencia nueva que empieza el día que acaba otra).
+function cierrePorCarrera(
+  abierta: { slack_id: string; desde: string; eventos: unknown },
+  filas: { slack_id: string; hasta: string | null }[],
+): string | null {
+  const fin = finSegunEventos(abierta.eventos, abierta.desde)
+  let cierre: string | null = null
+  for (const f of filas) {
+    if (f.slack_id !== abierta.slack_id || f.hasta === null || f.hasta < abierta.desde) continue
+    if (fin !== null && fin > f.hasta) continue
+    if (cierre === null || f.hasta > cierre) cierre = f.hasta
+  }
+  return cierre
+}
+
+type Abierta = { id: number; desde: string; eventos: unknown } | { nueva: Extract<Operacion, { op: 'abrir' }> }
 
 export function planificar(
   pulsos: PulsoPersona[],
@@ -161,18 +194,27 @@ export function planificar(
   hoy: string,
 ): { operaciones: Operacion[]; respuesta: EnvioAceptado; resumen: string } {
   const porSlack = new Map(perfiles.filter((p) => p.slack_id).map((p) => [p.slack_id as string, p]))
+  const ayer = addDiasISO(hoy, -1)
   const abiertas = new Map<string, Abierta>()
   const cerradasHoy = new Set<string>()
-  // Un desactivar de este envío que no encontró nada que cerrar: si detrás viene el
-  // activar de la misma persona (los dos pulsos de un festivo, al revés), es una ausencia
-  // de un día.
-  const desactivadasSinAusencia = new Set<string>()
+  const cerradasAyer = new Set<string>()
+  const operaciones: Operacion[] = []
   for (const a of actuales) {
-    if (a.hasta === null) abiertas.set(a.slack_id, { id: a.id, eventos: a.eventos })
-    else if (a.hasta === hoy) cerradasHoy.add(a.slack_id)
+    if (a.hasta === hoy) cerradasHoy.add(a.slack_id)
+    else if (a.hasta === ayer) cerradasAyer.add(a.slack_id)
+  }
+  for (const a of actuales) {
+    if (a.hasta !== null) continue
+    // Una carrera anterior la dejó abierta junto a otra cerrada: se repara ahora.
+    const cierre = cierrePorCarrera(a, actuales)
+    if (cierre) {
+      operaciones.push({ op: 'cerrar', id: a.id, hasta: cierre })
+      if (cierre === hoy) cerradasHoy.add(a.slack_id)
+      continue
+    }
+    abiertas.set(a.slack_id, { id: a.id, desde: a.desde, eventos: a.eventos })
   }
 
-  const operaciones: Operacion[] = []
   const personas: ResultadoPersona[] = []
   for (const { slack_id, accion, eventos } of pulsos) {
     let abierta = abiertas.get(slack_id)
@@ -181,7 +223,7 @@ export function planificar(
     // Se perdió el desactivar de una ausencia vieja: si sus eventos dicen que ya terminó,
     // se cierra en su fin y este activar abre otra. Sin esto seguiría abierta sin límite.
     if (accion === 'activar' && abierta && 'id' in abierta) {
-      const fin = finSegunEventos(abierta.eventos)
+      const fin = finSegunEventos(abierta.eventos, abierta.desde)
       if (fin && fin < hoy) {
         operaciones.push({ op: 'cerrar', id: abierta.id, hasta: fin })
         abiertas.delete(slack_id)
@@ -191,12 +233,20 @@ export function planificar(
 
     if (accion === 'activar') {
       if (abierta) {
+        // Repetido. Si trae fechas que la ausencia guardada no tenía (el primer pulso llegó
+        // sin ellas), se añaden: así se sabe cuándo vuelve.
+        if ('id' in abierta) {
+          const guardados = Array.isArray(abierta.eventos) ? (abierta.eventos as EventoRef[]) : []
+          const clave = (e: EventoRef) => `${e.inicio ?? ''}|${e.fin ?? ''}|${e.tipo ?? ''}`
+          const vistos = new Set(guardados.map(clave))
+          const nuevos = eventos.filter((e) => !vistos.has(clave(e)))
+          if (nuevos.length) {
+            const todos = [...guardados, ...nuevos].slice(0, MAX_EVENTOS)
+            operaciones.push({ op: 'eventos', id: abierta.id, eventos: todos })
+            abierta.eventos = todos
+          }
+        }
         resultado = 'ya_iniciada'
-      } else if (desactivadasSinAusencia.has(slack_id)) {
-        operaciones.push({ op: 'cerrada', slack_id, desde: hoy, hasta: hoy, eventos })
-        desactivadasSinAusencia.delete(slack_id)
-        cerradasHoy.add(slack_id)
-        resultado = 'iniciada'
       } else if (cerradasHoy.has(slack_id) && !sigueDespues(eventos, hoy)) {
         // Ya se cerró hoy: es el activar de esa misma ausencia, repetido o fuera de orden.
         // Reabrirla la dejaría abierta hasta el próximo desactivar. Solo abre otra si sus
@@ -221,19 +271,20 @@ export function planificar(
       abiertas.delete(slack_id)
       cerradasHoy.add(slack_id)
       resultado = 'terminada'
-    } else if (cerradasHoy.has(slack_id)) {
+    } else if (cerradasHoy.has(slack_id) || cerradasAyer.has(slack_id)) {
+      // Repetido: el mismo día, o reintentado pasada la medianoche.
       resultado = 'ya_terminada'
+    } else if (fechasDe(eventos).length && !inicioEnCurso(eventos, hoy)) {
+      // Sus fechas dicen que la ausencia no es hoy: no se inventa una.
+      resultado = 'sin_ausencia'
     } else {
-      // Se perdió el activar: si un evento en curso dice desde cuándo, se guarda entera.
-      const desde = inicioEnCurso(eventos, hoy)
-      if (desde) {
-        operaciones.push({ op: 'cerrada', slack_id, desde, hasta: hoy, eventos })
-        cerradasHoy.add(slack_id)
-        resultado = 'terminada'
-      } else {
-        desactivadasSinAusencia.add(slack_id)
-        resultado = 'sin_ausencia'
-      }
+      // Sin su activar (se perdió, o llegó antes que él: los pulsos van de uno en uno). El
+      // desactivar llega el último día, así que al menos hoy es ausencia; si un evento en
+      // curso dice desde cuándo, se guarda entera. Así el activar que llegue después no
+      // reabre nada.
+      operaciones.push({ op: 'cerrada', slack_id, desde: inicioEnCurso(eventos, hoy) ?? hoy, hasta: hoy, eventos })
+      cerradasHoy.add(slack_id)
+      resultado = 'terminada'
     }
     const perfil = porSlack.get(slack_id)
     personas.push({ slack_id, accion, persona: perfil ? { id: perfil.id, nombre: perfil.nombre } : null, resultado })
@@ -258,8 +309,18 @@ export interface FilaAusencia { slack_id: string; desde: string; hasta: string |
 // vuelta conocida).
 function finDe(f: FilaAusencia, hoy: string): { fin: string; abierta: boolean } {
   if (f.hasta !== null) return { fin: f.hasta, abierta: false }
-  const segunEventos = finSegunEventos(f.eventos)
+  const segunEventos = finSegunEventos(f.eventos, f.desde)
   return segunEventos && segunEventos < hoy ? { fin: segunEventos, abierta: false } : { fin: hoy, abierta: true }
+}
+
+// Las filas tal como hay que leerlas: una abierta que una carrera dejó junto a otra cerrada
+// que la alcanza se lee cerrada ahí (el siguiente pulso de esa persona la repara en la base).
+function sinCarreras(filas: FilaAusencia[]): FilaAusencia[] {
+  return filas.map((f) => {
+    if (f.hasta !== null) return f
+    const cierre = cierrePorCarrera(f, filas)
+    return cierre ? { ...f, hasta: cierre } : f
+  })
 }
 
 export function ausenciasPorPersona(
@@ -268,7 +329,7 @@ export function ausenciasPorPersona(
   ventana: string,
 ): Map<string, { ausenteHoy: boolean; dias: Set<string> }> {
   const porSlack = new Map<string, { ausenteHoy: boolean; dias: Set<string> }>()
-  for (const f of filas) {
+  for (const f of sinCarreras(filas)) {
     if (f.desde > hoy) continue
     const { fin } = finDe(f, hoy)
     const a = porSlack.get(f.slack_id) ?? { ausenteHoy: false, dias: new Set<string>() }
@@ -289,9 +350,9 @@ export interface AusenciaHoy { desde: string; fin: string | null }
 
 export function ausenciasHoy(filas: FilaAusencia[], hoy: string): Map<string, AusenciaHoy> {
   const porSlack = new Map<string, AusenciaHoy>()
-  for (const f of filas) {
+  for (const f of sinCarreras(filas)) {
     if (f.desde > hoy) continue
-    const fin = f.hasta ?? finSegunEventos(f.eventos)
+    const fin = f.hasta ?? finSegunEventos(f.eventos, f.desde)
     if (fin !== null && fin < hoy) continue // terminó (o se perdió el desactivar y sus eventos ya acabaron)
     const previa = porSlack.get(f.slack_id)
     porSlack.set(f.slack_id, {

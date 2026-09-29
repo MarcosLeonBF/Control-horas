@@ -181,8 +181,9 @@ diario, con sus líneas (proyecto, área o departamento, etapa, horas y descripc
 Cada vez que alguien da de alta un registro (el pulso): uno por cada alta y día. Si alguien
 registra dos veces el mismo día llegan dos, cada uno con sus horas en `horas_registro` y el
 total acumulado del día en `horas_dia`. Las ediciones no envían pulso. No llega por la gente
-de Dirección y Administración ni por quien está de ausencia ese día (tampoco
-`registro.llamativo`): de quien está fuera no se manda nada.
+de Dirección y Administración ni por quien está de ausencia el día en que guarda el
+registro, sea cual sea el `dia` registrado (tampoco `registro.llamativo`): de quien está
+fuera no se manda nada.
 
 | Campo | Qué es |
 |---|---|
@@ -595,8 +596,14 @@ como día registrado.
 | `dias` | Días laborables seguidos sin registrar |
 | `desde` | El día pendiente más antiguo |
 | `ultimo_registro` | Último día que registró dentro de los últimos 90 días (`null` si no hay ninguno en ese periodo) |
-| `dentro_de_plazo` | `true` si todavía puede registrar el día más antiguo por su cuenta (la plataforma deja registrar 7 días hacia atrás salvo ampliación) |
+| `dentro_de_plazo` | `true` si todavía puede registrar el día más antiguo por su cuenta (la plataforma deja registrar 15 días hacia atrás salvo ampliación) |
 | `manager_directo` | Su manager directo o `null`. Lleva además `vacaciones` (`true`/`false`) |
+| `pendientes` | Todos sus laborables sin registrar de los últimos 30 laborables, del más antiguo al más reciente (`YYYY-MM-DD`), sin sus días de ausencia |
+| `pendientes_dd_mm` | Los mismos días, en el mismo orden, como `dd-mm` (para los mensajes) |
+| `dias_desde_mas_antiguo` | Laborables desde el primero de `pendientes` hasta ayer, sin sus días de ausencia |
+
+Sale quien tenga algún día en `pendientes`, aunque ayer registrara: entonces `dias` es `0`
+y `desde` y `dentro_de_plazo` llegan en `null`. Una `fecha` futura da `400`.
 
 ```json
 {
@@ -635,51 +642,51 @@ en un mismo envío, en una lista, o una sola como objeto.
 
 | Campo | Qué es |
 |---|---|
-| `slack_id` | ID de miembro de Slack de la persona (`U…`). Obligatorio |
-| `accion` | `"activar"` o `"desactivar"`, en minúsculas. Obligatorio |
-| `eventos` | Opcional. Lista con las fechas de la ausencia (`inicio`, `fin`, `tipo`), de referencia |
+| `Slack ID` (o `slack_id`) | ID de miembro de Slack de la persona (`U…`). Obligatorio |
+| `Accion` (o `accion`) | `"activar"` o `"desactivar"`, en minúsculas. Obligatorio |
+| `Fecha inicio` (o `inicio`) | Opcional. Primer día de la ausencia, `YYYY-MM-DD` |
+| `Fecha fin` (o `fin`) | Opcional. Último día de la ausencia, `YYYY-MM-DD` |
+| `eventos` | Opcional. Lista de fechas (`inicio`, `fin`, `tipo`), por si una persona tiene varias |
 
-Los nombres de campo valen también como vienen de Airtable (`Slack ID`, `Accion`,
-`Acción`…): no se distinguen mayúsculas, tildes, espacios, guiones ni guiones bajos.
+Los nombres de campo valen como vienen de Airtable o en minúsculas: no se distinguen
+mayúsculas, tildes, espacios, guiones ni guiones bajos. Las fechas van en `YYYY-MM-DD` (con
+hora también vale, se toma el día); en otro formato se ignoran sin error, así que conviene
+comprobarlas en **Recibidos**.
 
 ```json
-[
-  {
-    "slack_id": "U01LAURA001",
-    "accion": "activar",
-    "eventos": [{ "inicio": "2026-09-29", "fin": "2026-10-02", "tipo": "vacaciones" }]
-  },
-  { "slack_id": "U01CARLOS01", "accion": "desactivar" }
-]
+{ "Accion": "activar", "Slack ID": "U01LAURA001", "Fecha inicio": "2026-09-29", "Fecha fin": "2026-10-02" }
 ```
 
 Cómo se interpreta:
 
 - La ausencia va **del día del `activar` al día del `desactivar`, los dos incluidos**: el
   `desactivar` llega el último día, que todavía cuenta como ausencia.
-- Mientras no llegue su `desactivar`, la persona sigue de ausencia.
+- Mientras no llegue su `desactivar`, la persona sigue de ausencia, salvo que las fechas
+  digan que ya terminó (ver abajo).
 - El día es el de Madrid en el momento de recibir el pulso: mándalos durante el día (un
   pulso que llegue pasada la medianoche cuenta para el día siguiente).
-- Pulsos repetidos no cambian nada: un `activar` estando ya de ausencia, un `desactivar`
-  repetido el mismo día o un `activar` que llega después del `desactivar` de ese mismo día.
-  Reintentar un envío es seguro.
-- En un mismo envío, `desactivar` y `activar` de la misma persona, en cualquier orden, dejan
-  una ausencia de un día.
-- `eventos` es opcional; solo se usa como respaldo, con los eventos **en curso hoy**
-  (`inicio` ≤ hoy ≤ `fin`):
-  - si se perdió el `activar`, el `desactivar` guarda la ausencia desde ese `inicio` (como
-    mucho 90 días atrás);
-  - si el `activar` llega tarde, la ausencia empieza en ese `inicio`;
-  - si se perdió un `desactivar` y los `eventos` guardados de esa ausencia ya terminaron, la
-    ausencia se da por terminada en su `fin` (y el siguiente `activar` abre la nueva).
-  
-  De cada evento solo se guardan `inicio`, `fin` y `tipo`, y como mucho 50 por persona.
-  **Recomendado: manda `eventos` con `inicio` y `fin` en el `activar`.** Con ellos la
-  plataforma sabe cuándo vuelve la persona (se ve en el panel de usuarios) y, si un
-  `desactivar` no llega, la ausencia termina igual en su `fin`. Sin ellos, solo se sabe desde
-  cuándo está fuera, y sigue fuera hasta que llegue su `desactivar`.
-- Todo el envío se valida antes de guardar nada: si una persona está mal, se rechaza entero
-  y el error dice cuál. Como mucho 500 personas por envío; una lista vacía da `400`.
+- Pulsos repetidos o fuera de orden no cambian nada, lleguen en el mismo envío o en envíos
+  separados: un `activar` estando ya de ausencia, un `desactivar` repetido (también
+  reintentado pasada la medianoche) o un `activar` que llega después del `desactivar` de ese
+  mismo día. Reintentar un envío es seguro.
+- Un `desactivar` sin su `activar` (se perdió, o llegó antes que él) guarda la ausencia de
+  ese día, o desde la `Fecha inicio` si la trae y la ausencia sigue en curso (como mucho 90
+  días atrás). Si sus fechas dicen que la ausencia no es hoy, no guarda nada (`sin_ausencia`).
+
+**Las fechas.** **Recomendado: manda `Fecha inicio` y `Fecha fin` en el `activar`.** Solo
+cuentan las fechas de esa ausencia: las que incluyen el día en que empezó. Con ellas:
+
+- la plataforma sabe cuándo vuelve la persona, y se ve en el panel de usuarios;
+- si un `desactivar` no llega, la ausencia termina igual en su `Fecha fin`;
+- si el `activar` llega tarde, la ausencia empieza en su `Fecha inicio`.
+
+Sin fechas, solo se sabe desde cuándo está fuera, y sigue fuera hasta que llegue su
+`desactivar`. Un `activar` siempre abre la ausencia el día que llega: si trae fechas
+futuras, no se adelanta ni se programa nada. De cada evento solo se guardan `inicio`, `fin`
+y `tipo`, como mucho 50 por persona.
+
+Todo el envío se valida antes de guardar nada: si una persona está mal, se rechaza entero y
+el error dice cuál. Como mucho 500 personas por envío; una lista vacía da `400`.
 
 Respuesta (`200`), una línea por persona, en el mismo orden:
 
@@ -687,8 +694,7 @@ Respuesta (`200`), una línea por persona, en el mismo orden:
 {
   "ok": true,
   "personas": [
-    { "slack_id": "U01LAURA001", "accion": "activar", "persona": { "id": "a1b2…", "nombre": "Laura Gómez" }, "resultado": "iniciada" },
-    { "slack_id": "U01CARLOS01", "accion": "desactivar", "persona": null, "resultado": "sin_ausencia" }
+    { "slack_id": "U01LAURA001", "accion": "activar", "persona": { "id": "a1b2…", "nombre": "Laura Gómez" }, "resultado": "iniciada" }
   ]
 }
 ```
@@ -696,14 +702,14 @@ Respuesta (`200`), una línea por persona, en el mismo orden:
 - `persona`: a quién corresponde ese `slack_id` en la plataforma. `null` si no tiene
   usuario: se guarda igual y contará cuando lo tenga.
 - `resultado`: `iniciada`, `ya_iniciada` (ya estaba de ausencia), `terminada`,
-  `ya_terminada` (ya se había cerrado hoy) o `sin_ausencia` (un `desactivar` sin ausencia que
-  cerrar).
+  `ya_terminada` (ya se había cerrado hoy o ayer: un pulso repetido) o `sin_ausencia` (un
+  `desactivar` cuyas fechas dicen que la ausencia no es hoy).
 
 Si algo falla, la respuesta es `{ "ok": false, "error": "…" }` con el motivo:
 
 | Código | Cuándo |
 |---|---|
-| `400` | El cuerpo no es JSON o una persona no es válida. `error` dice cuál (`Persona 2 (U0…): …`) y, si era un objeto, termina con los campos que traía y su tipo (por ejemplo, `Campos recibidos: accion (texto).`) |
+| `400` | El cuerpo no es JSON o una persona no es válida. `error` dice cuál (`Persona 2 (U0…): …`) y, si era un objeto, termina con los campos que traía y su tipo (por ejemplo, `Campos recibidos: Accion (texto).`) |
 | `401` | Falta la clave o no es correcta |
 | `500` | Error de la plataforma. Se puede reintentar: repetir un envío no duplica nada |
 
@@ -783,9 +789,19 @@ respuesta trae un `resultado` por persona. Ver «Entradas → Vacaciones y ausen
   `dias-sin-registrar` ni generan `registro.enviado` ni `registro.llamativo`. Como managers
   de otras personas siguen apareciendo.
 
-**29/09/2026** · Ausencias en los avisos:
+**29/09/2026** · Durante un rato de la tarde (desde las 18:39) todas las personas del
+payload llevaron un campo `vacaciones` con `{ desde, hasta }` o `null`. **Ese campo se
+quita**: ya no viaja en `persona`, `manager_proyecto`, `managers`, el `actor` ni la
+`persona` de `registro`. Si llegaste a mapearlo, quítalo. Queda así:
 
-- De quien está de ausencia ese día no se manda nada: tampoco `registro.enviado` ni
-  `registro.llamativo` (en `dias-sin-registrar` ya no aparecía).
-- En `dias-sin-registrar`, `manager_directo` trae un campo nuevo, `vacaciones`: `true` si
-  el manager está de ausencia ese día, `false` si no. Nada de lo anterior cambia.
+- En `dias-sin-registrar`, `manager_directo` trae `vacaciones`, ahora un **booleano**:
+  `true` si el manager está de ausencia ese día, `false` si no.
+- De quien está de ausencia no se manda nada: tampoco `registro.enviado` ni
+  `registro.llamativo` si está fuera el día en que guarda (en `dias-sin-registrar` ya no
+  aparecía).
+- La entrada de vacaciones lee también `Fecha inicio` y `Fecha fin` sueltas, como las
+  mandas desde Airtable (antes solo dentro de `eventos`). Ver «Entradas → Vacaciones y
+  ausencias».
+
+De paso: en `dias-sin-registrar`, `dentro_de_plazo` decía 7 días y son 15 desde el 22/09, y
+se documentan `pendientes`, `pendientes_dd_mm` y `dias_desde_mas_antiguo`, que ya llegaban.

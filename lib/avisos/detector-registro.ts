@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { emitirAviso } from '@/lib/avisos/bandeja'
 import { esProduccion, esPersonaDePrueba, enlaceRegistro } from '@/lib/avisos/entorno'
 import { perfilesPorId, managerDe, sinAvisosPropios } from '@/lib/avisos/personas'
+import { diaMadrid } from '@/lib/horas/auditoria-types'
 import {
   resumirPorDia, motivosLlamativo, claveLlamativo, textoProyectos, descripcionLlamativo, registroPorProyecto,
 } from '@/lib/avisos/reglas'
@@ -24,7 +25,8 @@ export async function alGuardarRegistro(args: { esAlta: boolean; logId: string; 
     const { data: log, error } = await db.from('time_logs').select('user_id, updated_at').eq('id', args.logId).single()
     if (error) throw new Error(`time_logs: ${error.message}`)
     const duenoId = log.user_id as string
-    const perfiles = await perfilesPorId(db)
+    // Con ausencias: de quien está fuera hoy no se manda nada.
+    const perfiles = await perfilesPorId(db, diaMadrid(new Date().toISOString()))
     const dueno = perfiles.get(duenoId)
     if (!dueno || esPersonaDePrueba(dueno.persona.email)) return
     const manager = managerDe(dueno, perfiles)

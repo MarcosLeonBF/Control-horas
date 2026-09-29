@@ -65,13 +65,18 @@ export function aPerfil(r: PerfilRaw, ausenteHoy = false): Perfil {
 }
 
 // Todos los perfiles (son pocas decenas): hacen falta enteros para resolver los managers.
-// `hoy` es el día en que se mira quién está de ausencia (por defecto, hoy en Madrid). Si la
-// consulta de ausencias falla, falla todo, como con los perfiles: sin ella, a quien está
+// `ausenciasDe`: el día en que mirar quién está de ausencia. Solo lo pasan quienes lo usan
+// (días sin registrar y los avisos de registro); sin él no se consulta y ausenteHoy es false,
+// para que un fallo de esa consulta no se lleve por delante avisos que no dependen de ella
+// (bancos, ampliaciones, resúmenes). Con él, si falla, falla todo: sin ella, a quien está
 // fuera le llegarían avisos y su manager saldría como si estuviera trabajando.
-export async function perfilesPorId(db: SupabaseClient, hoy = diaMadrid(new Date().toISOString())): Promise<Map<string, Perfil>> {
-  const [{ data, error }, filas] = await Promise.all([db.from('profiles').select(SELECT_PERFIL), filasAusenciaDeHoy(db, hoy)])
+export async function perfilesPorId(db: SupabaseClient, ausenciasDe?: string): Promise<Map<string, Perfil>> {
+  const [{ data, error }, filas] = await Promise.all([
+    db.from('profiles').select(SELECT_PERFIL),
+    ausenciasDe ? filasAusenciaDeHoy(db, ausenciasDe) : Promise.resolve([] as FilaAusencia[]),
+  ])
   if (error) throw new Error(`profiles: ${error.message}`)
-  const ausentes = ausenciasHoy(filas, hoy)
+  const ausentes = ausenciasDe ? ausenciasHoy(filas, ausenciasDe) : new Map()
   return new Map(((data ?? []) as unknown as PerfilRaw[])
     .map((r) => [r.id, aPerfil(r, r.slack_id !== null && ausentes.has(r.slack_id))]))
 }
