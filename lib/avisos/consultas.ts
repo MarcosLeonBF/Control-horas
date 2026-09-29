@@ -88,7 +88,7 @@ export async function diasSinRegistrarDe(fecha: string): Promise<{ fecha: string
   // 3 × tope en días naturales cubre los 30 laborables con fines de semana y festivos.
   const ventana = addDiasISO(fecha, -TOPE_DIAS * 3)
   const [perfiles, logs, fest, vac] = await Promise.all([
-    perfilesPorId(db),
+    perfilesPorId(db, fecha),
     fetchAllRows<{ user_id: string; entry_date: string }>((desde, hasta) =>
       db.from('time_logs').select('user_id, entry_date').neq('status', 'anulado')
         .gte('entry_date', ventana).lt('entry_date', fecha).range(desde, hasta)),

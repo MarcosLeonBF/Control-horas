@@ -14,6 +14,7 @@
 import { normalizarSlackId } from '@/lib/slack-id'
 import { addDiasISO } from '@/lib/horas/auditoria-types'
 import { describirCampos, tipoDe } from '@/lib/avisos/entrantes'
+import type { VacacionesAviso } from '@/lib/avisos/contrato'
 
 export const MAX_PERSONAS = 500
 const MAX_EVENTOS = 50
@@ -254,6 +255,14 @@ export interface FilaAusencia { slack_id: string; desde: string; hasta: string |
 // abierta, sigue hasta hoy, salvo que sus eventos digan que terminó antes: entonces se
 // perdió el desactivar y se da por cerrada en ese fin (sin esto, la persona se quedaría sin
 // recordatorios para siempre). Mismo criterio que planificar al recibir el siguiente activar.
+// Hasta qué día llega una ausencia vista desde `hoy`, y si sigue abierta (sin fecha de
+// vuelta conocida).
+function finDe(f: FilaAusencia, hoy: string): { fin: string; abierta: boolean } {
+  if (f.hasta !== null) return { fin: f.hasta, abierta: false }
+  const segunEventos = finSegunEventos(f.eventos)
+  return segunEventos && segunEventos < hoy ? { fin: segunEventos, abierta: false } : { fin: hoy, abierta: true }
+}
+
 export function ausenciasPorPersona(
   filas: FilaAusencia[],
   hoy: string,
@@ -262,8 +271,7 @@ export function ausenciasPorPersona(
   const porSlack = new Map<string, { ausenteHoy: boolean; dias: Set<string> }>()
   for (const f of filas) {
     if (f.desde > hoy) continue
-    const segunEventos = f.hasta === null ? finSegunEventos(f.eventos) : null
-    const fin = f.hasta ?? (segunEventos && segunEventos < hoy ? segunEventos : hoy)
+    const { fin } = finDe(f, hoy)
     const a = porSlack.get(f.slack_id) ?? { ausenteHoy: false, dias: new Set<string>() }
     if (f.desde <= hoy && hoy <= fin) a.ausenteHoy = true
     const hasta = fin < hoy ? fin : hoy
@@ -271,4 +279,41 @@ export function ausenciasPorPersona(
     porSlack.set(f.slack_id, a)
   }
   return porSlack
+}
+
+// La marca `vacaciones` de cada persona del payload y la etiqueta del panel: por slack_id,
+// quién está de ausencia `hoy`, desde cuándo y, si ya llegó el desactivar, hasta hoy
+// (hasta null = sigue fuera sin fecha de vuelta). Con dos ausencias a la vez se juntan.
+export function vacacionesHoy(filas: FilaAusencia[], hoy: string): Map<string, VacacionesAviso> {
+  const porSlack = new Map<string, VacacionesAviso>()
+  for (const f of filas) {
+    const { fin, abierta } = finDe(f, hoy)
+    if (f.desde > hoy || fin < hoy) continue
+    const previa = porSlack.get(f.slack_id)
+    porSlack.set(f.slack_id, {
+      desde: previa && previa.desde < f.desde ? previa.desde : f.desde,
+      hasta: abierta || (previa && previa.hasta === null) ? null : fin,
+    })
+  }
+  return porSlack
+}
+
+// Las ausencias de hoy cuyo slack_id no es de ningún usuario: gente de Slack sin usuario en
+// la plataforma, o alguien que sí lo tiene pero sin su ID de Slack cargado (entonces su
+// ausencia no cuenta hasta que se le cargue).
+export function ausenciasSinUsuario(
+  filas: FilaAusencia[],
+  slacksConUsuario: Set<string>,
+  hoy: string,
+): ({ slack_id: string } & VacacionesAviso)[] {
+  return [...vacacionesHoy(filas, hoy)]
+    .filter(([slack]) => !slacksConUsuario.has(slack))
+    .map(([slack_id, v]) => ({ slack_id, ...v }))
+    .sort((a, b) => a.desde.localeCompare(b.desde) || a.slack_id.localeCompare(b.slack_id))
+}
+
+// El texto de la etiqueta del panel de usuarios. Sin fecha de vuelta hasta que llega el
+// desactivar, que llega el último día: entonces "hasta hoy".
+export function etiquetaAusencia(v: VacacionesAviso): string {
+  return v.hasta === null ? `Ausente desde el ${v.desde.slice(8, 10)}/${v.desde.slice(5, 7)}` : 'Ausente hasta hoy'
 }

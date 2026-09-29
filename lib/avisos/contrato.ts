@@ -30,11 +30,20 @@ export const DESCRIPCION_TIPO: Record<TipoAviso, string> = {
 // `slack_id` es su ID de miembro de Slack (U…, migración 0050), para que los flujos la
 // mencionen (<@U…>) o le escriban por mensaje directo. Mismo criterio que `equipo`: va en
 // toda persona del payload, y null = sin asignar todavía o no se sabe quién es.
+// Si esa persona está de ausencia hoy (vacaciones, festivo… que manda el flujo, 0054):
+// desde el día del activar; `hasta` es el día del desactivar si ya llegó (hoy es su último
+// día) o null si sigue fuera sin fecha de vuelta. null = no está de ausencia.
+export interface VacacionesAviso { desde: string; hasta: string | null }
+
 export interface PersonaAviso {
   id: string; nombre: string; email: string; posicion: string | null; equipo: string | null; slack_id: string | null; rol: string
+  vacaciones: VacacionesAviso | null
 }
-export interface ManagerAviso { id: string | null; nombre: string; email: string | null; equipo: string | null; slack_id: string | null }
-export interface ActorAviso { nombre: string; email: string | null; equipo: string | null; slack_id: string | null }
+export interface ManagerAviso {
+  id: string | null; nombre: string; email: string | null; equipo: string | null; slack_id: string | null
+  vacaciones: VacacionesAviso | null
+}
+export interface ActorAviso { nombre: string; email: string | null; equipo: string | null; slack_id: string | null; vacaciones: VacacionesAviso | null }
 export interface HorasAviso { asignadas: number; ampliadas: number; consumidas: number; inutilizables: number; disponibles: number }
 export interface SaldoHucha { asignado: number; consumido: number; disponible: number }
 
@@ -103,14 +112,14 @@ export interface DatosPorTipo {
 export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
   const persona: PersonaAviso = {
     id: '00000000-0000-4000-8000-00000000a1b2', nombre: 'Laura Gómez', email: 'laura.gomez@ejemplo.com',
-    posicion: 'SEO Strategist', equipo: 'Clientes', slack_id: 'U01LAURA001', rol: 'operativo',
+    posicion: 'SEO Strategist', equipo: 'Clientes', slack_id: 'U01LAURA001', rol: 'operativo', vacaciones: null,
   }
   const manager: ManagerAviso = {
     id: '00000000-0000-4000-8000-00000000c3d4', nombre: 'Carlos Ruiz', email: 'carlos.ruiz@ejemplo.com',
-    equipo: 'Clientes', slack_id: 'U01CARLOS01',
+    equipo: 'Clientes', slack_id: 'U01CARLOS01', vacaciones: null,
   }
   // Quien amplía, en los dos avisos de ampliación (horas y HUCHA).
-  const marta: ActorAviso = { nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH', slack_id: 'U01MARTA001' }
+  const marta: ActorAviso = { nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH', slack_id: 'U01MARTA001', vacaciones: null }
   const proyectoId = '00000000-0000-4000-8000-00000000e5f6'
   const enlaceHucha = `${base}/presupuestos/${proyectoId}`
   // Un id que no existe: en la prueba, el enlace abre «Registro no disponible», que es
@@ -137,8 +146,10 @@ export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
       enlace_registro: enlaceRegistro,
     },
     'banco.nivel': banco,
+    // Con el manager del proyecto de vacaciones: el caso en que el flujo querrá avisar a otro.
     'banco.al_tope': {
       ...banco, alcance: 'proyecto', posicion: null, nivel: 'consumido', nivel_anterior: 'bajo',
+      manager_proyecto: { ...manager, vacaciones: { desde: '2026-09-14', hasta: null } },
       horas: { asignadas: 120, ampliadas: 20, consumidas: 120, inutilizables: 0, disponibles: 0 }, porcentaje_consumido: 100,
     },
     // El caso con el Excel respondiendo, que es el normal. Que `horas`, `nivel` y

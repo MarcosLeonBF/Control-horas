@@ -25,7 +25,7 @@ test('la prueba de registro.llamativo trae un proyecto y la de ampliación, el e
   expect(l.proyecto).toBe('Proyecto Ejemplo')
   expect(l.limite).toBe(LIMITE_PROYECTO_HORAS)
   expect(e['hucha.ampliacion'].actor).toEqual({
-    nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH', slack_id: 'U01MARTA001',
+    nombre: 'Marta López', email: 'marta.lopez@ejemplo.com', equipo: 'RRHH', slack_id: 'U01MARTA001', vacaciones: null,
   })
 })
 
@@ -102,4 +102,20 @@ test('las personas que siembran los E2E no cuentan', () => {
   expect(esPersonaDePrueba('laura.gomez@bastidafarina.com')).toBe(false)
   expect(esPersonaDePrueba('alguien@test.com')).toBe(false)
   expect(esPersonaDePrueba(null)).toBe(false)
+})
+
+// Las ausencias (0054): toda persona del payload dice si está fuera, para que el flujo
+// decida (no avisarle, mandárselo a otro manager…). El ejemplo de banco.al_tope enseña el
+// caso con el manager del proyecto fuera, que es el que más importa al enrutar.
+test('toda persona del payload trae vacaciones', () => {
+  const e = ejemplos('https://app.test')
+  expect(e['registro.enviado'].persona.vacaciones).toBe(null)
+  expect(e['registro.enviado'].manager_directo).toHaveProperty('vacaciones', null)
+  expect(e['banco.nivel'].registro?.persona).toHaveProperty('vacaciones')
+  expect(e['banco.al_tope'].manager_proyecto?.vacaciones).toEqual({ desde: '2026-09-14', hasta: null })
+  expect(e['banco.ampliacion'].actor).toHaveProperty('vacaciones', null)
+  expect(e['hucha.ampliacion'].actor).toHaveProperty('vacaciones', null)
+  for (const t of ['hucha.proyecto_nuevo', 'hucha.ampliacion', 'hucha.nivel'] as const) {
+    for (const m of e[t].managers) expect(m).toHaveProperty('vacaciones')
+  }
 })

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { validarEnvio, planificar, ausenciasPorPersona, type PerfilIdentificable, type AusenciaActual, type EventoRef } from '../lib/avisos/vacaciones'
+import { validarEnvio, planificar, ausenciasPorPersona, vacacionesHoy, ausenciasSinUsuario, etiquetaAusencia, type PerfilIdentificable, type AusenciaActual, type EventoRef } from '../lib/avisos/vacaciones'
 
 // Las ausencias (vacaciones, festivos…) llegan del flujo de Julián como pulsos por persona:
 // `activar` el día que empieza y `desactivar` el día que termina. Lo que cuenta es el
@@ -239,4 +239,36 @@ test('ausenciasPorPersona: suma varias ausencias de la misma persona y recorta p
   ], HOY, '2026-07-01').get('U096AGWQJN4')!
   expect([...a.dias].sort()).toEqual(['2026-07-01', '2026-07-02', '2026-09-28', '2026-09-29'])
   expect(a.ausenteHoy).toBe(true)
+})
+
+// --- vacacionesHoy y ausenciasSinUsuario: la marca del payload y el panel ------------
+
+test('vacacionesHoy: abierta = desde y hasta null; cerrada hoy = hasta hoy; terminada, nada', () => {
+  const m = vacacionesHoy([
+    fila('U096AGWQJN4', '2026-09-25', null),
+    fila('U09L2RSD2S1', '2026-09-28', HOY),
+    fila('U0APJJT2811', '2026-09-21', '2026-09-23'),
+    fila('U07TUQRL4TT', '2026-09-07', null, [{ inicio: '2026-09-07', fin: '2026-09-09' }]), // se perdió el desactivar
+  ], HOY)
+  expect(m.get('U096AGWQJN4')).toEqual({ desde: '2026-09-25', hasta: null })
+  expect(m.get('U09L2RSD2S1')).toEqual({ desde: '2026-09-28', hasta: HOY })
+  expect(m.has('U0APJJT2811')).toBe(false)
+  expect(m.has('U07TUQRL4TT')).toBe(false)
+})
+
+test('vacacionesHoy: dos ausencias a la vez de la misma persona se juntan', () => {
+  const m = vacacionesHoy([fila('U096AGWQJN4', '2026-09-28', HOY), fila('U096AGWQJN4', HOY, null)], HOY)
+  expect(m.get('U096AGWQJN4')).toEqual({ desde: '2026-09-28', hasta: null })
+})
+
+test('ausenciasSinUsuario: las de hoy cuyo slack_id no es de ningún usuario', () => {
+  const r = ausenciasSinUsuario([fila('U096AGWQJN4', HOY, null), fila('U0A85K6107L', HOY, null), fila('U0A85K6107X', '2026-09-01', '2026-09-02')],
+    new Set(['U096AGWQJN4']), HOY)
+  expect(r).toEqual([{ slack_id: 'U0A85K6107L', desde: HOY, hasta: null }])
+})
+
+test('etiquetaAusencia: el texto del panel de usuarios', () => {
+  expect(etiquetaAusencia({ desde: '2026-09-29', hasta: null })).toBe('Ausente desde el 29/09')
+  // El desactivar llega el último día: sigue fuera hoy, vuelve mañana.
+  expect(etiquetaAusencia({ desde: '2026-09-25', hasta: HOY })).toBe('Ausente hasta hoy')
 })

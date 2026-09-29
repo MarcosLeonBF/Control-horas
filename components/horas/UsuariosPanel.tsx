@@ -7,6 +7,8 @@ import { actualizarUsuario, actualizarDiasRegistro, cambiarEstadoUsuario, elimin
 import type { AreaRow } from '@/lib/horas/types'
 import { formatFechaISO } from '@/lib/horas/format'
 import { AYUDA_SLACK_ID } from '@/lib/slack-id'
+import type { VacacionesAviso } from '@/lib/avisos/contrato'
+import { etiquetaAusencia } from '@/lib/avisos/vacaciones'
 import { cn } from '@/lib/utils'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -26,6 +28,7 @@ export interface UsuarioRow {
   managerId: string | null // manager directo; null = sin asignar
   equipoId: string | null // equipo de la empresa (0049); null = sin asignar
   slackId: string | null // ID de miembro de Slack (0050); null = sin asignar
+  ausencia: VacacionesAviso | null // de ausencia hoy, según el flujo de ausencias (0054); null = no
 }
 
 const fieldSelect = 'h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
@@ -433,14 +436,17 @@ export default function UsuariosPanel({ usuarios, areas, posiciones, managers, e
                         <TableCell className="py-3">
                           {/* El texto del DOM se queda en minúscula (la mayúscula la pone
                               CSS): es el contrato que ya afirman los E2E del panel. */}
-                          {inactivo ? (
-                            <Badge className="bg-neutral-100 capitalize text-neutral-500">{u.status}</Badge>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 text-sm text-foreground/70">
-                              <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" />
-                              <span className="capitalize">{u.status}</span>
-                            </span>
-                          )}
+                          <div className="flex flex-col items-start gap-1">
+                            {inactivo ? (
+                              <Badge className="bg-neutral-100 capitalize text-neutral-500">{u.status}</Badge>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-sm text-foreground/70">
+                                <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" />
+                                <span className="capitalize">{u.status}</span>
+                              </span>
+                            )}
+                            {u.ausencia && <Badge className="bg-amber-50 text-amber-800">{etiquetaAusencia(u.ausencia)}</Badge>}
+                          </div>
                         </TableCell>
                         {!readOnly && (
                           <TableCell className="py-3">

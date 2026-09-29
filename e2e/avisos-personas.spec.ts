@@ -16,7 +16,7 @@ test('aPerfil: posición y equipo (objeto o lista), Slack, día de alta en Madri
   })
   expect(a.persona).toEqual({
     id: 'u1', nombre: 'Laura Gómez', email: 'u1@ejemplo.com', posicion: 'SEO Strategist', equipo: 'RRHH',
-    slack_id: 'U01LAURA001', rol: 'manager',
+    slack_id: 'U01LAURA001', rol: 'manager', vacaciones: null,
   })
   expect(a.alta).toBe('2026-09-14') // 23:30 UTC = 01:30 del día siguiente en Madrid (verano)
   expect(a.activo).toBe(false)
@@ -34,7 +34,7 @@ test('managerDe: el manager directo si existe', () => {
   // El manager lleva SU equipo y SU Slack, no los de la persona avisada: es a él a quien
   // hay que enrutar el mensaje y mencionar.
   expect(managerDe(laura, todos)).toEqual({
-    id: 'm1', nombre: 'Carlos Ruiz', email: 'm1@ejemplo.com', equipo: 'RRHH', slack_id: 'U01CARLOS01',
+    id: 'm1', nombre: 'Carlos Ruiz', email: 'm1@ejemplo.com', equipo: 'RRHH', slack_id: 'U01CARLOS01', vacaciones: null,
   })
   expect(managerDe(jefe, todos)).toBeNull()
   expect(managerDe(perfil('u3', 'Huérfano', { manager_id: 'no-existe' }), todos)).toBeNull()
@@ -43,12 +43,12 @@ test('managerDe: el manager directo si existe', () => {
 test('managerPorNombre: sin mayúsculas ni espacios; ambiguo o desconocido sin email', () => {
   const todos = mapa(perfil('m1', 'Carlos Ruiz', { slack_id: 'U01CARLOS01' }), perfil('m2', 'Ana Pérez'), perfil('m3', 'Ana Pérez'))
   expect(managerPorNombre('  carlos ruiz ', todos)).toEqual({
-    id: 'm1', nombre: 'Carlos Ruiz', email: 'm1@ejemplo.com', equipo: 'Clientes', slack_id: 'U01CARLOS01',
+    id: 'm1', nombre: 'Carlos Ruiz', email: 'm1@ejemplo.com', equipo: 'Clientes', slack_id: 'U01CARLOS01', vacaciones: null,
   })
   // Ambiguo o desconocido: equipo y Slack van a null porque no se sabe de quién es, igual
   // que el email. Inventar uno sería peor que no mandarlo (mencionaría a otra persona).
-  expect(managerPorNombre('Ana Pérez', todos)).toEqual({ id: null, nombre: 'Ana Pérez', email: null, equipo: null, slack_id: null })
-  expect(managerPorNombre('Pilar', todos)).toEqual({ id: null, nombre: 'Pilar', email: null, equipo: null, slack_id: null })
+  expect(managerPorNombre('Ana Pérez', todos)).toEqual({ id: null, nombre: 'Ana Pérez', email: null, equipo: null, slack_id: null, vacaciones: null })
+  expect(managerPorNombre('Pilar', todos)).toEqual({ id: null, nombre: 'Pilar', email: null, equipo: null, slack_id: null, vacaciones: null })
   expect(managerPorNombre('', todos)).toBeNull()
   expect(managerPorNombre(undefined, todos)).toBeNull()
 })
@@ -62,4 +62,18 @@ test('sinAvisosPropios: Dirección y Administración no reciben avisos sobre sí
   expect(sinAvisosPropios('Clientes')).toBe(false)
   expect(sinAvisosPropios('RRHH')).toBe(false)
   expect(sinAvisosPropios(null)).toBe(false) // sin equipo asignado, sí
+})
+
+test('vacaciones: la persona y, como manager, la misma marca; por nombre del Excel sin identificar, null', () => {
+  const fuera = { desde: '2026-09-29', hasta: null }
+  const carlos = aPerfil({
+    id: 'm1', full_name: 'Carlos Ruiz', email: 'carlos@ejemplo.com', role: 'manager', status: 'activo', manager_id: null,
+    created_at: '2026-07-01T10:00:00Z', registro_dias_atras: null, positions: null, equipos: null, slack_id: 'U01CARLOS01',
+  }, fuera)
+  const laura = perfil('u1', 'Laura Gómez', { manager_id: 'm1' })
+  expect(carlos.persona.vacaciones).toEqual(fuera)
+  expect(laura.persona.vacaciones).toBe(null) // sin segundo argumento, no está fuera
+  expect(managerDe(laura, mapa(laura, carlos))?.vacaciones).toEqual(fuera)
+  expect(managerPorNombre('Carlos Ruiz', mapa(laura, carlos))?.vacaciones).toEqual(fuera)
+  expect(managerPorNombre('Nadie Conocido', mapa(laura, carlos))?.vacaciones).toBe(null)
 })

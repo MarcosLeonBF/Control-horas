@@ -106,18 +106,18 @@ function firmaValida(cabecera, cuerpoCrudo, secreto) {
 **Persona**
 
 ```json
-{ "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo" }
+{ "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo", "vacaciones": null }
 ```
 
 **Manager** (`manager_directo`, `manager_proyecto`, cada elemento de `managers`)
 
 ```json
-{ "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" }
+{ "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01", "vacaciones": null }
 ```
 
 - `manager_directo` es `null` si la persona todavía no tiene manager directo asignado.
 - En `manager_proyecto`, si el nombre que viene del Excel no coincide con ningún usuario,
-  llega `{ "id": null, "nombre": "<nombre del Excel>", "email": null, "equipo": null, "slack_id": null }`. Si
+  llega `{ "id": null, "nombre": "<nombre del Excel>", "email": null, "equipo": null, "slack_id": null, "vacaciones": null }`. Si
   el proyecto no tiene manager en el Excel, llega `null`.
 
 **`equipo`: a qué parte de la empresa pertenece esa persona**
@@ -151,6 +151,24 @@ escribirle por mensaje directo, sin tener que buscarla en Slack por su email.
   del Excel, que no se pudo identificar). Al principio llegará `null` en casi todo el mundo:
   conviene tener un plan B, por ejemplo mencionar por `email` o avisar al canal sin mención.
 - Lo carga Administración a mano en el panel de usuarios.
+
+**`vacaciones`: si esa persona está de ausencia hoy**
+
+Lo llevan las mismas personas que `slack_id` (todas). Sale de las ausencias que manda tu
+flujo a «Entradas → Vacaciones y ausencias»: sirve, por ejemplo, para no avisar a un manager
+que está fuera y mandárselo a otra persona.
+
+```json
+"vacaciones": { "desde": "2026-09-29", "hasta": null }
+```
+
+- `desde`: el día del `activar`.
+- `hasta`: `null` mientras sigue fuera, porque la vuelta no se sabe hasta que llega el
+  `desactivar`. Ese día, que es el último de la ausencia, llega con la fecha de hoy.
+- `vacaciones: null` = no está de ausencia hoy (o no tiene `slack_id`, o es un manager que
+  viene por nombre del Excel y no se pudo identificar).
+- En `dias-sin-registrar`, la `persona` siempre llega con `null` (quien está fuera no
+  aparece); el `manager_directo` sí puede estar fuera.
 
 **Enlaces a un registro** (`enlace_registro`, y `registro.enlace` en los avisos de banco)
 
@@ -775,3 +793,8 @@ respuesta trae un `resultado` por persona. Ver «Entradas → Vacaciones y ausen
 - **Dirección y Administración** (por el equipo del organigrama) ya no aparecen en
   `dias-sin-registrar` ni generan `registro.enviado` ni `registro.llamativo`. Como managers
   de otras personas siguen apareciendo.
+
+**29/09/2026** · Se añade `vacaciones` a todas las personas del payload (las mismas que
+llevan `slack_id`): `{ desde, hasta }` si esa persona está de ausencia hoy, o `null`. Campo
+nuevo: nada de lo anterior cambia. La prueba de `banco.al_tope` lo trae relleno en
+`manager_proyecto`, para ver cómo llega.

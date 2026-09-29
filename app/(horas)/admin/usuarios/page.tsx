@@ -4,6 +4,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCatalogos } from '@/lib/horas/queries'
 import UsuarioForm from '@/components/horas/UsuarioForm'
 import UsuariosPanel, { type UsuarioRow, type PosicionOpt } from '@/components/horas/UsuariosPanel'
+import { filasAusenciaDeHoy } from '@/lib/avisos/personas'
+import { ausenciasSinUsuario, etiquetaAusencia, vacacionesHoy } from '@/lib/avisos/vacaciones'
+import { diaMadrid } from '@/lib/horas/auditoria-types'
 
 interface RawUsuario {
   id: string; full_name: string; email: string; position_id: string | null
@@ -46,10 +49,18 @@ export default async function UsuariosPage() {
     .select('id, full_name, email, position_id, role, status, can_create_users, registro_dias_atras, manager_id, equipo_id, slack_id, user_areas(area_id)')
     .order('full_name')
   if (usuariosError) throw new Error(`No se pudo leer la lista de usuarios: ${usuariosError.message}`)
+  // Quién está de ausencia hoy, según los pulsos del flujo de Julián (0054). Por slack_id:
+  // las que no casan con ningún usuario se listan aparte, debajo del panel.
+  const hoy = diaMadrid(new Date().toISOString())
+  const filasAusencia = await filasAusenciaDeHoy(admin, hoy)
+  const ausencias = vacacionesHoy(filasAusencia, hoy)
+  const slacksConUsuario = new Set(((raw ?? []) as RawUsuario[]).flatMap((u) => (u.slack_id ? [u.slack_id] : [])))
+  const sinUsuario = ausenciasSinUsuario(filasAusencia, slacksConUsuario, hoy)
   const usuarios: UsuarioRow[] = ((raw ?? []) as RawUsuario[]).map((u) => ({
     id: u.id, full_name: u.full_name, email: u.email, positionId: u.position_id,
     role: u.role, status: u.status, canCreateUsers: u.can_create_users, areaIds: (u.user_areas ?? []).map((a) => a.area_id),
     registroDiasAtras: u.registro_dias_atras, managerId: u.manager_id, equipoId: u.equipo_id, slackId: u.slack_id,
+    ausencia: u.slack_id ? ausencias.get(u.slack_id) ?? null : null,
   }))
 
   // Candidatos a manager directo: managers y admins activos.
@@ -62,6 +73,27 @@ export default async function UsuariosPage() {
       <section className="space-y-4">
         <h1 className="font-display text-2xl">Usuarios</h1>
         <UsuariosPanel usuarios={usuarios} areas={areas} posiciones={posiciones} managers={managers} equipos={equipos} readOnly={!esAdmin} />
+        {/* Plegado: casi siempre será gente de Slack que no usa la plataforma. Lo que importa
+            es encontrar a un usuario al que le falta cargar su ID de Slack. */}
+        {sinUsuario.length > 0 && (
+          <details className="rounded-xl bg-card px-4 py-3 text-sm ring-1 ring-foreground/10">
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+              Ausentes hoy sin usuario en la plataforma ({sinUsuario.length})
+            </summary>
+            <p className="mt-2 max-w-2xl text-xs text-muted-foreground">
+              Llegan del flujo de ausencias con un ID de Slack que no es de ningún usuario. Si alguno es de un usuario de
+              la plataforma, cárgale ese ID de Slack en su ficha: hasta entonces su ausencia no cuenta.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {sinUsuario.map((a) => (
+                <li key={a.slack_id} className="flex gap-3 text-xs">
+                  <span className="font-mono">{a.slack_id}</span>
+                  <span className="text-muted-foreground">{etiquetaAusencia(a)}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </section>
 
       <section className="space-y-4">

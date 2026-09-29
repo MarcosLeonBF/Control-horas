@@ -7,7 +7,7 @@ import { emitirAviso } from '@/lib/avisos/bandeja'
 import { esProduccion, esPersonaDePrueba, enlaceHucha } from '@/lib/avisos/entorno'
 import { transicion, comoNivel, centesimas, type Nivel } from '@/lib/avisos/reglas'
 import { leerEstados, guardarEstados } from '@/lib/avisos/estado'
-import { actorDe, nombreEquipo, type EquipoRaw } from '@/lib/avisos/personas'
+import { actorDe, nombreEquipo, vacacionesPorSlack, type EquipoRaw } from '@/lib/avisos/personas'
 import type { ManagerAviso, SaldoHucha } from '@/lib/avisos/contrato'
 
 export interface MovimientoAmpliacion {
@@ -52,7 +52,7 @@ const PROYECTO_E2E = /\be2e\b/i
 export async function leerHuchas(db: SupabaseClient, ids?: string[]): Promise<Hucha[]> {
   let q = db.from('projects').select(SELECT_HUCHA).eq('status', 'activo')
   if (ids) q = q.in('id', ids)
-  const { data, error } = await q
+  const [{ data, error }, vacaciones] = await Promise.all([q, vacacionesPorSlack(db)])
   if (error) throw new Error(`projects/hucha_banks: ${error.message}`)
   return ((data ?? []) as unknown as HuchaRaw[]).flatMap((p) => {
     if (PROYECTO_E2E.test(p.name)) return []
@@ -64,6 +64,7 @@ export async function leerHuchas(db: SupabaseClient, ids?: string[]): Promise<Hu
       .filter((pr) => !esPersonaDePrueba(pr.email))
       .map((pr) => ({
         id: pr.id, nombre: pr.full_name ?? '', email: pr.email, equipo: nombreEquipo(pr.equipos), slack_id: pr.slack_id ?? null,
+        vacaciones: pr.slack_id ? vacaciones.get(pr.slack_id) ?? null : null,
       }))
     return [{
       id: p.id, nombre: p.name, moneda: b.currency ?? 'EUR',
