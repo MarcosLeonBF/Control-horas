@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { casarPorNombre } from '@/lib/casar-nombre'
 
 export interface ExcelProyecto { proyecto: string; hucha: number }
 export interface HuchaExcelData { proyectos: ExcelProyecto[]; managerPorProyecto: Map<string, string> }
@@ -21,14 +22,10 @@ export async function aplicarSync(data: HuchaExcelData, db: SupabaseClient<any>)
     managersAsignados: 0, managersNoEncontrados: [], saltadosSinHucha: 0, creados: [],
   }
 
-  // Cargar perfiles una vez para matchear manager por nombre (case-insensitive).
+  // Cargar perfiles una vez para casar el manager por nombre: el Excel trae el de pila
+  // ("Antonio") y el perfil el completo, así que se casa con casarPorNombre.
   const { data: profiles } = await db.from('profiles').select('id, full_name')
-  const perfilPorNombre = new Map<string, string[]>()
-  for (const p of profiles ?? []) {
-    const key = String(p.full_name ?? '').trim().toLowerCase()
-    if (!key) continue
-    perfilPorNombre.set(key, [...(perfilPorNombre.get(key) ?? []), p.id])
-  }
+  const perfiles = (profiles ?? []) as { id: string; full_name: string | null }[]
 
   for (const { proyecto, hucha } of data.proyectos) {
     if (!(hucha > 0)) {
@@ -71,11 +68,11 @@ export async function aplicarSync(data: HuchaExcelData, db: SupabaseClient<any>)
     // Asignación de manager por nombre.
     const mgr = (data.managerPorProyecto.get(proyecto) ?? '').trim()
     if (mgr) {
-      const ids = perfilPorNombre.get(mgr.toLowerCase()) ?? []
-      if (ids.length === 1) {
+      const perfil = casarPorNombre(mgr, perfiles, (p) => p.full_name ?? '')
+      if (perfil) {
         const { data: ya } = await db.from('project_assignments')
-          .select('id').eq('project_id', projectId).eq('user_id', ids[0]).maybeSingle()
-        if (!ya) await db.from('project_assignments').insert({ project_id: projectId, user_id: ids[0] })
+          .select('id').eq('project_id', projectId).eq('user_id', perfil.id).maybeSingle()
+        if (!ya) await db.from('project_assignments').insert({ project_id: projectId, user_id: perfil.id })
         report.managersAsignados++
       } else {
         report.managersNoEncontrados.push({ proyecto, manager: mgr })

@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { diaMadrid } from '@/lib/horas/auditoria-types'
 import type { ActorAviso, ManagerAviso, PersonaAviso } from '@/lib/avisos/contrato'
 import { ausenciasHoy, type FilaAusencia } from '@/lib/avisos/vacaciones'
+import { casarPorNombre } from '@/lib/casar-nombre'
 
 export interface Perfil {
   persona: PersonaAviso
@@ -127,14 +128,14 @@ export function managerConVacaciones(perfil: Perfil | undefined, todos: Map<stri
   return m ? { ...comoManager(m), vacaciones: m.ausenteHoy } : null
 }
 
-// Sin coincidencia única (nadie, o dos personas con el mismo nombre) se devuelve el
-// nombre del Excel sin email, equipo ni Slack: el flujo puede avisar al canal aunque no
-// sepa a quién. Van a null porque no se sabe de quién es, no porque no los tenga; con dos
-// "Ana Pérez", mandar el Slack de una mencionaría a la persona equivocada.
+// El Excel suele traer solo el nombre de pila: casarPorNombre lo resuelve si apunta a una
+// sola persona, y entonces viaja el nombre completo del perfil. Sin coincidencia única
+// (nadie, o dos "Ana") se devuelve el nombre del Excel sin email, equipo ni Slack: el flujo
+// puede avisar al canal aunque no sepa a quién. Van a null porque no se sabe de quién es,
+// no porque no los tenga; mandar el Slack de una mencionaría a la persona equivocada.
 export function managerPorNombre(nombre: string | undefined, todos: Map<string, Perfil>): ManagerAviso | null {
   const n = (nombre ?? '').trim()
   if (!n) return null
-  const clave = n.toLowerCase()
-  const iguales = [...todos.values()].filter((p) => p.persona.nombre.trim().toLowerCase() === clave)
-  return iguales.length === 1 ? comoManager(iguales[0]) : { id: null, nombre: n, email: null, equipo: null, slack_id: null }
+  const m = casarPorNombre(n, [...todos.values()], (p) => p.persona.nombre)
+  return m ? comoManager(m) : { id: null, nombre: n, email: null, equipo: null, slack_id: null }
 }

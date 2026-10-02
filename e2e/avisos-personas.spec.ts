@@ -53,6 +53,14 @@ test('managerPorNombre: sin mayúsculas ni espacios; ambiguo o desconocido sin e
   expect(managerPorNombre(undefined, todos)).toBeNull()
 })
 
+test('managerPorNombre: el nombre de pila del Excel trae el manager entero, con su Slack', () => {
+  // El Excel pone "Antonio"; el perfil es "Antonio Parrilla". El nombre que viaja es el del perfil.
+  const todos = mapa(perfil('m1', 'Antonio Parrilla', { slack_id: 'U01ANTONIO1' }), perfil('m2', 'Pilar Ferré'))
+  expect(managerPorNombre('Antonio', todos)).toEqual({
+    id: 'm1', nombre: 'Antonio Parrilla', email: 'm1@ejemplo.com', equipo: 'Clientes', slack_id: 'U01ANTONIO1',
+  })
+})
+
 test('sinAvisosPropios: Dirección y Administración no reciben avisos sobre sí mismos', () => {
   // No registran horas: ni recordatorios de días sin registrar ni avisos de sus registros.
   expect(sinAvisosPropios('Dirección')).toBe(true)
