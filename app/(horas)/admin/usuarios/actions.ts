@@ -4,12 +4,13 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizarSlackId } from '@/lib/slack-id'
 import { cierreManual, type FilaAusencia } from '@/lib/avisos/vacaciones'
 import { diaMadrid } from '@/lib/horas/auditoria-types'
+import { errorCamposAlta } from '@/lib/horas/alta-usuario'
 
 export interface NuevoUsuario {
   full_name: string; email: string; password: string; positionId: string
   role: 'operativo' | 'manager' | 'admin'; areaIds: string[]
   equipoId: string | null // equipo de la empresa (0049); opcional, viaja en los avisos
-  slackId: string // ID de miembro de Slack (0050), tal como se tecleó; '' = sin asignar
+  slackId: string // ID de miembro de Slack (0050), tal como se tecleó; obligatorio en el alta
 }
 
 type SlackIdResuelto = { ok: true; valor: string | null } | { ok: false; error: string }
@@ -57,9 +58,8 @@ export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | 
     return { ok: false, error: 'Solo un administrador puede crear usuarios admin.' }
   }
 
-  if (!input.full_name.trim() || !input.email.trim() || input.password.length < 8) {
-    return { ok: false, error: 'Nombre, correo y contraseña (mín. 8) son obligatorios.' }
-  }
+  const faltaCampo = errorCamposAlta(input)
+  if (faltaCampo) return { ok: false, error: faltaCampo }
 
   const admin = createAdminClient()
   const slack = await resolverSlackId(admin, input.slackId)

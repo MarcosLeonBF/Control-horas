@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { slackE2E } from './helpers/slack-e2e'
 
 // Corre con storage state de e2e-rrhh@horas.test (rol operativo + can_create_users).
 test('un usuario con permiso delegado ve la lista sin acciones y da de alta un operativo', async ({ page }) => {
@@ -18,6 +19,7 @@ test('un usuario con permiso delegado ve la lista sin acciones y da de alta un o
   await page.getByLabel('Nombre').fill('Alta Delegada E2E')
   await page.getByLabel('Correo').fill(email)
   await page.getByLabel('Contraseña').fill('Deleg-Pass-123')
+  await page.getByLabel('ID de Slack', { exact: true }).fill(slackE2E())
   await page.getByRole('button', { name: /crear usuario/i }).click()
   await expect(page.getByText(/usuario creado/i)).toBeVisible()
 

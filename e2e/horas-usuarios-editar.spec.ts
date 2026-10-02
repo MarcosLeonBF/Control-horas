@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { slackE2E } from './helpers/slack-e2e'
 
 // Crea un usuario y luego lo desactiva desde el panel (auto-limpiante: cleanup borra e2e-nuevo-*).
 test('el admin crea, ve en el panel y desactiva un usuario', async ({ page }) => {
@@ -9,6 +10,7 @@ test('el admin crea, ve en el panel y desactiva un usuario', async ({ page }) =>
   await page.getByLabel('Nombre').fill('Editable E2E')
   await page.getByLabel('Correo').fill(email)
   await page.getByLabel('Contraseña').fill('E2e-Edit-Pass-123')
+  await page.getByLabel('ID de Slack', { exact: true }).fill(slackE2E())
   // Posición es un <select> del catálogo: se elige la primera posición real.
   await page.getByLabel('Posición').selectOption({ index: 1 })
   await page.getByRole('button', { name: 'Crear usuario' }).click()
@@ -34,6 +36,7 @@ test('el admin elimina a un usuario recién creado', async ({ page }) => {
   await page.getByLabel('Nombre').fill('Borrable E2E')
   await page.getByLabel('Correo').fill(email)
   await page.getByLabel('Contraseña').fill('E2e-Del-Pass-123')
+  await page.getByLabel('ID de Slack', { exact: true }).fill(slackE2E())
   await page.getByRole('button', { name: 'Crear usuario' }).click()
   await expect(page.getByText('Usuario creado')).toBeVisible()
 
@@ -55,6 +58,7 @@ test('el admin concede el permiso de alta de usuarios', async ({ page }) => {
   await page.getByLabel('Nombre').fill('Con Permiso E2E')
   await page.getByLabel('Correo').fill(email)
   await page.getByLabel('Contraseña').fill('E2e-Flag-Pass-123')
+  await page.getByLabel('ID de Slack', { exact: true }).fill(slackE2E())
   await page.getByRole('button', { name: 'Crear usuario' }).click()
   await expect(page.getByText('Usuario creado')).toBeVisible()
 

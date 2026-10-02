@@ -29,12 +29,12 @@ export interface UsuarioRow {
   ausencia: string | null // etiqueta si está de ausencia hoy (flujo de ausencias, 0054), p. ej. "Ausente hasta el 02/10"; null = no
 }
 
-const fieldSelect = 'h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
+export const fieldSelect = 'h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
 
 const DIAS_NORMALES = 7
 const DIAS_MAX = 3650 // el mismo techo que el CHECK de la migración 0043
 
-function initials(name: string) {
+export function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '·'
 }
 
@@ -68,10 +68,14 @@ function diasDeMeses(n: number) {
   return Math.round((hoy.getTime() - antes.getTime()) / 86_400_000)
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+// También lo usa el alta (UsuarioForm), para que crear y editar se vean igual. El asterisco
+// de `obligatorio` es solo visual: al lector de pantalla se lo dice el `required` del campo.
+export function Field({ label, obligatorio = false, children }: { label: string; obligatorio?: boolean; children: ReactNode }) {
   return (
     <label className="block space-y-1.5">
-      <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}{obligatorio && <span aria-hidden className="ml-0.5 text-(--brand)">*</span>}
+      </span>
       {children}
     </label>
   )
