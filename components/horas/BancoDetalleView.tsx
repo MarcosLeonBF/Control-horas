@@ -1,18 +1,55 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
-import { Clock, ChevronRight } from 'lucide-react'
+import { Fragment, useMemo, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { Clock, ChevronRight, ChevronDown, Info } from 'lucide-react'
 import type { BancoHorasDetalle } from '@/lib/horas/bancos-status'
-import { formatHoras, currentMonth, mesCorto } from '@/lib/horas/format'
+import { computeHorasStatus, estadoProyectoBadgeClass, HORAS_BAR_COLOR } from '@/lib/horas/bancos-status'
+import { formatHoras, formatFechaISO, currentMonth, mesCorto } from '@/lib/horas/format'
 import { cn } from '@/lib/utils'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
-import MonthPicker from '@/components/ui/month-picker'
+import VistaPeriodo, { periodoEnPalabras, type Vista } from '@/components/horas/VistaPeriodo'
+import AmpliarHorasDialog from '@/components/horas/AmpliarHorasDialog'
 import AnularAmpliacionButton from '@/components/horas/AnularAmpliacionButton'
 import type { BancoMensual } from '@/lib/horas/bancos-status'
 import { HATCH, LeyendaCierre, CierrePosicionPanel, BarraComposicion, BarraMes, tieneCierre } from '@/components/horas/CarryForwardCharts'
 
-export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle; isAdmin: boolean }) {
-  const [vista, setVista] = useState<'total' | 'mensual'>('total')
+// Metadatos del proyecto (Excel Clientes_Proyectos) para la cabecera.
+export interface MetaProyecto { estado: string; manager: string; fechaAuditoria: string }
+
+const PCT = new Intl.NumberFormat('es-ES', { style: 'percent', maximumFractionDigits: 0 })
+// Movimientos visibles de entrada: los más recientes; el resto, a demanda.
+const MOVIMIENTOS_INICIALES = 10
+
+// Una cifra del resumen: rótulo, valor y, si hace falta, de qué se compone.
+function Cifra({ label, extra, value, caption, excedido }: { label: string; extra?: ReactNode; value: string; caption?: string; excedido?: boolean }) {
+  return (
+    <div className="p-5">
+      <dt className="flex items-center gap-1.5 text-xs text-foreground/50">{label}{extra}</dt>
+      <dd className={cn('tabular-money mt-1 text-2xl font-semibold', excedido && 'text-(--status-excedido)')}>{value}</dd>
+      {caption && <dd className="mt-1 text-xs text-foreground/45">{caption}</dd>}
+    </div>
+  )
+}
+
+// Las explicaciones de cómo se calculan las cifras, plegadas: quien ya lo sabe no tiene
+// que leer un párrafo cada vez, y quien no, lo tiene a un clic.
+function ComoSeLee({ children }: { children: ReactNode }) {
+  return (
+    <details className="group mb-4 text-sm">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+        <Info aria-hidden className="size-3.5" />
+        ¿Cómo se lee?
+        <ChevronDown aria-hidden className="size-3.5 transition-transform group-open:rotate-180" />
+      </summary>
+      <p className="mt-2 max-w-prose text-muted-foreground">{children}</p>
+    </details>
+  )
+}
+
+export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDetalle; isAdmin: boolean; meta?: MetaProyecto }) {
+  // Como la lista: se entra en Mensual, en el mes en curso; Total si no hay meses.
+  const [vista, setVista] = useState<Vista>(() => (d.monthly.length > 0 ? 'mensual' : 'total'))
 
   const meses = useMemo(() => d.monthly.map((m) => m.month), [d.monthly])
   const [mesesSel, setMesesSel] = useState<string[]>(() => {
@@ -24,6 +61,9 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
   const mesesOrden = useMemo(() => [...mesesSel].sort(), [mesesSel])
   const hayMensual = meses.length > 0
   const esMensual = vista === 'mensual'
+  // Con un solo mes, la matriz posición × mes quedaría en una columna: se muestra la
+  // misma tabla que en Total, con las cifras de ese mes.
+  const mesUnico = esMensual && mesesOrden.length === 1 ? mesesOrden[0] : null
 
   // Cabecera: total confirmado, o la suma de los meses elegidos (Excel + ampliaciones +
   // provisional + carry de esos meses). En Total, libres = carryNeto (neteado de excesos);
@@ -40,10 +80,16 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
   }, [esMensual, d, selSet])
   const incluyeProv = cab.provisional > 0
   // Disponible real (ambas vistas): descuenta los inutilizables del carry forward
-  // (spec 2026-07-14). El desglose libres/inutilizables vive en sus propias cards
-  // informativas (ya están sumadas/descontadas del total).
+  // (spec 2026-07-14). El desglose libres/inutilizables va al pie del resumen
+  // (ya están sumadas/descontadas del total).
   const restante = cab.assigned - cab.consumed - cab.inutilizables
   const hayCartasCarry = cab.libres > 0 || cab.inutilizables > 0
+  // Estado del periodo que se mira (mismo cálculo que el del proyecto), para que el badge
+  // no diga "Disponible" del total mientras las cifras son de un mes excedido.
+  const estadoPeriodo = computeHorasStatus(cab.assigned - cab.inutilizables, cab.consumed)
+  // Barra del resumen: gastado = consumido + inutilizables, sobre el asignado.
+  const fracConsumo = cab.assigned > 0 ? Math.min(cab.consumed / cab.assigned, 1) : cab.consumed > 0 ? 1 : 0
+  const fracInutil = cab.assigned > 0 ? Math.min(cab.inutilizables / cab.assigned, 1 - fracConsumo) : 0
 
   // Cierre de mes integrado en "Por posición": cada fila con meses se despliega y
   // muestra su cierre ahí mismo (leyenda junto al título; sin sección aparte).
@@ -84,6 +130,10 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
   // Ampliaciones y movimientos: en Mensual, solo los de los meses elegidos.
   const ampliaciones = esMensual ? d.ampliaciones.filter((a) => selSet.has(a.entry_date.slice(0, 7))) : d.ampliaciones
   const movimientos = esMensual ? d.movimientos.filter((m) => selSet.has(m.date.slice(0, 7))) : d.movimientos
+  // Del más reciente al más antiguo, como un extracto; de entrada solo los últimos.
+  const [verTodosMovs, setVerTodosMovs] = useState(false)
+  const movsRecientes = [...movimientos].reverse()
+  const movsVisibles = verTodosMovs ? movsRecientes : movsRecientes.slice(0, MOVIMIENTOS_INICIALES)
 
   // Celda de un mes en la matriz: GASTADO (consumido + inutilizables) / asignado —
   // la diferencia es siempre lo disponible ("restante y disponible son lo mismo",
@@ -102,100 +152,159 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
     )
   }
 
+  // Consumido e Inutilizables son restas del asignado: rojo + signo −.
+  const celdaResta = (h: number) =>
+    h > 0 ? <span className="text-(--status-excedido)">−{formatHoras(h)}</span> : <span className="text-muted-foreground/40">—</span>
+
   return (
     <div>
-      {/* Vista Total | Mensual + selector de meses. Solo si el Excel ya trae meses. */}
-      {hayMensual && (
-        <div className="mb-8 flex flex-wrap items-center gap-3">
-          <div role="group" aria-label="Vista del banco" className="inline-flex rounded-lg bg-(--muted-surface) p-0.5">
-            {(['total', 'mensual'] as const).map((v) => (
-              <button
-                key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
-                className={cn(
-                  'rounded-md px-3.5 py-1.5 text-sm transition-colors',
-                  vista === v ? 'bg-card font-medium text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {v === 'total' ? 'Total' : 'Mensual'}
-              </button>
-            ))}
-          </div>
-          {esMensual && <MonthPicker value={mesesSel} onChange={setMesesSel} available={meses} />}
-        </div>
-      )}
+      <Link href="/bancos" className="text-xs text-foreground/55 hover:text-foreground">← Bancos de horas</Link>
 
-      <div className={cn('mb-10 grid gap-4 sm:grid-cols-3', hayCartasCarry && 'lg:grid-cols-5')}>
-        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs text-foreground/50">
-            Asignado
-            {incluyeProv && (
+      {/* Cabecera: el periodo gobierna todo lo de abajo, así que va junto al título, igual
+          que en la lista. Ampliar horas es ocasional: un botón, no un formulario fijo. */}
+      <header className="mt-3 mb-8 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-3xl font-semibold tracking-tight">{d.project}</h1>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
+            {meta?.estado && (
+              <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', estadoProyectoBadgeClass(meta.estado))}>{meta.estado}</span>
+            )}
+            <span className="text-muted-foreground">
+              Manager <span className="font-medium text-foreground/85">{meta?.manager || '—'}</span>
+            </span>
+            {meta?.fechaAuditoria && (
+              <span className="text-muted-foreground">
+                Auditoría <span className="font-medium text-foreground/85">{formatFechaISO(meta.fechaAuditoria)}</span>
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {hayMensual && <VistaPeriodo vista={vista} onVista={setVista} meses={meses} mesesSel={mesesSel} onMesesSel={setMesesSel} />}
+          {isAdmin && <AmpliarHorasDialog project={d.project} />}
+        </div>
+      </header>
+
+      {/* Resumen del periodo: estado, cuánto se gastó y las tres cifras. El carry
+          (libres / inutilizables) ya está dentro del disponible: va al pie, como detalle. */}
+      <section aria-label="Resumen del banco" className="mb-10 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 pt-5">
+          <div className="flex items-center gap-2.5">
+            <HorasStatusBadge status={estadoPeriodo} />
+            <span className="text-sm text-muted-foreground">{periodoEnPalabras(vista, mesesSel)}</span>
+          </div>
+          <span className="tabular-money text-sm text-muted-foreground" title="Gastado = consumido + inutilizables">
+            {cab.assigned > 0
+              ? <><strong className={cn('font-semibold text-foreground', restante < 0 && 'text-(--status-excedido)')}>{PCT.format((cab.consumed + cab.inutilizables) / cab.assigned)}</strong> del asignado gastado</>
+              : cab.consumed > 0 ? 'Consumo sin horas asignadas' : 'Sin horas en este periodo'}
+          </span>
+        </div>
+        <div className="px-5 pb-5 pt-3">
+          <div className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-(--muted-surface)">
+            {fracConsumo > 0 && <span className={cn('h-full', HORAS_BAR_COLOR[estadoPeriodo])} style={{ width: `${fracConsumo * 100}%` }} />}
+            {fracInutil > 0 && <span className="h-full bg-foreground/10" style={{ width: `${fracInutil * 100}%`, ...HATCH }} />}
+          </div>
+        </div>
+        <dl className="grid divide-y divide-border border-t border-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <Cifra
+            label="Asignado"
+            extra={incluyeProv && (
               <span className="inline-flex items-center gap-1 rounded-full bg-(--brand)/10 px-1.5 py-px text-[0.6rem] font-medium text-(--brand)">
                 <Clock aria-hidden className="size-2.5 shrink-0" />
                 Provisional
               </span>
             )}
-          </p>
-          <p className="tabular-money mt-1 text-2xl font-semibold">{formatHoras(cab.assigned)}</p>
-          <p className="mt-1 text-xs text-foreground/45">
-            {[
+            value={formatHoras(cab.assigned)}
+            caption={[
               cab.excelBase > 0 && `Excel ${formatHoras(cab.excelBase)}`,
               cab.provisional > 0 && `provisional +${formatHoras(cab.provisional)}`,
               cab.ampliado > 0 && `ampliado +${formatHoras(cab.ampliado)}`,
             ].filter(Boolean).join(' · ') || 'Sin asignación'}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-xs text-foreground/50">Consumido</p>
-          <p className="tabular-money mt-1 text-2xl font-semibold">{formatHoras(cab.consumed)}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-xs text-foreground/50">Disponible real</p>
-          <p className={`tabular-money mt-1 text-2xl font-semibold ${restante < 0 ? 'text-(--status-excedido)' : ''}`}>
-            {formatHoras(restante)}
-          </p>
-        </div>
-
-        {/* Cards informativas del carry: ya sumadas/descontadas del disponible real.
-            El swatch replica la leyenda de "Cierre de mes por posición". */}
+          />
+          <Cifra label="Consumido" value={formatHoras(cab.consumed)} />
+          <Cifra label="Disponible real" value={formatHoras(restante)} excedido={restante < 0} />
+        </dl>
         {hayCartasCarry && (
-          <>
-            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-              <p className="flex items-center gap-1.5 text-xs text-foreground/50">
-                <span aria-hidden className="size-2.5 shrink-0 rounded-[3px] bg-(--status-disponible)" />
-                Libres (carry)
-              </p>
-              <p className="tabular-money mt-1 text-2xl font-semibold text-(--status-disponible)">+{formatHoras(cab.libres)}</p>
-              <p className="mt-1 text-xs text-foreground/45">Ya sumadas al disponible real</p>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-              <p className="flex items-center gap-1.5 text-xs text-foreground/50">
-                <span aria-hidden className="size-2.5 shrink-0 rounded-[3px] bg-foreground/10" style={HATCH} />
-                Inutilizables
-              </p>
-              <p className="tabular-money mt-1 text-2xl font-semibold text-foreground/70">{formatHoras(cab.inutilizables)}</p>
-              <p className="mt-1 text-xs text-foreground/45">Ya descontadas del disponible real</p>
-            </div>
-          </>
+          <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-border bg-(--muted-surface)/40 px-5 py-3 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="size-2.5 shrink-0 rounded-[3px] bg-(--status-disponible)" />
+              Libres (carry)
+              <strong className="tabular-money font-semibold text-(--status-disponible)">+{formatHoras(cab.libres)}</strong>
+              <span className="text-foreground/45">ya sumadas al disponible real</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="size-2.5 shrink-0 rounded-[3px] bg-foreground/10" style={HATCH} />
+              Inutilizables
+              <strong className="tabular-money font-semibold text-foreground/70">{formatHoras(cab.inutilizables)}</strong>
+              <span className="text-foreground/45">ya descontadas del disponible real</span>
+            </span>
+          </div>
         )}
-      </div>
+      </section>
 
       <section className="mb-10">
-        <div className="mb-1 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <h2 className="font-display text-xl font-semibold">{esMensual ? 'Banco mensual por posición' : 'Por posición'}</h2>
           {hayCierre && <LeyendaCierre />}
         </div>
-        {esMensual ? (
-          <p className="mb-4 text-sm text-muted-foreground">Cada mes muestra gastado (consumido + inutilizables) / asignado: la diferencia es lo disponible — en meses cerrados, las horas libres del carry, como reparte su barra. El asignado puede ser provisional (estimado) en los meses aún no cargados.</p>
+        {mesUnico ? (
+          <ComoSeLee>Disponible real = asignado − consumido − inutilizables. En los meses cerrados, lo que sobra se reparte: 75% inutilizables y 25% libres, que pasan como carry forward. El asignado puede ser provisional (estimado) si el mes aún no está cargado.</ComoSeLee>
+        ) : esMensual ? (
+          <ComoSeLee>Cada mes muestra gastado (consumido + inutilizables) / asignado: la diferencia es lo disponible — en meses cerrados, las horas libres del carry, como reparte su barra. El asignado puede ser provisional (estimado) en los meses aún no cargados.</ComoSeLee>
         ) : hayCierre ? (
-          <p className="mb-4 text-sm text-muted-foreground">
-            Desplegá una posición para ver su cierre mes a mes: consumido, inutilizables (75% del sobrante) y libres (25%, arrastran como carry forward). El mes en curso aún no sufre el corte.
-          </p>
+          <ComoSeLee>Desplegá una posición para ver su cierre mes a mes: consumido, inutilizables (75% del sobrante) y libres (25%, arrastran como carry forward). El mes en curso aún no sufre el corte.</ComoSeLee>
         ) : (
           <div className="mb-4" />
         )}
 
         {d.posiciones.length === 0 ? (
           <p className="text-sm text-muted-foreground">Este proyecto no tiene posiciones con banco.</p>
+        ) : mesUnico ? (
+          /* Un solo mes: las cifras de ese mes por posición */
+          <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+            <table className="w-full min-w-176 text-sm">
+              <thead>
+                <tr className="bg-(--muted-surface) text-left text-muted-foreground">
+                  <th className="px-4 py-2.5 font-medium">Posición</th>
+                  <th className="px-4 py-2.5 font-medium text-right">
+                    <span className="inline-flex items-center gap-1">
+                      Asignado
+                      {mesEsProvisional(mesUnico) && <span className="rounded-full bg-(--brand)/10 px-1 py-px text-[0.55rem] font-medium text-(--brand)">prov</span>}
+                    </span>
+                  </th>
+                  <th className="px-4 py-2.5 font-medium text-right">Consumido</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Inutilizables</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Disponible real</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.posiciones.map((p) => {
+                  const m = p.monthly.find((x) => x.month === mesUnico)
+                  const inutil = m?.inutilizables ?? 0
+                  const sinDatos = !m || (m.assigned === 0 && m.consumed === 0)
+                  const disponible = sinDatos ? 0 : m.assigned - m.consumed - inutil
+                  return (
+                    <tr key={p.position} className="border-t border-border">
+                      <td className="px-4 py-2.5">
+                        <div className="font-medium">{p.position}</div>
+                        {!sinDatos && <BarraMes m={m} enCurso={mesUnico >= cmAct} className="mt-1.5 h-1.5 w-48 max-w-full" />}
+                      </td>
+                      <td className="tabular-money px-4 py-2.5 text-right">{sinDatos ? <span className="text-muted-foreground/40">—</span> : formatHoras(m.assigned)}</td>
+                      <td className="tabular-money px-4 py-2.5 text-right">{sinDatos ? <span className="text-muted-foreground/40">—</span> : celdaResta(m.consumed)}</td>
+                      <td className="tabular-money px-4 py-2.5 text-right">{sinDatos ? <span className="text-muted-foreground/40">—</span> : celdaResta(inutil)}</td>
+                      <td className={cn('tabular-money px-4 py-2.5 text-right font-medium', disponible < 0 && 'text-(--status-excedido)')}>
+                        {sinDatos ? <span className="font-normal text-muted-foreground/40">—</span> : formatHoras(disponible)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        {sinDatos ? <span className="text-muted-foreground/40">—</span> : <HorasStatusBadge status={computeHorasStatus(m.assigned - inutil, m.consumed)} />}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : esMensual ? (
           /* Matriz posición × mes */
           <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
@@ -233,8 +342,8 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
           </div>
         ) : (
           /* Vista Total: tabla agregada por posición */
-          <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+            <table className="w-full min-w-176 text-sm">
               <thead>
                 <tr className="bg-(--muted-surface) text-left text-muted-foreground">
                   <th className="px-4 py-2.5 font-medium">Posición</th>
@@ -271,14 +380,8 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
                           </div>
                         </td>
                         <td className="tabular-money px-4 py-2.5 text-right">{formatHoras(p.assigned)}</td>
-                        {/* Consumido e Inutilizables son restas del asignado: rojo + signo −. */}
-                        <td className={cn('tabular-money px-4 py-2.5 text-right', p.consumed === 0 ? 'text-muted-foreground/50' : 'text-(--status-excedido)')}>
-                          {p.consumed > 0 ? `−${formatHoras(p.consumed)}` : formatHoras(p.consumed)}
-                        </td>
-                        {/* En rojo y con signo −: se restan del disponible, igual que el consumo. */}
-                        <td className="tabular-money px-4 py-2.5 text-right text-(--status-excedido)">
-                          {p.inutilizables > 0 ? `−${formatHoras(p.inutilizables)}` : <span className="text-muted-foreground/40">—</span>}
-                        </td>
+                        <td className="tabular-money px-4 py-2.5 text-right">{celdaResta(p.consumed)}</td>
+                        <td className="tabular-money px-4 py-2.5 text-right">{celdaResta(p.inutilizables)}</td>
                         <td className={cn('tabular-money px-4 py-2.5 text-right font-medium', p.remaining < 0 && 'text-(--status-excedido)')}>{formatHoras(p.remaining)}</td>
                         <td className="px-4 py-2.5 text-right"><HorasStatusBadge status={p.status} /></td>
                       </tr>
@@ -319,7 +422,7 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
               <tbody>
                 {ampliaciones.map((a) => (
                   <tr key={a.id} className={`border-t border-border ${a.active ? '' : 'text-muted-foreground line-through'}`}>
-                    <td className="px-4 py-2.5 whitespace-nowrap">{a.entry_date}</td>
+                    <td className="tabular-money px-4 py-2.5 whitespace-nowrap">{formatFechaISO(a.entry_date)}</td>
                     <td className="tabular-money px-4 py-2.5 text-right whitespace-nowrap">+{formatHoras(Number(a.hours))}</td>
                     <td className="px-4 py-2.5">{a.reason}</td>
                     <td className="px-4 py-2.5 whitespace-nowrap">{a.actor_name}</td>
@@ -339,47 +442,57 @@ export default function BancoDetalleView({ d, isAdmin }: { d: BancoHorasDetalle;
       <section className="mt-10">
         <h2 className="font-display mb-1 text-xl font-semibold">Movimientos</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          Consumos y ampliaciones en orden cronológico, con el saldo de horas disponibles antes y después.
+          Consumos y ampliaciones, del más reciente al más antiguo, con el saldo de horas disponibles antes y después.
         </p>
         {movimientos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {esMensual ? 'Sin movimientos en los meses elegidos.' : 'Sin movimientos todavía.'}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-            <table className="w-full min-w-176 text-sm">
-              <thead>
-                <tr className="bg-(--muted-surface) text-left text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">Fecha</th>
-                  <th className="px-4 py-2.5 font-medium">Acción</th>
-                  <th className="px-4 py-2.5 font-medium text-right">Horas</th>
-                  <th className="px-4 py-2.5 font-medium text-right">Antes</th>
-                  <th className="px-4 py-2.5 font-medium text-right">Después</th>
-                  <th className="px-4 py-2.5 font-medium">Por</th>
-                  <th className="px-4 py-2.5 font-medium">Detalle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movimientos.map((m, i) => (
-                  <tr key={i} className="border-t border-border">
-                    <td className="px-4 py-2.5 whitespace-nowrap">{m.date}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={m.kind === 'ampliacion' ? 'text-(--brand)' : 'text-foreground/70'}>
-                        {m.kind === 'ampliacion' ? 'Ampliación' : 'Consumo'}
-                      </span>
-                    </td>
-                    <td className={`tabular-money px-4 py-2.5 text-right whitespace-nowrap ${m.kind === 'ampliacion' ? 'text-(--brand)' : ''}`}>
-                      {m.kind === 'ampliacion' ? '+' : '−'}{formatHoras(m.hours)}
-                    </td>
-                    <td className="tabular-money px-4 py-2.5 text-right text-foreground/55 whitespace-nowrap">{formatHoras(m.saldoAntes)}</td>
-                    <td className={`tabular-money px-4 py-2.5 text-right whitespace-nowrap ${m.saldoDespues < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(m.saldoDespues)}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">{m.actor}</td>
-                    <td className="px-4 py-2.5 text-foreground/70">{m.detail}</td>
+          <>
+            <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+              <table className="w-full min-w-176 text-sm">
+                <thead>
+                  <tr className="bg-(--muted-surface) text-left text-muted-foreground">
+                    <th className="px-4 py-2.5 font-medium">Fecha</th>
+                    <th className="px-4 py-2.5 font-medium">Acción</th>
+                    <th className="px-4 py-2.5 font-medium text-right">Horas</th>
+                    <th className="px-4 py-2.5 font-medium text-right">Antes</th>
+                    <th className="px-4 py-2.5 font-medium text-right">Después</th>
+                    <th className="px-4 py-2.5 font-medium">Por</th>
+                    <th className="px-4 py-2.5 font-medium">Detalle</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {movsVisibles.map((m, i) => (
+                    <tr key={i} className="border-t border-border">
+                      <td className="tabular-money px-4 py-2.5 whitespace-nowrap">{formatFechaISO(m.date)}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={m.kind === 'ampliacion' ? 'text-(--brand)' : 'text-foreground/70'}>
+                          {m.kind === 'ampliacion' ? 'Ampliación' : 'Consumo'}
+                        </span>
+                      </td>
+                      <td className={`tabular-money px-4 py-2.5 text-right whitespace-nowrap ${m.kind === 'ampliacion' ? 'text-(--brand)' : ''}`}>
+                        {m.kind === 'ampliacion' ? '+' : '−'}{formatHoras(m.hours)}
+                      </td>
+                      <td className="tabular-money px-4 py-2.5 text-right text-foreground/55 whitespace-nowrap">{formatHoras(m.saldoAntes)}</td>
+                      <td className={`tabular-money px-4 py-2.5 text-right whitespace-nowrap ${m.saldoDespues < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(m.saldoDespues)}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">{m.actor}</td>
+                      <td className="px-4 py-2.5 text-foreground/70">{m.detail}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {movsRecientes.length > MOVIMIENTOS_INICIALES && (
+              <button
+                type="button" onClick={() => setVerTodosMovs((v) => !v)}
+                className="mt-3 text-sm text-muted-foreground transition-colors hover:text-(--brand)"
+              >
+                {verTodosMovs ? `Ver solo los ${MOVIMIENTOS_INICIALES} más recientes` : `Ver los ${movsRecientes.length} movimientos`}
+              </button>
+            )}
+          </>
         )}
       </section>
     </div>

@@ -20,8 +20,6 @@ const ICONS: Record<HorasStatus, LucideIcon> = {
   sin_asignacion: CircleDashed,
 }
 
-// `label` permite matizar el texto sin cambiar el estado ni su color: la lista de
-// bancos lo usa para "Excedido en <posición>" cuando no lo están todas.
 export default function HorasStatusBadge({ status, label, title }: { status: HorasStatus; label?: string; title?: string }) {
   const Icon = ICONS[status]
   return (

@@ -15,16 +15,19 @@ test('el admin amplía y anula horas de un proyecto', async ({ page }) => {
     await primera.click()
     await page.waitForURL(/\/bancos\/.+/, { timeout: 2500 })
   }).toPass({ timeout: 15000 })
-  await expect(page.getByRole('heading', { name: 'Ampliar horas' })).toBeVisible()
-  // Esperar a que carguen los chunks + margen de hidratación: la página del detalle es
-  // pesada y, si el submit se dispara antes de hidratar, se pierde (un solo envío).
-  await page.waitForLoadState('networkidle').catch(() => {})
-  await page.waitForTimeout(1500)
+  // "Ampliar horas" es un botón de la cabecera que abre un diálogo. Clic con reintento: la
+  // página del detalle es pesada y, si se pulsa antes de hidratar, el diálogo no se abre.
+  const dialogo = page.getByRole('dialog')
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Ampliar horas' }).click()
+    await expect(dialogo.getByRole('heading', { name: 'Ampliar horas' })).toBeVisible({ timeout: 1500 })
+  }).toPass({ timeout: 15000 })
 
   const motivo = `E2E ampliación ${Date.now()}`
-  await page.getByLabel('Horas').fill('3')
-  await page.getByLabel('Motivo').fill(motivo)
-  await page.getByRole('button', { name: /^ampliar$/i }).click()
+  await dialogo.getByLabel('Horas').fill('3')
+  await dialogo.getByLabel('Motivo').fill(motivo)
+  await dialogo.getByRole('button', { name: /^ampliar$/i }).click()
+  await expect(dialogo).toBeHidden()
 
   // El motivo aparece en dos tablas (Ampliaciones y Movimientos, que lo muestra como
   // detalle): acotamos a la sección "Ampliaciones" para no matchear ambas filas.

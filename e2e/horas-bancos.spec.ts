@@ -4,10 +4,11 @@ test('el admin ve los bancos de horas con asignado vs registrado', async ({ page
   await page.goto('/bancos')
   await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
   // KPIs
-  await expect(page.getByText('Asignado total')).toBeVisible()
-  await expect(page.getByText('Consumido total')).toBeVisible()
+  await expect(page.getByText('Asignado', { exact: true })).toBeVisible()
+  await expect(page.getByText('Consumido', { exact: true })).toBeVisible()
   // Al menos un proyecto del Excel y el contador "N proyectos · M bancos"
-  await expect(page.getByText(/\d+ proyectos?/)).toBeVisible()
+  // (first(): la tarjeta Atención también dice "De N proyectos").
+  await expect(page.getByText(/\d+ proyectos?/).first()).toBeVisible()
 
   // Descarga de bancos (CSV)
   const [download] = await Promise.all([
@@ -21,7 +22,7 @@ test('el admin ve los bancos de horas con asignado vs registrado', async ({ page
   await expect(page.getByText('No hay bancos que coincidan con los filtros.')).toBeVisible()
 })
 
-test('el switch Mensual muestra el selector de meses (calendario) con el mes en curso', async ({ page }) => {
+test('se entra en la vista Mensual, con el selector de meses (calendario) en el mes en curso', async ({ page }) => {
   await page.goto('/bancos')
   await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
 
@@ -32,7 +33,8 @@ test('el switch Mensual muestra el selector de meses (calendario) con el mes en 
     return
   }
 
-  await mensual.click()
+  // Mensual viene puesta por defecto.
+  await expect(mensual).toHaveAttribute('aria-pressed', 'true')
   // El selector de meses (MonthPicker) muestra el mes en curso por defecto ("Julio 2026").
   const mesActual = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' })
     .format(new Date())
@@ -50,7 +52,7 @@ test('el switch Mensual muestra el selector de meses (calendario) con el mes en 
   await expect(page.getByRole('button', { name: new RegExp(label) })).toHaveCount(0)
 })
 
-test('el detalle del banco alterna Total y Mensual', async ({ page }) => {
+test('el detalle del banco entra en Mensual y alterna a Total', async ({ page }) => {
   await page.goto('/bancos')
   await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
   const primera = page.locator('a[href^="/bancos/"]').first()
@@ -62,26 +64,34 @@ test('el detalle del banco alterna Total y Mensual', async ({ page }) => {
   }).toPass({ timeout: 15000 })
   // En Total el detalle muestra la sección "Por posición" (aserción específica del detalle).
   // exact: true porque "Cierre de mes por posición" (charts de carry forward) también matchea por substring.
-  await expect(page.getByRole('heading', { name: 'Por posición', exact: true })).toBeVisible()
+  const porPosicion = page.getByRole('heading', { name: 'Por posición', exact: true })
+  const porPosicionMensual = page.getByRole('heading', { name: 'Banco mensual por posición' })
+  await expect(porPosicion.or(porPosicionMensual)).toBeVisible() // el detalle ya cargó
 
   const mensual = page.getByRole('button', { name: 'Mensual' })
-  if (!(await mensual.isVisible().catch(() => false))) return // Excel sin columna Fecha
+  if (!(await mensual.isVisible().catch(() => false))) {
+    await expect(porPosicion).toBeVisible() // Excel sin columna Fecha: solo hay Total
+    return
+  }
+  // Se entra en Mensual: "Banco mensual por posición".
+  await expect(porPosicionMensual).toBeVisible()
   // Clic con reintento: la página del detalle es pesada y el primer clic puede perderse
-  // si el componente cliente aún no hidrató. En Mensual muestra "Banco mensual por posición".
+  // si el componente cliente aún no hidrató.
   await expect(async () => {
-    await mensual.click()
-    await expect(page.getByRole('heading', { name: 'Banco mensual por posición' })).toBeVisible({ timeout: 1500 })
+    await page.getByRole('button', { name: 'Total' }).click()
+    await expect(porPosicion).toBeVisible({ timeout: 1500 })
   }).toPass({ timeout: 12000 })
 })
 
-test('ocultar finalizados quita del banco los proyectos finalizados', async ({ page }) => {
+test('los proyectos finalizados salen ocultos hasta marcar Mostrar finalizados', async ({ page }) => {
   await page.goto('/bancos')
   await expect(page.getByRole('heading', { name: 'Bancos de horas' })).toBeVisible()
-  const toggle = page.getByRole('checkbox', { name: 'Ocultar finalizados' })
-  await expect(toggle).toBeVisible()
-  // Si hay algún proyecto finalizado visible, al activar el filtro debe desaparecer.
-  if (!(await page.getByText('Finalizado', { exact: true }).first().isVisible().catch(() => false))) return
+  const toggle = page.getByRole('checkbox', { name: 'Mostrar finalizados' })
+  await expect(toggle).not.toBeChecked()
+  await expect(page.getByText('Finalizado', { exact: true })).toHaveCount(0)
+  // Al marcarla vuelven (si el Excel tiene alguno) y al desmarcarla se van otra vez.
   await toggle.check()
+  await toggle.uncheck()
   await expect(page.getByText('Finalizado', { exact: true })).toHaveCount(0)
 })
 

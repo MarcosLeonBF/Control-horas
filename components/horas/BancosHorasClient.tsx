@@ -8,7 +8,7 @@ import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProj
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, formatFechaISO, currentMonth } from '@/lib/horas/format'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
-import MonthPicker from '@/components/ui/month-picker'
+import VistaPeriodo, { periodoEnPalabras, type Vista } from '@/components/horas/VistaPeriodo'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import NativeSelect from '@/components/ui/native-select'
@@ -28,15 +28,16 @@ function estadoOrden(estado?: string): number {
 
 // Un proyecto excedido en UNA posición y otro excedido en TODAS se ven igual en el
 // badge, porque el estado se calcula sobre los totales. Cuando solo lo están algunas
-// se nombra cuál (o cuántas); si lo están todas, "Excedido" a secas ya es exacto.
+// se dice debajo del badge cuál (o cuántas posiciones de cuántas); si lo están todas,
+// "Excedido" a secas ya es exacto. El badge queda igual en todas las filas.
 function excedidoParcial(g: BancoHorasProyecto): boolean {
   return g.status === 'excedido' && g.excedidas.length > 0 && g.excedidas.length < g.positions.length
 }
-function excedidoLabel(g: BancoHorasProyecto): string | undefined {
+function excedidoDetalle(g: BancoHorasProyecto): string | undefined {
   if (!excedidoParcial(g)) return undefined
   return g.excedidas.length === 1
-    ? `Excedido en ${g.excedidas[0]}`
-    : `Excedido en ${g.excedidas.length} de ${g.positions.length}`
+    ? `en ${g.excedidas[0]}`
+    : `en ${g.excedidas.length} de ${g.positions.length} posiciones`
 }
 function excedidoTitle(g: BancoHorasProyecto): string | undefined {
   return excedidoParcial(g) ? `Excedido en: ${g.excedidas.join(', ')}` : undefined
@@ -45,13 +46,27 @@ function excedidoTitle(g: BancoHorasProyecto): string | undefined {
 const selectClass =
   'h-10 min-w-40 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
-function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'excedido' }) {
+// `hint`: a qué periodo se refiere la cifra, para que no se lea como el total del banco
+// cuando la vista es Mensual.
+function Kpi({ label, value, hint, tone }: { label: string; value: string; hint: string; tone?: 'excedido' }) {
   return (
     <Card className="gap-1 p-5">
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className={cn('tabular-money text-2xl font-semibold', tone === 'excedido' && 'text-(--status-excedido)')}>{value}</p>
+      <p className="text-xs text-muted-foreground/80">{hint}</p>
     </Card>
   )
+}
+
+// Lo que le queda al proyecto (o lo que se pasó), bajo la barra de la fila. Descuenta los
+// inutilizables del carry, igual que el estado: por eso un proyecto puede estar excedido
+// con el consumido por debajo del asignado, y el title lo explica.
+function restanteFila(g: BancoHorasProyecto): { texto: string; excedido: boolean; title?: string } | null {
+  if (g.assigned === 0 && g.consumed === 0) return null
+  const title = g.inutilizables > 0 ? `Descuenta ${formatHoras(g.inutilizables)} inutilizables del carry` : undefined
+  return g.remaining < 0
+    ? { texto: `${formatHoras(-g.remaining)} de más`, excedido: true, title }
+    : { texto: `Quedan ${formatHoras(g.remaining)}`, excedido: false, title }
 }
 
 // Campo de filtro etiquetado: micro-etiqueta arriba + control, para orden y legibilidad.
@@ -64,15 +79,19 @@ function FilterField({ label, children }: { label: string; children: ReactNode }
   )
 }
 
-export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
+// `managerInicial`: el nombre del Excel del manager en sesión; el filtro arranca en él.
+export default function BancosHorasClient({ rows, managerInicial }: { rows: BancoHorasRow[]; managerInicial?: string }) {
   const [search, setSearch] = useState('')
   const [estado, setEstado] = useState<HorasStatus | 'todos'>('todos')
   const [posicion, setPosicion] = useState<string>('todas')
-  const [manager, setManager] = useState('todos')
+  const [manager, setManager] = useState(managerInicial ?? 'todos')
   const [auditFrom, setAuditFrom] = useState('')
   const [auditTo, setAuditTo] = useState('')
-  const [ocultarFinalizados, setOcultarFinalizados] = useState(false)
-  const [vista, setVista] = useState<'total' | 'mensual'>('total')
+  // Los finalizados salen ocultos; la casilla los muestra.
+  const [mostrarFinalizados, setMostrarFinalizados] = useState(false)
+  // Se entra en Mensual, en el mes en curso; Total solo si el Excel aún no trae meses
+  // (entonces no hay switch).
+  const [vista, setVista] = useState<Vista>(() => (rows.some((r) => r.monthly.length > 0) ? 'mensual' : 'total'))
   // Selección de meses (multi): por defecto el mes en curso, o el último con datos.
   const [mesesSel, setMesesSel] = useState<string[]>(() => {
     const s = new Set<string>()
@@ -131,14 +150,14 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
         const fa = r.fechaAuditoria ?? ''
         if (auditFrom && (!fa || fa < auditFrom)) return false
         if (auditTo && (!fa || fa > auditTo)) return false
-        if (ocultarFinalizados && (r.projectEstado ?? '').toLowerCase() === 'finalizado') return false
+        if (!mostrarFinalizados && (r.projectEstado ?? '').toLowerCase() === 'finalizado') return false
         return true
       })
       .sort((a, b) =>
         estadoOrden(a.projectEstado) - estadoOrden(b.projectEstado)
         || HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status]
         || a.project.localeCompare(b.project) || a.position.localeCompare(b.position))
-  }, [viewRows, search, estado, posicion, manager, auditFrom, auditTo, ocultarFinalizados])
+  }, [viewRows, search, estado, posicion, manager, auditFrom, auditTo, mostrarFinalizados])
 
   // Agrupado por proyecto: una fila por proyecto con el banco total; el desglose por
   // posición se ve al desplegar. Orden: por estado (activo → pausa → finalizado), y
@@ -151,15 +170,20 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
     [filtered],
   )
 
+  // Excedidos y bajos se cuentan por PROYECTO, como los badges de la lista (antes eran
+  // bancos/posiciones y no cuadraban con el contador de proyectos de al lado).
   const totals = useMemo(() => {
     const t = { assigned: 0, consumed: 0, remaining: 0, excedidos: 0, bajos: 0 }
     for (const r of filtered) {
       t.assigned += r.assigned; t.consumed += r.consumed; t.remaining += r.remaining
-      if (r.status === 'excedido') t.excedidos++
-      if (r.status === 'bajo') t.bajos++
+    }
+    for (const g of groups) {
+      if (g.status === 'excedido') t.excedidos++
+      if (g.status === 'bajo') t.bajos++
     }
     return t
-  }, [filtered])
+  }, [filtered, groups])
+  const hintPeriodo = periodoEnPalabras(vista, mesesSel)
 
   // En Mensual, el asignado del mes puede incluir horas provisionales (estimadas). Lo
   // avisamos en los KPIs y lo marcamos en la descarga para no mezclarlas con lo confirmado.
@@ -181,14 +205,26 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
 
   return (
     <div className="space-y-6">
+      {/* Cabecera: el periodo (Total | Mensual, spec §5.1) gobierna toda la página, KPIs
+          incluidos, así que va arriba junto al título. Solo si el Excel ya trae meses. */}
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+          <h1 className="font-display text-2xl">Bancos de horas</h1>
+          <p className="text-sm text-muted-foreground">Horas asignadas (Excel) frente a las registradas, por proyecto y posición.</p>
+        </div>
+        {hayMensual && (
+          <VistaPeriodo vista={vista} onVista={setVista} meses={meses} mesesSel={mesesSel} onMesesSel={setMesesSel} />
+        )}
+      </header>
+
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Asignado total" value={formatHorasTotal(totals.assigned)} />
-        <Kpi label="Consumido total" value={formatHorasTotal(totals.consumed)} />
-        <Kpi label="Restante total" value={formatHorasTotal(totals.remaining)} tone={totals.remaining < 0 ? 'excedido' : undefined} />
-        <Card className="gap-2 p-5">
+        <Kpi label="Asignado" value={formatHorasTotal(totals.assigned)} hint={hintPeriodo} />
+        <Kpi label="Consumido" value={formatHorasTotal(totals.consumed)} hint={hintPeriodo} />
+        <Kpi label="Restante" value={formatHorasTotal(totals.remaining)} hint={hintPeriodo} tone={totals.remaining < 0 ? 'excedido' : undefined} />
+        <Card className="gap-1 p-5">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Atención</p>
-          <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 py-1 text-sm">
             <span className="inline-flex items-center gap-1.5 text-(--status-excedido)">
               <AlertTriangle className="size-4" /> <strong className="tabular-money">{totals.excedidos}</strong> excedidos
             </span>
@@ -196,39 +232,21 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
               <TrendingDown className="size-4" /> <strong className="tabular-money">{totals.bajos}</strong> bajos
             </span>
           </div>
+          <p className="text-xs text-muted-foreground/80">De {groups.length} {groups.length === 1 ? 'proyecto' : 'proyectos'}</p>
         </Card>
       </div>
 
       {hayProvisional && (
-        <p className="-mt-3 text-xs text-(--brand)">
-          El asignado incluye horas <strong className="font-medium">provisionales</strong> (estimadas por tipo de contrato, transitorias hasta que se cargue el mes real); marcadas con «Prov.» y en la columna «Provisional» de la descarga.
+        <p className="-mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
+          <Clock aria-hidden className="mt-px size-3.5 shrink-0 text-(--brand)" />
+          <span>
+            El asignado incluye horas <span className="font-medium text-(--brand)">provisionales</span>: estimadas por tipo de contrato hasta que se cargue el mes real. Van marcadas con «Prov.» y en la columna «Provisional» de la descarga.
+          </span>
         </p>
       )}
 
       {/* Filtros */}
       <div className="space-y-3.5">
-        {/* Vista Total | Mensual (spec §5.1). Solo si el Excel ya trae meses. */}
-        {hayMensual && (
-          <div className="flex flex-wrap items-center gap-3">
-            <div role="group" aria-label="Vista del banco" className="inline-flex rounded-lg bg-(--muted-surface) p-0.5">
-              {(['total', 'mensual'] as const).map((v) => (
-                <button
-                  key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
-                  className={cn(
-                    'rounded-md px-3.5 py-1.5 text-sm transition-colors',
-                    vista === v ? 'bg-card font-medium text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {v === 'total' ? 'Total' : 'Mensual'}
-                </button>
-              ))}
-            </div>
-            {vista === 'mensual' && (
-              <MonthPicker value={mesesSel} onChange={setMesesSel} available={meses} />
-            )}
-          </div>
-        )}
-
         {/* Buscar + resumen */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-56 flex-1">
@@ -276,42 +294,41 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
           <label className="inline-flex h-10 cursor-pointer select-none items-center gap-2 self-end rounded-lg border border-border bg-card px-3 text-sm text-foreground transition-colors hover:bg-(--muted-surface)">
             <input
               type="checkbox"
-              checked={ocultarFinalizados}
-              onChange={(e) => setOcultarFinalizados(e.target.checked)}
+              checked={mostrarFinalizados}
+              onChange={(e) => setMostrarFinalizados(e.target.checked)}
               className="size-4 accent-(--brand)"
             />
-            Ocultar finalizados
+            Mostrar finalizados
           </label>
-          {(search || estado !== 'todos' || posicion !== 'todas' || manager !== 'todos' || auditFrom || auditTo || ocultarFinalizados) && (
+          {(search || estado !== 'todos' || posicion !== 'todas' || manager !== 'todos' || auditFrom || auditTo || mostrarFinalizados) && (
             <button
-              onClick={() => { setSearch(''); setEstado('todos'); setPosicion('todas'); setManager('todos'); setAuditFrom(''); setAuditTo(''); setOcultarFinalizados(false) }}
+              onClick={() => { setSearch(''); setEstado('todos'); setPosicion('todas'); setManager('todos'); setAuditFrom(''); setAuditTo(''); setMostrarFinalizados(false) }}
               className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:text-(--brand)"
             >
               <X className="size-3.5" /> Limpiar filtros
             </button>
           )}
+          {/* Descargas (PDF §17.5): de lo que se ve, así que viven con los filtros. */}
+          <div className="ml-auto flex items-center gap-2 self-end text-sm">
+            <span className="text-muted-foreground">Descargar</span>
+            <button onClick={() => void downloadXlsx(`${fileBase}.xlsx`, buildRows(), 'Bancos')}
+              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-foreground/80 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
+              <Download className="size-3.5" /> Excel
+            </button>
+            <button onClick={() => downloadCsv(`${fileBase}.csv`, buildRows())}
+              className="inline-flex h-10 items-center rounded-lg border border-border bg-card px-3 text-foreground/80 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
+              CSV
+            </button>
+          </div>
         </div>
-      </div>
-
-      {/* Descargas (PDF §17.5) */}
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Descargar bancos:</span>
-        <button onClick={() => void downloadXlsx(`${fileBase}.xlsx`, buildRows(), 'Bancos')}
-          className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-foreground/70 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
-          <Download className="size-3.5" /> Excel
-        </button>
-        <button onClick={() => downloadCsv(`${fileBase}.csv`, buildRows())}
-          className="rounded-lg border border-border px-2.5 py-1.5 text-foreground/70 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
-          CSV
-        </button>
       </div>
 
       {/* Lista agrupada por proyecto: click en una fila abre el detalle del proyecto */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="hidden items-center gap-4 border-b border-border bg-(--muted-surface) px-5 py-2.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-muted-foreground md:flex">
           <span className="flex-1">Proyecto</span>
-          <span className="w-44 text-right">Banco total</span>
-          <span className="w-28 text-right">Estado</span>
+          <span className="w-44 text-right">Consumido / asignado</span>
+          <span className="w-40 text-right">Estado</span>
           <span className="w-4" aria-hidden />
         </div>
 
@@ -320,7 +337,9 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
         ) : (
           <ul className="divide-y divide-border">
             {groups.map((g) => {
-              const pct = g.assigned > 0 ? Math.min((g.consumed / g.assigned) * 100, 100) : 0
+              // Sin asignado pero con consumo ya está excedido: barra llena, no vacía.
+              const pct = g.assigned > 0 ? Math.min((g.consumed / g.assigned) * 100, 100) : g.consumed > 0 ? 100 : 0
+              const resto = restanteFila(g)
               // «Prov.» va junto al nombre (es un atributo del banco, no del estado):
               // la columna de estado queda solo para el badge, sin chips que colisionen.
               const marcaProv = vista === 'mensual'
@@ -367,6 +386,11 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                       <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-(--muted-surface)">
                         <span className={cn('block h-full rounded-full', HORAS_BAR_COLOR[g.status])} style={{ width: `${pct}%` }} />
                       </span>
+                      {resto && (
+                        <span title={resto.title} className={cn('mt-1.5 block text-right text-[0.7rem] leading-none', resto.excedido ? 'text-(--status-excedido)' : 'text-muted-foreground')}>
+                          {resto.texto}
+                        </span>
+                      )}
                     </span>
 
                     {/* Banco total compacto (móvil) */}
@@ -375,10 +399,13 @@ export default function BancosHorasClient({ rows }: { rows: BancoHorasRow[] }) {
                       <span className="text-muted-foreground">/{formatHoras(g.assigned)}</span>
                     </span>
 
-                    <span className="flex w-28 shrink-0 items-center justify-end md:w-40">
+                    <span className="flex w-32 shrink-0 flex-col items-end justify-center gap-1 md:w-40" title={excedidoTitle(g)}>
                       {vista === 'mensual' && g.assigned === 0 && g.consumed === 0 && !marcaProv
                         ? <span aria-label="Sin datos este mes" className="text-sm text-muted-foreground/50">—</span>
-                        : <HorasStatusBadge status={g.status} label={excedidoLabel(g)} title={excedidoTitle(g)} />}
+                        : <HorasStatusBadge status={g.status} />}
+                      {excedidoDetalle(g) && (
+                        <span className="max-w-full truncate text-[0.7rem] leading-none text-rose-700/80">{excedidoDetalle(g)}</span>
+                      )}
                     </span>
                     <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-(--brand) md:block" />
                   </Link>
