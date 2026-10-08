@@ -205,17 +205,10 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
 
   return (
     <div className="space-y-6">
-      {/* Cabecera: el periodo (Total | Mensual, spec §5.1) gobierna toda la página, KPIs
-          incluidos, así que va arriba junto al título. Solo si el Excel ya trae meses. */}
-      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
-        <div>
-          <h1 className="font-display text-2xl">Bancos de horas</h1>
-          <p className="text-sm text-muted-foreground">Horas asignadas (Excel) frente a las registradas, por proyecto y posición.</p>
-        </div>
-        {hayMensual && (
-          <VistaPeriodo vista={vista} onVista={setVista} meses={meses} mesesSel={mesesSel} onMesesSel={setMesesSel} />
-        )}
-      </header>
+      <div>
+        <h1 className="font-display text-2xl">Bancos de horas</h1>
+        <p className="text-sm text-muted-foreground">Horas asignadas (Excel) frente a las registradas, por proyecto y posición.</p>
+      </div>
 
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -247,6 +240,11 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
 
       {/* Filtros */}
       <div className="space-y-3.5">
+        {/* Vista Mensual | Total (spec §5.1). Solo si el Excel ya trae meses. */}
+        {hayMensual && (
+          <VistaPeriodo vista={vista} onVista={setVista} meses={meses} mesesSel={mesesSel} onMesesSel={setMesesSel} />
+        )}
+
         {/* Buscar + resumen */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-56 flex-1">

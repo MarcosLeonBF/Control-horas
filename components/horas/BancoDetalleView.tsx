@@ -160,9 +160,7 @@ export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDe
     <div>
       <Link href="/bancos" className="text-xs text-foreground/55 hover:text-foreground">← Bancos de horas</Link>
 
-      {/* Cabecera: el periodo gobierna todo lo de abajo, así que va junto al título, igual
-          que en la lista. Ampliar horas es ocasional: un botón, no un formulario fijo. */}
-      <header className="mt-3 mb-8 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+      <header className="mt-3 mb-8">
         <div className="min-w-0">
           <h1 className="font-display text-3xl font-semibold tracking-tight">{d.project}</h1>
           <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
@@ -179,11 +177,16 @@ export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDe
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+      </header>
+
+      {/* Barra de controles: Mensual | Total + selector de meses (solo si el Excel ya trae
+          meses) y, a continuación, Ampliar horas (ocasional: un botón, no un formulario fijo). */}
+      {(hayMensual || isAdmin) && (
+        <div className="mb-8 flex flex-wrap items-center gap-3">
           {hayMensual && <VistaPeriodo vista={vista} onVista={setVista} meses={meses} mesesSel={mesesSel} onMesesSel={setMesesSel} />}
           {isAdmin && <AmpliarHorasDialog project={d.project} />}
         </div>
-      </header>
+      )}
 
       {/* Resumen del periodo: estado, cuánto se gastó y las tres cifras. El carry
           (libres / inutilizables) ya está dentro del disponible: va al pie, como detalle. */}

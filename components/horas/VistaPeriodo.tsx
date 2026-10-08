@@ -6,9 +6,9 @@ import { cn } from '@/lib/utils'
 
 export type Vista = 'total' | 'mensual'
 
-// Periodo que gobierna la pantalla de bancos (lista y detalle): Total | Mensual y, en
-// Mensual, los meses elegidos. El selector va a la IZQUIERDA del switch para que, al
-// quedar alineado a la derecha, el switch no se mueva cuando el selector aparece o se va.
+// Periodo que gobierna la pantalla de bancos (lista y detalle): Mensual | Total y, en
+// Mensual, los meses elegidos. Mensual va primero porque es la vista por defecto; el
+// selector de meses va a la derecha del switch, así el switch no se mueve al aparecer.
 export default function VistaPeriodo({ vista, onVista, meses, mesesSel, onMesesSel, className }: {
   vista: Vista
   onVista: (v: Vista) => void
@@ -19,9 +19,8 @@ export default function VistaPeriodo({ vista, onVista, meses, mesesSel, onMesesS
 }) {
   return (
     <div className={cn('flex flex-wrap items-center gap-3', className)}>
-      {vista === 'mensual' && <MonthPicker value={mesesSel} onChange={onMesesSel} available={meses} />}
       <div role="group" aria-label="Vista del banco" className="inline-flex rounded-lg bg-(--muted-surface) p-0.5">
-        {(['total', 'mensual'] as const).map((v) => (
+        {(['mensual', 'total'] as const).map((v) => (
           <button
             key={v} type="button" onClick={() => onVista(v)} aria-pressed={vista === v}
             className={cn(
@@ -33,6 +32,7 @@ export default function VistaPeriodo({ vista, onVista, meses, mesesSel, onMesesS
           </button>
         ))}
       </div>
+      {vista === 'mensual' && <MonthPicker value={mesesSel} onChange={onMesesSel} available={meses} />}
     </div>
   )
 }
