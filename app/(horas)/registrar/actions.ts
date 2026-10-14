@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { trasResponder } from '@/lib/avisos/tras-responder'
 import { alGuardarRegistro } from '@/lib/avisos/detector-registro'
+import { revisarPendientes } from '@/lib/avisos/revisiones'
 
 export interface LineInput {
   entry_date: string; project: string; area_id: string; department: string; etapa_id: string; hours: number; description: string
@@ -24,6 +25,12 @@ export async function guardarRegistro(
   const id = data as string
   // Avisos (pulso, llamativo y bancos): después de responder se anota una espera de 5 minutos
   // y salen con cómo quedaron los registros. El guardado nunca espera a la red.
-  trasResponder(() => alGuardarRegistro({ logId: id, anclaId: logId }))
+  trasResponder(async () => {
+    await alGuardarRegistro({ logId: id, anclaId: logId })
+    // Segundo reloj: de paso se procesan las esperas de otros que ya vencieron. Normalmente no
+    // hay ninguna (el reloj de Supabase las toma al minuto); si ese reloj se para, así salen
+    // con el siguiente guardado de cualquiera y no con el cron del día siguiente.
+    await revisarPendientes(3, 8_000)
+  })
   return { ok: true, id }
 }

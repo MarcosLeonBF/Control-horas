@@ -89,14 +89,18 @@ create policy avisos_por_revisar_admin_select on public.avisos_por_revisar
   for select to authenticated using ((select public.is_admin()));
 
 -- El reloj: cada minuto, y solo si hay algo vencido, llama a la app. pg_net no espera la
--- respuesta; la app contesta enseguida y trabaja después.
+-- respuesta; la app contesta 202 enseguida y trabaja después. La clave va con btrim: un
+-- salto de línea pegado con el valor en Vault daría 401 en cada llamada sin que nada falle.
+-- Comprobar tras aplicar: select status_code from net._http_response order by created desc
+-- limit 5 → 202 (un 401 no cuenta como error para pg_net: error_msg sale vacío).
+-- Marcha atrás si hace falta: select cron.unschedule('avisos-revisar');
 select cron.schedule('avisos-revisar', '* * * * *', $job$
   select net.http_post(
     url := 'https://control-horas-theta.vercel.app/api/avisos/revisar',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer ' || coalesce(
-        (select decrypted_secret from vault.decrypted_secrets where name = 'avisos_cron_secret'), '')),
+        (select btrim(decrypted_secret, E' \t\r\n') from vault.decrypted_secrets where name = 'avisos_cron_secret'), '')),
     timeout_milliseconds := 10000)
   where exists (
           select 1 from public.avisos_por_revisar

@@ -5,6 +5,7 @@
 import { after } from 'next/server'
 import { autorizado } from '@/lib/avisos/auth'
 import { esProduccion } from '@/lib/avisos/entorno'
+import { plazoRestante } from '@/lib/avisos/reglas'
 import { revisarPendientes } from '@/lib/avisos/revisiones'
 import { despacharPendientes } from '@/lib/avisos/bandeja'
 
@@ -14,9 +15,14 @@ export async function POST(req: Request) {
   if (!autorizado(req, process.env.CRON_SECRET)) return Response.json({ error: 'No autorizado' }, { status: 401 })
   if (!esProduccion()) return Response.json({ ok: true, omitido: 'fuera de producción' })
   after(async () => {
-    // Plazos por debajo de maxDuration: lo que no dé tiempo vuelve a la cola sin gastar intento.
+    // Un solo plazo por debajo de maxDuration para las dos tandas: el despacho usa lo que dejó
+    // la revisión. Lo que no dé tiempo vuelve a la cola sin gastar intento.
+    const fin = Date.now() + 45_000
     try { await revisarPendientes(20, 25_000) } catch (e) { console.error('[avisos] revisar:', e instanceof Error ? e.message : e) }
-    try { await despacharPendientes(50, 25_000) } catch (e) { console.error('[avisos] despacho:', e instanceof Error ? e.message : e) }
+    const resto = plazoRestante(fin)
+    if (resto > 1_000) {
+      try { await despacharPendientes(50, resto) } catch (e) { console.error('[avisos] despacho:', e instanceof Error ? e.message : e) }
+    }
   })
   return Response.json({ ok: true }, { status: 202 })
 }

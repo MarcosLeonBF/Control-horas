@@ -191,6 +191,21 @@ export function planAvisosRegistro(args: {
   return { pulsos, llamativos }
 }
 
+// Milisegundos que quedan hasta `fin` (0 si ya pasó): para repartir un único plazo entre
+// varias tandas dentro de una misma función (maxDuration).
+export function plazoRestante(fin: number, ahora = Date.now()): number {
+  return Math.max(0, fin - ahora)
+}
+
+// Cuántas de estas esperas vencieron hace más de 15 minutos. El reloj de Supabase las toma
+// al minuto de vencer, así que si aparecen es que se paró (clave mal copiada en Vault, URL
+// cambiada...) y las está sacando la red: el guardado siguiente o el cron diario.
+export const ATRASO_RELOJ_MINUTOS = 15
+export function esperasAtrasadas(vencimientos: string[], ahora = Date.now()): number {
+  const limite = ahora - ATRASO_RELOJ_MINUTOS * 60_000
+  return vencimientos.filter((v) => Date.parse(v) < limite).length
+}
+
 // Tras un intento fallido de procesar una espera: vuelve a la cola (el reloj la toma al
 // minuto siguiente) hasta MAX_INTENTOS_REVISION; después queda 'fallida'.
 export function estadoTrasFallo(intentos: number): 'pendiente' | 'fallida' {

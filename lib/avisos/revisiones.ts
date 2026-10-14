@@ -4,10 +4,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { esProduccion } from '@/lib/avisos/entorno'
-import { estadoTrasFallo, MAX_INTENTOS_REVISION } from '@/lib/avisos/reglas'
+import { estadoTrasFallo, esperasAtrasadas, MAX_INTENTOS_REVISION, ATRASO_RELOJ_MINUTOS } from '@/lib/avisos/reglas'
 import { revisarGuardado, type EsperaGuardado } from '@/lib/avisos/detector-registro'
 
-type FilaEspera = EsperaGuardado & { intentos: number }
+type FilaEspera = EsperaGuardado & { intentos: number; vence_at: string }
 
 async function cerrar(db: SupabaseClient, id: string, cambios: Record<string, unknown>): Promise<void> {
   const { error } = await db.from('avisos_por_revisar').update(cambios).eq('id', id)
@@ -23,6 +23,11 @@ export async function revisarPendientes(limite = 20, plazoMs = 25_000): Promise<
   const { data, error } = await db.rpc('avisos_reclamar_revisiones', { p_limite: limite })
   if (error) throw new Error(`avisos_reclamar_revisiones: ${error.message}`)
   const filas = (data ?? []) as FilaEspera[]
+  const atrasadas = esperasAtrasadas(filas.map((f) => f.vence_at))
+  if (atrasadas) {
+    console.error(`[avisos] ${atrasadas} espera(s) vencida(s) hace más de ${ATRASO_RELOJ_MINUTOS} min: `
+      + 'el reloj de Supabase (avisos-revisar) no está llamando bien; revisar cron.job_run_details y net._http_response')
+  }
   let hechas = 0
   let fallidas = 0
   for (const [i, fila] of filas.entries()) {

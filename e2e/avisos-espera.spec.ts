@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import {
-  armarGuardado, planAvisosRegistro, estadoTrasFallo, resumirPorDia, type RegistroActual,
+  armarGuardado, planAvisosRegistro, estadoTrasFallo, resumirPorDia, plazoRestante, esperasAtrasadas, type RegistroActual,
 } from '../lib/avisos/reglas'
 
 // Los avisos de un registro esperan 5 minutos y se arman con cómo quedaron sus registros
@@ -96,6 +96,21 @@ test('plan: horasDia suma los otros registros del día; horasRegistro, solo los 
   const totales = totalesDe([...lineas, { entry_date: '2026-10-09', project: 'Departamento', hours: 6 }])
   const [p] = planAvisosRegistro({ esAlta: true, lineas, totales }).pulsos
   expect([p.horasRegistro, p.horasDia]).toEqual([2, 8])
+})
+
+test('plazoRestante: lo que falta hasta el límite, nunca negativo', () => {
+  expect(plazoRestante(10_000, 4_000)).toBe(6_000)
+  expect(plazoRestante(10_000, 12_000)).toBe(0)
+})
+
+test('esperasAtrasadas: cuenta las que vencieron hace más de 15 min (reloj parado)', () => {
+  const ahora = Date.parse('2026-10-14T12:00:00Z')
+  expect(esperasAtrasadas([
+    '2026-10-14T11:59:00Z', // vencida hace 1 min: lo normal
+    '2026-10-14T11:46:00Z', // 14 min: todavía no
+    '2026-10-14T11:44:00Z', // 16 min: atrasada
+    '2026-10-13T09:00:00Z', // de ayer: atrasada
+  ], ahora)).toBe(2)
 })
 
 test('estadoTrasFallo: se reintenta hasta el tercer intento', () => {

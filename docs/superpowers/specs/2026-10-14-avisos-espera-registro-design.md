@@ -197,12 +197,36 @@ Entrada nueva en «Cambios de versión» del contrato, sin tocar nada de lo que 
 ## Puesta en marcha
 
 1. Roberto crea en Supabase → Vault el secreto `avisos_cron_secret` con el valor de
-   `CRON_SECRET`.
-2. Se aplica la migración 0061 (por MCP, tras la revisión).
+   `CRON_SECRET` (la tarea le quita espacios y saltos de línea de los extremos).
+2. Se aplica la migración 0061.
 3. Push `master:main` con el OK de Roberto (ver memoria «Deploy: siempre a main»).
-4. Comprobación con los guardados reales siguientes.
+4. Comprobación:
+   - `select jobname, schedule, active from cron.job` → `avisos-revisar` y `avisos-limpieza`.
+   - Con el primer guardado real: su espera pasa a `hecha` a los 5–6 minutos y salen sus avisos.
+   - `select status_code, error_msg from net._http_response order by created desc limit 5` →
+     **202**. Un 401 (clave mal copiada) no cuenta como error para pg_net: `error_msg` sale
+     vacío, así que hay que mirar el código.
+   - `get_advisors` (security) sin avisos nuevos.
 
-La migración va antes que el código a propósito. Entre los pasos 2 y 3 el código viejo sigue
-armando los avisos al momento y no anota esperas; la tarea solo llamaría por reintentos de la
-bandeja, a una ruta que todavía no existe (404), y esos reintentos los sigue cubriendo el cron
-diario. Al revés (código antes que la migración), las esperas se acumularían sin reloj.
+**El orden importa: la migración SIEMPRE antes que el código.** Entre los pasos 2 y 3 el
+código viejo sigue armando los avisos al momento y no anota esperas; la tarea solo llamaría
+por reintentos de la bandeja, a una ruta que todavía no existe (404), y esos reintentos los
+sigue cubriendo el cron diario. Al revés, con el código y sin la migración, la llamada a
+`avisos_esperar_guardado` falla en cada guardado (solo queda en el log) y **no sale ningún
+aviso de registro**: se pierden, no se acumulan.
+
+**Marcha atrás:** revertir el código no basta; la tarea seguiría llamando cada minuto a una
+ruta que ya no existe mientras haya esperas vencidas. Hay que parar el reloj:
+`select cron.unschedule('avisos-revisar');`.
+
+## Red si el reloj se para
+
+Si la tarea de cada minuto deja de llamar bien (clave rotada en Vercel y no en Vault, URL
+cambiada, `pg_cron` o `pg_net` caídos), las esperas no se pierden:
+
+- **Cada guardado de /registrar** procesa de paso hasta 3 esperas vencidas de cualquiera
+  (segundo reloj): en horario de trabajo salen con el siguiente guardado.
+- **El cron diario** las procesa lo primero, antes de evaluar bancos y HUCHA, con un solo plazo
+  para todo.
+- Cuando se procesa una espera vencida hace más de 15 minutos, el log de Vercel lo dice
+  (`[avisos] N espera(s) vencida(s) hace más de 15 min`): es la señal de que el reloj se paró.
