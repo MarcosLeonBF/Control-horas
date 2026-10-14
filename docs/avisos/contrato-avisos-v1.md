@@ -185,6 +185,9 @@ de Dirección y Administración ni por quien está de ausencia el día en que gu
 registro, sea cual sea el `dia` registrado (tampoco `registro.llamativo`): de quien está
 fuera no se manda nada.
 
+Llega unos **5 minutos después** del último cambio del registro y con cómo quedó: si la
+persona corrige la fecha o las horas en ese rato, llega ya corregido; si lo anula, no llega.
+
 | Campo | Qué es |
 |---|---|
 | `persona` | Quién registra |
@@ -223,7 +226,8 @@ fuera no se manda nada.
 
 Cuando un día se sale de lo normal. Un aviso por persona, día, regla y proyecto (en
 `proyecto_largo`, uno por cada proyecto que llegue al límite). No se repite aunque la
-persona vuelva a editar ese día.
+persona vuelva a editar ese día. Como el pulso, llega unos 5 minutos después del último
+cambio y solo si el día sigue pasándose del límite en ese momento.
 
 | Regla | Cuándo salta |
 |---|---|
@@ -818,3 +822,10 @@ quita**: ya no viaja en `persona`, `manager_proyecto`, `managers`, el `actor` ni
 
 De paso: en `dias-sin-registrar`, `dentro_de_plazo` decía 7 días y son 15 desde el 22/09, y
 se documentan `pendientes`, `pendientes_dd_mm` y `dias_desde_mas_antiguo`, que ya llegaban.
+
+**14/10/2026** · Sin campos nuevos. `registro.enviado`, `registro.llamativo` y los
+`banco.nivel` / `banco.al_tope` que provoca un registro llegan unos **5 minutos después**
+del último cambio de ese registro, y reflejan cómo quedó: si la persona corrige la fecha o
+las horas en ese rato, llega ya corregido; si lo anula, no llega. Cada corrección dentro de
+esos 5 minutos vuelve a empezar la espera. Lo demás (HUCHA, ampliaciones, consultas) sigue
+llegando al momento.
