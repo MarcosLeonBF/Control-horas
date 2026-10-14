@@ -22,7 +22,8 @@ export async function guardarRegistro(
   })
   if (error) return { ok: false, error: error.message }
   const id = data as string
-  // Avisos (pulso, llamativo y bancos) después de responder: el guardado nunca espera a la red.
-  trasResponder(() => alGuardarRegistro({ esAlta: logId === null, logId: id, lineas: lines }))
+  // Avisos (pulso, llamativo y bancos): después de responder se anota una espera de 5 minutos
+  // y salen con cómo quedaron los registros. El guardado nunca espera a la red.
+  trasResponder(() => alGuardarRegistro({ logId: id, anclaId: logId }))
   return { ok: true, id }
 }
