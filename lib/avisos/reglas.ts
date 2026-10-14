@@ -113,6 +113,90 @@ export function registroPorProyecto(
   return out
 }
 
+// --- Espera de los avisos de un registro (0061) -------------------------------
+// Los avisos que dispara un guardado salen ESPERA_REGISTRO_MINUTOS después del último
+// cambio y se arman con cómo quedaron los registros: si la persona corrige la fecha o las
+// horas en ese rato, el aviso sale ya corregido.
+
+export const ESPERA_REGISTRO_MINUTOS = 5
+export const MAX_INTENTOS_REVISION = 3
+
+export interface LineaGuardada {
+  entry_date: string
+  project: string
+  hours: number
+}
+
+// Un registro de la espera tal como está al procesarla.
+export interface RegistroActual {
+  id: string
+  entry_date: string
+  status: string
+  lineas: { project: string; hours: number }[]
+}
+
+// Las líneas del guardado según cómo quedaron sus registros (los anulados no cuentan) y qué
+// registro enlazar en cada día. Si dos registros acaban en la misma fecha, el día enlaza el
+// de más horas; a igualdad, el de id menor, para que no dependa del orden de la consulta.
+export function armarGuardado(registros: RegistroActual[]): { lineas: LineaGuardada[]; logPorDia: Map<string, string> } {
+  const vivos = registros.filter((r) => r.status !== 'anulado').sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  const lineas: LineaGuardada[] = []
+  const mejor = new Map<string, { id: string; horas: number }>()
+  for (const r of vivos) {
+    let horas = 0
+    for (const l of r.lineas) {
+      lineas.push({ entry_date: r.entry_date, project: l.project, hours: Number(l.hours) })
+      horas = centesimas(horas + Number(l.hours))
+    }
+    const previo = mejor.get(r.entry_date)
+    if (!previo || horas > previo.horas) mejor.set(r.entry_date, { id: r.id, horas })
+  }
+  return { lineas, logPorDia: new Map([...mejor].map(([dia, m]) => [dia, m.id])) }
+}
+
+export interface PulsoPlan {
+  dia: string
+  horasRegistro: number
+  horasDia: number
+  proyectos: { proyecto: string; horas: number }[]
+}
+
+export interface LlamativoPlan {
+  dia: string
+  motivo: MotivoLlamativo
+  horasDia: number
+}
+
+// Qué avisos de registro salen de un guardado: el pulso (solo altas, uno por fecha) y los
+// llamativos de cada fecha. `totales` es el día entero de la persona (todos sus registros
+// no anulados), no solo este guardado.
+export function planAvisosRegistro(args: {
+  esAlta: boolean; lineas: LineaGuardada[]; totales: Map<string, DiaResumido>
+}): { pulsos: PulsoPlan[]; llamativos: LlamativoPlan[] } {
+  const deEste = resumirPorDia(args.lineas.map((l) => ({ dia: l.entry_date, proyecto: l.project.trim(), horas: Number(l.hours) })))
+  const pulsos: PulsoPlan[] = []
+  const llamativos: LlamativoPlan[] = []
+  // Fechas ISO (AAAA-MM-DD): el orden de texto es el orden de fechas.
+  for (const dia of [...deEste.keys()].sort()) {
+    const total = args.totales.get(dia) ?? { total: 0, porProyecto: new Map<string, number>() }
+    const este = deEste.get(dia)!
+    if (args.esAlta) {
+      pulsos.push({
+        dia, horasRegistro: este.total, horasDia: total.total,
+        proyectos: [...este.porProyecto].map(([proyecto, horas]) => ({ proyecto, horas })),
+      })
+    }
+    for (const motivo of motivosLlamativo(total)) llamativos.push({ dia, motivo, horasDia: total.total })
+  }
+  return { pulsos, llamativos }
+}
+
+// Tras un intento fallido de procesar una espera: vuelve a la cola (el reloj la toma al
+// minuto siguiente) hasta MAX_INTENTOS_REVISION; después queda 'fallida'.
+export function estadoTrasFallo(intentos: number): 'pendiente' | 'fallida' {
+  return intentos >= MAX_INTENTOS_REVISION ? 'fallida' : 'pendiente'
+}
+
 // --- Reintentos --------------------------------------------------------------
 
 export const MAX_INTENTOS = 5
