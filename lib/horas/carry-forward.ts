@@ -33,7 +33,9 @@ export function carrySplit(
   let excesos = 0
   for (const m of monthly) {
     if (m.month >= mesActual) continue // mes en curso (o futuro): sin corte
-    const base = m.assigned - (m.ampliado ?? 0)
+    // (x + a) − a no siempre da x en coma flotante: sin redondear, un consumo igual a la
+    // base dejaría un sobrante o un exceso de 1e-15 (y un estado que no es).
+    const base = m.ampliado ? Math.round((m.assigned - m.ampliado) * 1e9) / 1e9 : m.assigned
     const sobrante = Math.max(base - m.consumed, 0)
     const exceso = Math.max(m.consumed - base, 0)
     const libres = CARRY_FORWARD_PCT * sobrante

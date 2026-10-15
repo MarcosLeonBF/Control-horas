@@ -426,10 +426,11 @@ export async function getBancoHorasDetalle(
 
   // Todo sale de las posiciones: excelBase = solo real (Excel); provBase = provisional
   // (transitorio); ampliado = ampliaciones activas. Los tres suman al total.
+  // provBase se suma directamente, no por resta: (excel + prov + ampliado) − excel − ampliado
+  // puede dejar 1e-15 y la cabecera diría "Provisional" sin haberlo.
   const excelBase = posiciones.reduce((s, p) => s + (excelByPos.get(p.position) ?? 0), 0)
+  const provBase = posiciones.reduce((s, p) => s + (provByPos.get(p.position) ?? []).reduce((t, pm) => t + pm.assigned, 0), 0)
   const assigned = posiciones.reduce((s, p) => s + p.assigned, 0)
-  const ampliado = posiciones.reduce((s, p) => s + p.ampliado, 0)
-  const provBase = assigned - excelBase - ampliado
   const consumed = posiciones.reduce((s, p) => s + p.consumed, 0)
   const inutilizables = posiciones.reduce((s, p) => s + p.inutilizables, 0)
   const carryNeto = posiciones.reduce((s, p) => s + p.carryNeto, 0)

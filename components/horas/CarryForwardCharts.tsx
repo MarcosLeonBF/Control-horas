@@ -43,6 +43,10 @@ function FilaDesglose({ swatch, label, value }: { swatch: ReactNode; label: stri
   )
 }
 
+// A centésimas, como se muestra: el restante sale de restas y sin redondear dejaría un
+// «Restante 0,00h» de 1e-15 en meses cerrados.
+const r2 = (h: number) => Math.round(h * 100) / 100
+
 const sw = (className: string, style?: CSSProperties) => (
   <span aria-hidden className={cn('size-2 shrink-0 rounded-xs', className)} style={style} />
 )
@@ -124,7 +128,7 @@ export function BarraMes({ m, className }: { m: BancoMensual; className?: string
             consumido={m.consumed}
             inutilizables={m.inutilizables ?? 0}
             libres={m.libres ?? 0}
-            restante={Math.max(m.assigned - m.consumed - (m.inutilizables ?? 0) - (m.libres ?? 0), 0)}
+            restante={Math.max(r2(m.assigned - m.consumed - (m.inutilizables ?? 0) - (m.libres ?? 0)), 0)}
             exceso={Math.max(m.consumed - m.assigned, 0)}
             asignado={m.assigned}
             ampliado={m.ampliado ?? 0}
@@ -197,7 +201,7 @@ export function BarraComposicion({ posicion, className }: { posicion: BancoHoras
             consumido={posicion.consumed}
             inutilizables={inutil}
             libres={libres}
-            restante={Math.max(asignado - consumido - inutil - libres, 0)}
+            restante={Math.max(r2(asignado - consumido - inutil - libres), 0)}
             exceso={posicion.consumed - consumido}
             asignado={asignado}
             ampliado={posicion.ampliado}

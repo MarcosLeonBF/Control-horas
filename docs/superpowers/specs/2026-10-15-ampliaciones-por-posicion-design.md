@@ -79,12 +79,22 @@ ven. Además solo un admin puede ampliar; se quiere que el manager del proyecto 
   siempre 0 y la ampliación mejora el nivel de su posición.
 - Entrada nueva en el historial del contrato; avisar a Julián antes de desplegar.
 
+Nota (revisión): cuando un mes cerrado consume más que su base y hay ampliado, el resumen
+(«Libres (carry)», `carryNeto`) descuenta ese exceso primero de las libres, y la barra del
+mes lo muestra comido de lo ampliado. El disponible real es el mismo en ambos; se acepta.
+
 ## Despliegue
 
 Rama `feat/ampliaciones-por-posicion` desde `origin/main` (en `master` hay trabajo sin
 subir que espera a la 0061). Orden: aplicar 0062 → push a `main` → verificar en vivo →
 fusionar la rama en `master`. La 0062 quita la firma vieja de `ampliar_horas`: entre aplicar
 y desplegar, ampliar falla (ventana corta; ampliar es raro).
+
+- Justo antes de aplicar: `select count(*) from horas_ampliaciones` debe dar 0 (la columna
+  nace `not null` sin default; con filas, la migración aborta sin aplicar nada).
+- El código nuevo NO puede ir antes que la 0062: `/bancos` pide `position` y daría 500.
+- No subir la rama a GitHub antes que a `main`: Vercel haría un Preview (contra la base de
+  producción, sin la columna) y luego no desplegaría ese mismo commit en producción.
 
 ## Pruebas
 

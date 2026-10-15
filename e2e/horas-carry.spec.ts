@@ -83,6 +83,12 @@ test('el consumo sale primero del Excel: lo que pasa de la base es exceso aunque
   expect(porMes[0].exceso).toBe(4)
 })
 
+test('consumo igual a la base con ampliado: ni sobrante ni exceso por ruido de coma flotante', () => {
+  // (7,35 + 2,2) − 2,2 !== 7,35 en coma flotante: sin redondear saldría un exceso de 1e-15.
+  const { porMes } = carrySplit([{ month: '2026-09', assigned: 7.35 + 2.2, ampliado: 2.2, consumed: 7.35 }], '2026-10')
+  expect(porMes[0]).toEqual({ month: '2026-09', libres: 0, inutilizables: 0, exceso: 0 })
+})
+
 test('un mes solo con ampliado no genera libres ni inutilizables', () => {
   const { porMes, totales } = carrySplit([{ month: '2026-09', assigned: 8, ampliado: 8, consumed: 0 }], '2026-10')
   expect(porMes[0]).toEqual({ month: '2026-09', libres: 0, inutilizables: 0, exceso: 0 })
