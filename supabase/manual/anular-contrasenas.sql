@@ -16,6 +16,9 @@
 --      hashes al migrar: después de este paso ya no habría nada que copiar.
 --   2. Producción ya corre con ACCESO_ISSUER y el resto de variables, y se probó entrar,
 --      salir y el conector (alta, edición y baja desde Acceso).
+--   3. En el mismo paso, en Supabase → Authentication: alta pública desactivada y sin
+--      correos de recuperación de contraseña (docs/acceso.md, paso 5). Si no, cualquiera
+--      podría crearse una cuenta o ponerse una contraseña nueva y saltarse Acceso igual.
 --   Si hubiera que volver atrás después de esto (quitar ACCESO_ISSUER), cada persona
 --   necesitaría una contraseña nueva puesta por un admin: las de antes ya no existen.
 --

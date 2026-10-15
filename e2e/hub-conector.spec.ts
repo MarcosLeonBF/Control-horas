@@ -35,6 +35,10 @@ test('esquema: los campos de profiles, con las reglas de la base y del panel', (
   const campo = (clave: string) => campos.find((c) => c.clave === clave)!
   expect(campo('role')).toMatchObject({ tipo: 'seleccion', requerido: true, porDefecto: 'operativo' })
   expect(campo('role').opciones!.map((o) => o.valor)).toEqual(['operativo', 'manager', 'admin'])
+  // Pistas para el formulario de Acceso: solo un admin de Acceso da estos privilegios.
+  expect(campo('role').opciones!.filter((o) => o.soloAdmin).map((o) => o.valor)).toEqual(['admin'])
+  expect(campo('can_create_users').soloAdmin).toBe(true)
+  expect(campos.filter((c) => c.soloAdmin).map((c) => c.clave)).toEqual(['can_create_users'])
   // El mismo patrón que el CHECK profiles_slack_id_formato (0050).
   expect(campo('slack_id')).toMatchObject({ tipo: 'texto', requerido: true, patron: '^[UW][A-Z0-9]{8,}$' })
   expect(campo('position_id').opciones).toEqual(opciones.posiciones)
@@ -168,8 +172,49 @@ test('validarPut: las reglas del panel según el rol', () => {
   const op = validarPut({ ...alta, datos: { ...alta.datos, role: 'operativo', areas: ['area-seo'] } }, nuevo)
   expect(op.ok && op.valor.datos.areas).toEqual([])
   // Admin: sin permiso delegado de alta ni ventana ampliada, que no le hacen nada.
-  const adm = validarPut({ ...alta, datos: { ...alta.datos, role: 'admin', can_create_users: true, registro_dias_atras: 30, areas: ['area-crm'] } }, nuevo)
+  const adm = validarPut({ ...alta, actor: { id: 'a', rol: 'admin' }, datos: { ...alta.datos, role: 'admin', can_create_users: true, registro_dias_atras: 30, areas: ['area-crm'] } }, nuevo)
   expect(adm.ok && adm.valor.datos).toMatchObject({ can_create_users: false, registro_dias_atras: null, areas: ['area-crm'] })
+})
+
+// Escalada de privilegios: un gestor de Acceso no puede hacer admin a nadie (ni a sí mismo)
+// ni darle el permiso de alta. Sin `actor`, o con uno que no es admin, cuenta como no admin.
+const ADMIN = { id: 'a', rol: 'admin' }
+const NO_ADMINS: unknown[] = [undefined, { id: 'g', rol: 'gestor' }, { id: 'u', rol: 'usuario' }, { id: 'x', rol: 'ADMIN' }, 'admin', null]
+
+test('validarPut: solo un admin de Acceso da el rol de administrador', () => {
+  for (const actor of NO_ADMINS) {
+    expect(validarPut({ ...alta, actor, datos: { ...alta.datos, role: 'admin' } }, nuevo))
+      .toMatchObject({ ok: false, errores: { role: 'Solo un administrador de Acceso puede dar el rol de administrador.' } })
+    expect(validarPut({ ...alta, actor, datos: { ...alta.datos, role: 'admin' } }, { ...nuevo, actual: existente }))
+      .toMatchObject({ ok: false, errores: { role: expect.stringMatching(/Solo un administrador/) } })
+  }
+  expect(validarPut({ ...alta, actor: ADMIN, datos: { ...alta.datos, role: 'admin' } }, nuevo))
+    .toMatchObject({ ok: true, valor: { datos: { role: 'admin' } } })
+})
+
+test('validarPut: solo un admin de Acceso da el permiso de alta', () => {
+  const sinPermiso: Ficha = { ...existente, datos: { ...existente.datos, can_create_users: false } }
+  for (const actor of NO_ADMINS) {
+    expect(validarPut({ ...alta, actor, datos: { ...alta.datos, can_create_users: true } }, nuevo))
+      .toMatchObject({ ok: false, errores: { can_create_users: 'Solo un administrador de Acceso puede dar el permiso de alta de usuarios.' } })
+    expect(validarPut({ ...alta, actor, datos: { can_create_users: true } }, { ...nuevo, actual: sinPermiso }))
+      .toMatchObject({ ok: false, errores: { can_create_users: expect.stringMatching(/Solo un administrador/) } })
+  }
+  expect(validarPut({ ...alta, actor: ADMIN, datos: { can_create_users: true } }, { ...nuevo, actual: sinPermiso }))
+    .toMatchObject({ ok: true, valor: { datos: { can_create_users: true } } })
+})
+
+test('validarPut: un no admin puede reenviar privilegios que ya estaban y quitarlos', () => {
+  const gestor = { id: 'g', rol: 'gestor' }
+  const admin: Ficha = { ...existente, datos: { ...existente.datos, role: 'admin', can_create_users: false, registro_dias_atras: null } }
+  // Acceso reenvía la ficha entera al cambiar un nombre: lo que ya estaba no es un cambio.
+  expect(validarPut({ ...alta, actor: gestor, nombre: 'Otro nombre', datos: admin.datos }, { ...nuevo, actual: admin }))
+    .toMatchObject({ ok: true, valor: { nombre: 'Otro nombre', datos: { role: 'admin' } } })
+  expect(validarPut({ ...alta, actor: gestor, datos: existente.datos }, { ...nuevo, actual: existente }))
+    .toMatchObject({ ok: true, valor: { datos: { can_create_users: true } } })
+  // Quitar privilegios no es escalar.
+  expect(validarPut({ ...alta, actor: gestor, datos: { role: 'manager', can_create_users: false } }, { ...nuevo, actual: admin }))
+    .toMatchObject({ ok: true, valor: { datos: { role: 'manager', can_create_users: false } } })
 })
 
 test('parchePerfil: las columnas de profiles, con status según activo', () => {

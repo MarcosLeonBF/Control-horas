@@ -12,7 +12,9 @@ import { DIAS_REGISTRO_POR_DEFECTO } from '@/lib/horas/ventana-registro'
 
 export type Rol = 'operativo' | 'manager' | 'admin'
 
-export interface Opcion { valor: string; etiqueta: string }
+// soloAdmin: pista para el formulario de Acceso (solo un admin de Acceso puede elegirla). La
+// regla de verdad la impone validarPut con el `actor` del PUT.
+export interface Opcion { valor: string; etiqueta: string; soloAdmin?: boolean }
 
 // Contrato de Acceso (docs/integrar-una-app.md §5).
 export interface Campo {
@@ -20,6 +22,7 @@ export interface Campo {
   etiqueta: string
   ayuda?: string
   requerido?: boolean
+  soloAdmin?: boolean
   tipo: 'texto' | 'numero' | 'booleano' | 'seleccion' | 'seleccion_multiple'
   opciones?: Opcion[]
   patron?: string
@@ -54,10 +57,10 @@ export interface Ficha { activo: boolean; datos: DatosFicha }
 export const DIAS_ATRAS_MIN = 1
 export const DIAS_ATRAS_MAX = 3650
 
-const ROLES: { valor: Rol; etiqueta: string }[] = [
+const ROLES: (Opcion & { valor: Rol })[] = [
   { valor: 'operativo', etiqueta: 'Operativo' },
   { valor: 'manager', etiqueta: 'Manager' },
-  { valor: 'admin', etiqueta: 'Administrador' },
+  { valor: 'admin', etiqueta: 'Administrador', soloAdmin: true },
 ]
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -104,7 +107,7 @@ export function construirEsquema(o: OpcionesVivas): Esquema {
         ayuda: `Vacío: la ventana normal de ${DIAS_REGISTRO_POR_DEFECTO} días. El administrador registra sin límite.`,
       },
       {
-        clave: 'can_create_users', etiqueta: 'Puede dar de alta usuarios', tipo: 'booleano', porDefecto: false,
+        clave: 'can_create_users', etiqueta: 'Puede dar de alta usuarios', tipo: 'booleano', porDefecto: false, soloAdmin: true,
         ayuda: 'Solo operativos y managers. El administrador ya puede por su rol.',
       },
     ],
@@ -182,10 +185,16 @@ const MENSAJE_SLACK = 'El ID de Slack no es válido: es el ID de miembro, empiez
 // Un valor que ya tiene guardado la persona se acepta aunque ya no esté entre las opciones
 // vivas (una posición desactivada, un manager que dejó de serlo): devolver a Acceso su ficha
 // tal cual nunca puede ser un error.
+//
+// `actor` ({ id, rol }) es quién hizo el cambio en Acceso. Solo un admin de Acceso puede DAR
+// el rol de administrador o el permiso de alta: un gestor que podría hacerlo se ascendería a
+// sí mismo o a quien quisiera. Sin `actor` (o con uno raro) se trata como no admin. Mantener
+// un valor que ya estaba guardado sí pasa: Acceso reenvía la ficha entera al cambiar un nombre.
 export function validarPut(cuerpo: unknown, ctx: ContextoPut): ResultadoPut {
   if (!esObjeto(cuerpo)) return { ok: false, errores: { cuerpo: 'El cuerpo tiene que ser un objeto JSON.' } }
   const errores: Errores = {}
   const actual = ctx.actual?.datos ?? null
+  const actorEsAdmin = esObjeto(cuerpo.actor) && cuerpo.actor.rol === 'admin'
 
   const email = typeof cuerpo.email === 'string' ? cuerpo.email.trim() : ''
   if (!EMAIL.test(email)) errores.email = 'El correo no es válido.'
@@ -259,6 +268,17 @@ export function validarPut(cuerpo: unknown, ctx: ContextoPut): ResultadoPut {
     if (typeof v === 'boolean') can_create_users = v
     else if (v === null) can_create_users = false
     else errores.can_create_users = 'Tiene que ser sí o no.'
+  }
+
+  // Solo un admin de Acceso da privilegios (ver arriba). Se compara lo que quedaría guardado
+  // con lo que ya hay: si no cambia, pasa.
+  if (!actorEsAdmin) {
+    if (!errores.role && role === 'admin' && actual?.role !== 'admin') {
+      errores.role = 'Solo un administrador de Acceso puede dar el rol de administrador.'
+    }
+    if (!errores.can_create_users && can_create_users && actual?.can_create_users !== true) {
+      errores.can_create_users = 'Solo un administrador de Acceso puede dar el permiso de alta de usuarios.'
+    }
   }
 
   if (Object.keys(errores).length) return { ok: false, errores }

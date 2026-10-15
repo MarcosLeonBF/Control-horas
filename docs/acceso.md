@@ -56,6 +56,7 @@ Contrato en `docs/integrar-una-app.md` del repo de Acceso. Todas las rutas piden
 Como en `/admin/usuarios`, el rol admin apaga `can_create_users` y `registro_dias_atras`.
 
 - `PUT` crea la ficha si no existe: usuario de Supabase con `id` = `sub`, correo confirmado y contraseña aleatoria; el trigger crea el perfil y se completa. Una clave que no viene en `datos` conserva su valor (un PUT que solo cambia el nombre no borra nada); con `null` o `""` se vacía. Un valor que ya tenía guardado se acepta aunque ya no esté entre las opciones vivas.
+- **Privilegios.** El `PUT` trae `actor: { id, rol }`, quién hizo el cambio en Acceso. Solo con `rol: "admin"` se puede pasar a alguien al rol admin o darle `can_create_users`; si no, 422 en ese campo. Reenviar lo que ya tenía guardado pasa (Acceso reenvía la ficha entera al cambiar un nombre) y quitar privilegios también. Sin `actor` cuenta como no admin. El esquema marca la opción admin de `role` y el campo `can_create_users` con `soloAdmin: true` para que Acceso no se los ofrezca a un gestor.
 - `activo: false` (en `PUT`) y `baja` dejan el perfil inactivo y banean el usuario de Supabase, que ya no puede renovar su sesión. `activo: true` levanta el baneo. Por eso **las reactivaciones se hacen desde Acceso**: activar a alguien en `/admin/usuarios` no le quita el baneo.
 
 ## Paso a producción (con el usuario delante)
@@ -64,7 +65,10 @@ Como en `/admin/usuarios`, el rol admin apaga `can_create_users` y `registro_dia
 2. En el repo de Acceso, `npm run migrar:controlhoras -- --simular`, revisar, y `npm run migrar:controlhoras`. Comprobar que alguien migrado entra en Acceso con su contraseña de siempre.
 3. Poner las variables de entorno en Vercel (Production) y desplegar.
 4. Probar: entrar y salir; entrar con un enlace profundo (p. ej. un registro) y volver a él; `/perfil` y `/admin/usuarios` enlazan a Acceso; desde Acceso, alta de una persona de prueba, edición de su ficha y baja (la sesión abierta se corta en la siguiente página).
-5. Solo entonces, ejecutar `supabase/manual/anular-contrasenas.sql` en el SQL Editor (lee su cabecera antes).
+5. Solo entonces, cerrar las puertas traseras de Supabase, que permitirían entrar sin pasar por Acceso:
+   - En Supabase → Authentication, desactivar el alta pública ("Allow new users to sign up"). Las altas de la app y de los E2E usan la API de administración y no dependen de esto.
+   - Impedir los correos de recuperación de contraseña: con ellos cualquiera podría ponerse una contraseña nueva. Supabase no tiene un interruptor solo para eso; por ejemplo, un Send Email Hook que descarte los de tipo `recovery`. Comprobar después que pedirlo desde la API no llega a ningún buzón. **No** desactivar el proveedor Email entero: la entrada por Acceso canjea un token de tipo email (`verifyOtp`).
+   - Ejecutar `supabase/manual/anular-contrasenas.sql` en el SQL Editor (lee su cabecera antes).
 
 ## Vuelta atrás
 
@@ -74,4 +78,4 @@ Quitar `ACCESO_ISSUER` en Vercel y desplegar: vuelve el login con contraseña. S
 
 - **Límite de Supabase en `/verify`.** Cada entrada hace un `verifyOtp` desde el servidor, y Supabase limita las verificaciones por IP. Si muchas personas entran a la vez puede saltar; se sube en Supabase → Authentication → Rate Limits.
 - **Desarrollo local.** El servidor local y los E2E usan la misma base que producción. Sin `ACCESO_ISSUER` en `.env.local` el login local sigue siendo con contraseña, y tras anular las contraseñas solo entran los usuarios que crean los E2E.
-- **Tokens ya emitidos.** Tras una baja, las páginas cortan al momento, pero un access token de Supabase ya emitido sigue valiendo contra la API de Supabase hasta que caduca (1 h por defecto); RLS no mira `status`.
+- **Limitación conocida: tokens ya emitidos.** Tras una baja, las páginas cortan el acceso al momento (los layouts de Horas y HUCHA comprueban `status` en cada petición), pero un access token de Supabase ya emitido sigue valiendo contra la API de Supabase hasta que caduca (alrededor de 1 h, el valor por defecto). RLS no mira `status`, y la API de administración no permite cerrar las sesiones de otra persona; el baneo impide que se renueve.
