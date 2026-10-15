@@ -60,7 +60,9 @@ function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '·'
 }
 
-export default function AppShell({ displayName, role, canCreateUsers = false, children }: { displayName: string; role: string; canCreateUsers?: boolean; children: React.ReactNode }) {
+// urlSalidaHub: cierre de sesión de Acceso (lib/hub/config.ts), que lo calcula el layout en el
+// servidor. null sin Acceso: "Salir" vuelve al login de la app, como siempre.
+export default function AppShell({ displayName, role, canCreateUsers = false, urlSalidaHub = null, children }: { displayName: string; role: string; canCreateUsers?: boolean; urlSalidaHub?: string | null; children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
@@ -76,6 +78,12 @@ export default function AppShell({ displayName, role, canCreateUsers = false, ch
 
   async function logout() {
     await createClient().auth.signOut()
+    // Con Acceso hay que salir también de Acceso: si no, el login mandaría a Acceso, que aún
+    // tiene la sesión abierta, y volvería a dejar a la persona dentro sin pedirle nada.
+    if (urlSalidaHub) {
+      window.location.assign(urlSalidaHub)
+      return
+    }
     router.push('/login')
     router.refresh()
   }

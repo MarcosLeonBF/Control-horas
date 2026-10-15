@@ -2,11 +2,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient as createRawClient } from '@supabase/supabase-js'
+import { hubActivo } from '@/lib/hub/config'
 
 export async function cambiarContrasena(
   currentPassword: string,
   newPassword: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Con Acceso la contraseña de Supabase ya no sirve para entrar (y al pasar a producción se
+  // anula): cambiarla aquí no haría nada útil. La acción es una puerta pública, así que se
+  // cierra aquí también y no solo ocultando el formulario.
+  if (hubActivo()) return { ok: false, error: 'La contraseña se cambia en Acceso.' }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'No autenticado.' }
