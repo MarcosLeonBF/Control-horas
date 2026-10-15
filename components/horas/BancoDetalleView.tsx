@@ -262,11 +262,11 @@ export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDet
           {hayCierre && <LeyendaCierre />}
         </div>
         {mesUnico ? (
-          <ComoSeLee>Disponible real = asignado − consumido − inutilizables. En los meses cerrados, lo que sobra se reparte: 75% inutilizables y 25% libres, que pasan como carry forward. El asignado puede ser provisional (estimado) si el mes aún no está cargado. Las horas ampliadas se suman a su posición y no sufren el corte: siguen disponibles hasta que se consumen.</ComoSeLee>
+          <ComoSeLee>Disponible real = asignado − consumido − inutilizables. En los meses cerrados, lo que sobra se reparte: 75% inutilizables y 25% libres, que pasan como carry forward. El asignado puede ser provisional (estimado) si el mes aún no está cargado. Las horas ampliadas no se pierden al cerrar el mes.</ComoSeLee>
         ) : esMensual ? (
-          <ComoSeLee>Cada mes muestra gastado (consumido + inutilizables) / asignado: la diferencia es lo disponible — en meses cerrados, las horas libres del carry, como reparte su barra. El asignado puede ser provisional (estimado) en los meses aún no cargados. Las horas ampliadas se suman a su posición y no sufren el corte: siguen disponibles hasta que se consumen.</ComoSeLee>
+          <ComoSeLee>Cada mes muestra gastado (consumido + inutilizables) / asignado: la diferencia es lo disponible — en meses cerrados, las horas libres del carry, como reparte su barra. El asignado puede ser provisional (estimado) en los meses aún no cargados. Las horas ampliadas no se pierden al cerrar el mes.</ComoSeLee>
         ) : hayCierre ? (
-          <ComoSeLee>Desplegá una posición para ver su cierre mes a mes: consumido, inutilizables (75% del sobrante) y libres (25%, arrastran como carry forward). El mes en curso aún no sufre el corte. Las horas ampliadas se suman a su posición y no sufren el corte: siguen disponibles hasta que se consumen.</ComoSeLee>
+          <ComoSeLee>Desplegá una posición para ver su cierre mes a mes: consumido, inutilizables (75% del sobrante) y libres (25%, arrastran como carry forward). El mes en curso aún no sufre el corte. Las horas ampliadas no se pierden al cerrar el mes.</ComoSeLee>
         ) : (
           <div className="mb-4" />
         )}

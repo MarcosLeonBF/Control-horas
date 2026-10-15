@@ -54,10 +54,7 @@ export default function AmpliarHorasDialog({ project, posicionesProyecto, posici
         <form onSubmit={onSubmit} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>Ampliar horas</DialogTitle>
-            <DialogDescription>
-              {project}. Las horas se suman a la posición elegida, en el mes de la fecha, y no entran en el corte
-              75/25: siguen disponibles hasta que se consumen.
-            </DialogDescription>
+            <DialogDescription>{project}. Estas horas no se pierden al cerrar el mes.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5 sm:col-span-2">
