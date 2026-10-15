@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import type { BancoHorasRow, BancoMensual } from '@/lib/horas/bancos-status'
-import { currentMonth, formatHoras, mesCorto } from '@/lib/horas/format'
+import { formatHoras, mesCorto } from '@/lib/horas/format'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 
@@ -48,9 +48,11 @@ const sw = (className: string, style?: CSSProperties) => (
 )
 
 // Panel del tooltip: la distribución de una barra, fila por fila, con total asignado.
-function Desglose({ titulo, provisional, consumido, inutilizables, libres, restante, exceso, asignado }: {
+// `ampliado` es la parte del asignado que viene de ampliaciones (spec 2026-10-15): no
+// sufre el corte, así que en un mes cerrado lo ampliado sin usar sigue como restante.
+function Desglose({ titulo, provisional, consumido, inutilizables, libres, restante, exceso, asignado, ampliado = 0 }: {
   titulo: string; provisional?: boolean
-  consumido: number; inutilizables: number; libres: number; restante: number; exceso: number; asignado: number
+  consumido: number; inutilizables: number; libres: number; restante: number; exceso: number; asignado: number; ampliado?: number
 }) {
   return (
     <div className="min-w-44">
@@ -69,6 +71,12 @@ function Desglose({ titulo, provisional, consumido, inutilizables, libres, resta
         <span className="text-background/70">Asignado</span>
         <span className="tabular-money font-medium">{formatHoras(asignado)}</span>
       </p>
+      {ampliado > 0 && (
+        <p className="mt-1 flex items-center justify-between gap-6 text-background/70">
+          <span>de ellas, ampliadas</span>
+          <span className="tabular-money">+{formatHoras(ampliado)}</span>
+        </p>
+      )}
     </div>
   )
 }
@@ -81,16 +89,17 @@ export function LeyendaCierre() {
       <Swatch className="bg-(--brand)" label="Consumido" />
       <Swatch className="bg-foreground/10" style={HATCH} label="Inutilizables" />
       <Swatch className="bg-(--status-disponible)" label="Libres (carry)" />
-      <Swatch className="bg-(--muted-surface) ring-1 ring-inset ring-border" label="Restante (mes en curso)" />
+      <Swatch className="bg-(--muted-surface) ring-1 ring-inset ring-border" label="Restante (mes en curso y ampliadas)" />
     </div>
   )
 }
 
 // La barra segmentada de un mes: composición sobre el asignado del mes (orden fijo:
-// consumido → inutilizables → libres; el tramo vacío del track es el restante del
-// mes en curso). El detalle completo va en el title. Exportada: la matriz de la
+// consumido → inutilizables → libres; el tramo vacío del track es el restante: el del
+// mes en curso y, en meses cerrados, lo ampliado sin usar, que no caduca). El detalle
+// completo va en el title. Exportada: la matriz de la
 // vista Mensual la usa como micro-barra por celda.
-export function BarraMes({ m, enCurso, className }: { m: BancoMensual; enCurso: boolean; className?: string }) {
+export function BarraMes({ m, className }: { m: BancoMensual; className?: string }) {
   const partes: { pct: number; className?: string; style?: CSSProperties }[] = []
   if (m.assigned > 0) {
     const pct = (h: number) => (h / m.assigned) * 100
@@ -115,9 +124,10 @@ export function BarraMes({ m, enCurso, className }: { m: BancoMensual; enCurso: 
             consumido={m.consumed}
             inutilizables={m.inutilizables ?? 0}
             libres={m.libres ?? 0}
-            restante={enCurso ? Math.max(m.assigned - m.consumed, 0) : 0}
+            restante={Math.max(m.assigned - m.consumed - (m.inutilizables ?? 0) - (m.libres ?? 0), 0)}
             exceso={Math.max(m.consumed - m.assigned, 0)}
             asignado={m.assigned}
+            ampliado={m.ampliado ?? 0}
           />
         </TooltipContent>
       </Tooltip>
@@ -130,7 +140,7 @@ export function BarraMes({ m, enCurso, className }: { m: BancoMensual; enCurso: 
 // disponible (en meses cerrados, las libres del carry) — decisión Marcos 2026-07-14,
 // "lo restante y lo disponible son lo mismo". En el mes en curso inutilizables = 0,
 // así que queda consumido/asignado; el excedido va en rojo.
-function MesBar({ m, enCurso }: { m: BancoMensual; enCurso: boolean }) {
+function MesBar({ m }: { m: BancoMensual }) {
   const excedido = m.consumed > m.assigned
   const gastado = m.consumed + (m.inutilizables ?? 0)
   return (
@@ -139,7 +149,7 @@ function MesBar({ m, enCurso }: { m: BancoMensual; enCurso: boolean }) {
         {mesCorto(m.month)}
         {m.provisional && <span className="rounded-full bg-(--brand)/10 px-1 py-px text-[0.55rem] font-medium text-(--brand)">prov</span>}
       </span>
-      <BarraMes m={m} enCurso={enCurso} className="flex-1" />
+      <BarraMes m={m} className="flex-1" />
       <span className="w-24 shrink-0 text-right text-xs tabular-money whitespace-nowrap">
         <span className={cn('font-medium', excedido && 'text-(--status-excedido)')}>{formatHoras(gastado)}</span>
         <span className="text-muted-foreground"> / {formatHoras(m.assigned)}</span>
@@ -190,6 +200,7 @@ export function BarraComposicion({ posicion, className }: { posicion: BancoHoras
             restante={Math.max(asignado - consumido - inutil - libres, 0)}
             exceso={posicion.consumed - consumido}
             asignado={asignado}
+            ampliado={posicion.ampliado}
           />
         </TooltipContent>
       </Tooltip>
@@ -200,7 +211,6 @@ export function BarraComposicion({ posicion, className }: { posicion: BancoHoras
 // Panel desplegado de una posición dentro de la tabla "Por posición": resumen del
 // carry acumulado + una barrita por mes (el 16/16 de la spec).
 export function CierrePosicionPanel({ posicion }: { posicion: BancoHorasRow }) {
-  const cm = currentMonth()
   const meses = posicion.monthly.filter((m) => m.assigned > 0 || m.consumed > 0)
   if (meses.length === 0) return null
   return (
@@ -213,7 +223,7 @@ export function CierrePosicionPanel({ posicion }: { posicion: BancoHorasRow }) {
       </p>
       <ul className="space-y-2">
         {meses.map((m) => (
-          <MesBar key={m.month} m={m} enCurso={m.month >= cm} />
+          <MesBar key={m.month} m={m} />
         ))}
       </ul>
     </div>

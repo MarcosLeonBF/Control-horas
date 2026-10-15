@@ -33,7 +33,7 @@ async function loadPositionContext(scope: BancosScope, estricto = false) {
     { data: posAreas, error: errPosAreas },
     { data: profiles, error: errProfiles },
   ] = await Promise.all([
-    db.from('positions').select('id, name'),
+    db.from('positions').select('id, name, active'),
     db.from('position_areas').select('position_id, area_id'),
     db.from('profiles').select('id, position_id, full_name'),
   ])
@@ -47,7 +47,11 @@ async function loadPositionContext(scope: BancosScope, estricto = false) {
   }
 
   const posNameById = new Map<string, string>()
-  for (const p of (positions ?? []) as { id: string; name: string }[]) posNameById.set(p.id, p.name)
+  const activas = new Set<string>()
+  for (const p of (positions ?? []) as { id: string; name: string; active: boolean }[]) {
+    posNameById.set(p.id, p.name)
+    if (p.active) activas.add(p.name)
+  }
 
   // Posiciones visibles: admin → todas; manager → las de sus áreas.
   let allowed: Set<string> | null = null
@@ -72,10 +76,82 @@ async function loadPositionContext(scope: BancosScope, estricto = false) {
     if (pr.full_name) userName.set(pr.id, pr.full_name)
   }
 
-  return { allowed, userPosition, userName }
+  // Catálogo dentro del alcance: dónde puede ampliar quien mira (spec 2026-10-15). Solo
+  // las posiciones activas, como exige ampliar_horas (0062).
+  const catalogo = [...activas].filter((n) => visible(allowed, n)).sort((a, b) => a.localeCompare(b))
+
+  return { allowed, userPosition, userName, catalogo }
 }
 
 const visible = (allowed: Set<string> | null, position: string) => allowed === null || allowed.has(position)
+
+// Posiciones del catálogo en las que `scope` puede ampliar. Estricto: la acción de ampliar
+// no puede tomar una lectura fallida por "ninguna posición" ni por "todas".
+export async function posicionesDelAlcance(scope: BancosScope): Promise<string[]> {
+  return (await loadPositionContext(scope, true)).catalogo
+}
+
+// Ampliación activa tal como la usa el cálculo: horas por mes de su fecha.
+type AmpliacionFila = { project: string; position: string; hours: number; entry_date: string }
+
+// mes → horas, acumulando.
+function sumaMes(porMes: Map<string, number>, month: string, hours: number) {
+  porMes.set(month, (porMes.get(month) ?? 0) + hours)
+}
+
+// Cifras de una posición de un proyecto. Una sola receta para la lista y el detalle:
+//   - asignado = Excel + provisional + ampliado;
+//   - monthly: Excel real y provisional (disjuntos por mes) + ampliado + consumo;
+//   - carry forward (spec 2026-07-14): corte 75/25 de meses cerrados, que deja fuera lo
+//     ampliado (spec 2026-10-15); el disponible real y el estado descuentan los
+//     inutilizables, y cada mes anota su desglose.
+function armarPosicion(
+  excelTotal: number,
+  excelPorMes: { month: string; hours: number }[],
+  prov: BancoMensual[],
+  ampliadoPorMes: Map<string, number> | undefined,
+  consumoPorMes: Map<string, number> | undefined,
+) {
+  const byMonth = new Map<string, BancoMensual>()
+  for (const m of excelPorMes) if (m.hours !== 0) byMonth.set(m.month, { month: m.month, assigned: m.hours, consumed: 0 })
+  for (const pm of prov) byMonth.set(pm.month, { ...pm })
+  const mes = (month: string) => {
+    let m = byMonth.get(month)
+    if (!m) { m = { month, assigned: 0, consumed: 0 }; byMonth.set(month, m) }
+    return m
+  }
+  let ampliado = 0
+  for (const [month, h] of ampliadoPorMes ?? []) {
+    const m = mes(month)
+    m.assigned += h
+    m.ampliado = (m.ampliado ?? 0) + h
+    ampliado += h
+  }
+  let consumed = 0
+  for (const [month, h] of consumoPorMes ?? []) {
+    mes(month).consumed += h
+    consumed += h
+  }
+  const monthly = [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
+
+  const carry = carrySplit(monthly, currentMonth())
+  for (const cm of carry.porMes) {
+    const m = byMonth.get(cm.month)
+    if (m && (cm.libres > 0 || cm.inutilizables > 0)) { m.libres = cm.libres; m.inutilizables = cm.inutilizables }
+  }
+
+  // El asignado incluye las horas provisionales (transitorio): así un proyecto con
+  // estimado no se ve "excedido" solo porque su fila real aún no está cargada.
+  const assigned = excelTotal + prov.reduce((s, pm) => s + pm.assigned, 0) + ampliado
+  return {
+    assigned, ampliado, consumed,
+    remaining: assigned - consumed - carry.totales.inutilizables,
+    inutilizables: carry.totales.inutilizables,
+    carryNeto: carry.totales.carryNeto,
+    status: computeHorasStatus(assigned - carry.totales.inutilizables, consumed),
+    monthly,
+  }
+}
 
 // `estricto` (lo usan los avisos): /bancos prefiere degradar y enseñar lo que hay cuando
 // falla una lectura, pero un banco calculado con datos a medias no es "incompleto", es
@@ -97,9 +173,10 @@ export async function getBancosHoras(scope: BancosScope, opciones: { estricto?: 
   try { horasProvSetup = await getCachedHorasProvisionalesSetup() } catch (e) { if (estricto) throw e; horasProvSetup = new Map() }
 
   const db = createAdminClient()
-  // Ambas consultas traen la tabla entera y superan (o superarán) las 1.000 filas que
+  // Estas consultas traen la tabla entera y superan (o superarán) las 1.000 filas que
   // devuelve PostgREST por petición: sin paginar, el consumo saldría corto en silencio.
-  const [lines, historicas] = await Promise.all([
+  // `horas_ampliaciones.position` existe desde la 0062: la migración va antes que este código.
+  const [lines, historicas, ampliaciones] = await Promise.all([
     fetchAllRows<{ project: string; hours: number; time_logs: { user_id: string; entry_date: string } }>(
       (desde, hasta) =>
         db
@@ -110,6 +187,9 @@ export async function getBancosHoras(scope: BancosScope, opciones: { estricto?: 
     ),
     fetchAllRows<HistoricaRow>((desde, hasta) =>
       db.from('horas_historicas').select('project, month, hours, user_id').range(desde, hasta),
+    ),
+    fetchAllRows<AmpliacionFila>((desde, hasta) =>
+      db.from('horas_ampliaciones').select('project, position, hours, entry_date').eq('active', true).range(desde, hasta),
     ),
   ])
 
@@ -127,8 +207,7 @@ export async function getBancosHoras(scope: BancosScope, opciones: { estricto?: 
     /* sin metadatos: banco solo con lo real */
   }
 
-  // Consumo por (proyecto, posición): total, por mes, y posiciones con consumo por proyecto.
-  const consumed = new Map<string, number>()
+  // Consumo por (proyecto, posición) y por mes, y posiciones con consumo por proyecto.
   const consumedMes = new Map<string, Map<string, number>>()
   const posConsumoPorProyecto = new Map<string, Set<string>>()
   // Misma acumulación para las dos fuentes (plataforma e histórico).
@@ -138,13 +217,26 @@ export async function getBancosHoras(scope: BancosScope, opciones: { estricto?: 
     const position = userPosition.get(userId)
     if (!position) return // usuario sin posición: no se atribuye
     const k = key(project, position)
-    consumed.set(k, (consumed.get(k) ?? 0) + hours)
     let porMes = consumedMes.get(k)
     if (!porMes) { porMes = new Map(); consumedMes.set(k, porMes) }
-    porMes.set(month, (porMes.get(month) ?? 0) + hours)
+    sumaMes(porMes, month, hours)
     let ps = posConsumoPorProyecto.get(project)
     if (!ps) { ps = new Set(); posConsumoPorProyecto.set(project, ps) }
     ps.add(position)
+  }
+
+  // Ampliaciones activas por (proyecto, posición) y por mes de su fecha.
+  const ampliadoMes = new Map<string, Map<string, number>>()
+  const posAmpliadaPorProyecto = new Map<string, Set<string>>()
+  for (const a of ampliaciones) {
+    const project = a.project.trim()
+    const k = key(project, a.position)
+    let porMes = ampliadoMes.get(k)
+    if (!porMes) { porMes = new Map(); ampliadoMes.set(k, porMes) }
+    sumaMes(porMes, String(a.entry_date).slice(0, 7), Number(a.hours))
+    let ps = posAmpliadaPorProyecto.get(project)
+    if (!ps) { ps = new Set(); posAmpliadaPorProyecto.set(project, ps) }
+    ps.add(a.position)
   }
 
   for (const l of lines) {
@@ -162,8 +254,10 @@ export async function getBancosHoras(scope: BancosScope, opciones: { estricto?: 
   // Ventana provisional (global).
   const ventana = mesesVentana(ultimoRegistroGlobal(excel), currentMonth())
 
-  // Conjunto de proyectos = registro maestro ∪ los que tengan Excel o consumo. Sin "Departamento".
-  const projectNames = new Set<string>([...metaByProject.keys(), ...excelByProject.keys(), ...posConsumoPorProyecto.keys()])
+  // Conjunto de proyectos = registro maestro ∪ los que tengan Excel, consumo o ampliaciones. Sin "Departamento".
+  const projectNames = new Set<string>([
+    ...metaByProject.keys(), ...excelByProject.keys(), ...posConsumoPorProyecto.keys(), ...posAmpliadaPorProyecto.keys(),
+  ])
   projectNames.delete('Departamento')
 
   const rows: BancoHorasRow[] = []
@@ -183,54 +277,29 @@ export async function getBancosHoras(scope: BancosScope, opciones: { estricto?: 
         )
       : new Map<string, BancoMensual[]>()
 
-    // Posiciones del proyecto = Excel ∪ consumo ∪ provisional.
+    // Posiciones del proyecto = Excel ∪ consumo ∪ provisional ∪ ampliaciones.
     const positions = new Set<string>([
       ...(proj?.positions ?? []).map((p) => p.position),
       ...(posConsumoPorProyecto.get(project) ?? []),
       ...provByPos.keys(),
+      ...(posAmpliadaPorProyecto.get(project) ?? []),
     ])
     const excelByPos = new Map((proj?.positions ?? []).map((p) => [p.position, Number(p.hours)]))
 
     for (const position of positions) {
       if (!visible(allowed, position)) continue
       const k = key(project, position)
-      const cons = consumed.get(k) ?? 0
-      const prov = provByPos.get(position) ?? []
-      const provTotal = prov.reduce((s, pm) => s + pm.assigned, 0)
-      // El asignado incluye las horas provisionales (transitorio): así un proyecto con
-      // estimado no se ve "excedido" solo porque su fila real aún no está cargada.
-      const assigned = (excelByPos.get(position) ?? 0) + provTotal
-      if (assigned === 0 && cons === 0) continue // nada que mostrar
-
-      // monthly: Excel real + provisional (disjuntos por mes) + consumo (merge).
-      const byMonth = new Map<string, BancoMensual>()
-      for (const m of proj?.months ?? []) {
-        const h = m.positions.find((p) => p.position === position)?.hours ?? 0
-        if (h !== 0) byMonth.set(m.month, { month: m.month, assigned: h, consumed: 0 })
-      }
-      for (const pm of prov) byMonth.set(pm.month, { ...pm })
-      for (const [month, h] of consumedMes.get(k) ?? []) {
-        const acc = byMonth.get(month) ?? { month, assigned: 0, consumed: 0 }
-        acc.consumed += h
-        byMonth.set(month, acc)
-      }
-      const monthly = [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
-
-      // Carry forward (spec 2026-07-14): corte 75/25 de meses cerrados; el disponible
-      // real y el status descuentan los inutilizables. Anota el desglose en cada mes.
-      const carry = carrySplit(monthly, currentMonth())
-      for (const cm of carry.porMes) {
-        const m = byMonth.get(cm.month)
-        if (m && (cm.libres > 0 || cm.inutilizables > 0)) { m.libres = cm.libres; m.inutilizables = cm.inutilizables }
-      }
+      const cifras = armarPosicion(
+        excelByPos.get(position) ?? 0,
+        (proj?.months ?? []).map((m) => ({ month: m.month, hours: m.positions.find((p) => p.position === position)?.hours ?? 0 })),
+        provByPos.get(position) ?? [],
+        ampliadoMes.get(k),
+        consumedMes.get(k),
+      )
+      if (cifras.assigned === 0 && cifras.consumed === 0) continue // nada que mostrar
 
       rows.push({
-        project, position, assigned, consumed: cons,
-        remaining: assigned - cons - carry.totales.inutilizables,
-        inutilizables: carry.totales.inutilizables,
-        carryNeto: carry.totales.carryNeto,
-        status: computeHorasStatus(assigned - carry.totales.inutilizables, cons),
-        monthly,
+        project, position, ...cifras,
         projectEstado: meta?.estado,
         manager: meta?.manager,
         fechaAuditoria: meta?.fechaAuditoria,
@@ -287,13 +356,13 @@ export async function getBancoHorasDetalle(
       .neq('time_logs.status', 'anulado'),
     db
       .from('horas_ampliaciones')
-      .select('id, project, hours, reason, entry_date, actor_name, active')
+      .select('id, project, position, hours, reason, entry_date, actor_name, created_by, active')
       .eq('project', name)
       .order('entry_date', { ascending: false }),
     db.from('horas_historicas').select('project, month, hours, user_id').eq('project', name),
   ])
 
-  const { allowed, userPosition, userName } = await loadPositionContext(scope)
+  const { allowed, userPosition, userName, catalogo } = await loadPositionContext(scope)
 
   type RawLine = {
     hours: number; description: string | null
@@ -304,16 +373,14 @@ export async function getBancoHorasDetalle(
   // Las líneas de plataforma anteriores al corte las cubre el histórico (no se cuentan dos veces).
   const lineasPlataforma = rawLines.filter((l) => l.time_logs.entry_date.slice(0, 7) > MES_CORTE_HISTORICO)
 
-  // Consumido por posición (solo las visibles).
-  const consumedByPos = new Map<string, number>()
+  // Consumido por posición y mes (solo las visibles).
   const consumedByPosMes = new Map<string, Map<string, number>>() // posición → mes → horas
   const acumulaPos = (userId: string, month: string, hours: number) => {
     const position = userPosition.get(userId)
     if (!position || !visible(allowed, position)) return
-    consumedByPos.set(position, (consumedByPos.get(position) ?? 0) + hours)
     let porMes = consumedByPosMes.get(position)
     if (!porMes) { porMes = new Map(); consumedByPosMes.set(position, porMes) }
-    porMes.set(month, (porMes.get(month) ?? 0) + hours)
+    sumaMes(porMes, month, hours)
   }
   for (const l of lineasPlataforma) {
     acumulaPos(l.time_logs.user_id, l.time_logs.entry_date.slice(0, 7), Number(l.hours))
@@ -322,62 +389,52 @@ export async function getBancoHorasDetalle(
     acumulaPos(h.user_id, h.month, Number(h.hours))
   }
 
-  // Desglose por posición: une columnas del Excel visibles + consumos.
+  // Ampliaciones de las posiciones visibles (el manager no ve las de otras áreas) y, de las
+  // activas, cuánto suma cada posición por mes.
+  const ampliaciones = ((amps ?? []) as AmpliacionHoras[]).filter((a) => visible(allowed, a.position))
+  const ampliadoByPosMes = new Map<string, Map<string, number>>() // posición → mes → horas
+  for (const a of ampliaciones) {
+    if (!a.active) continue
+    let porMes = ampliadoByPosMes.get(a.position)
+    if (!porMes) { porMes = new Map(); ampliadoByPosMes.set(a.position, porMes) }
+    sumaMes(porMes, a.entry_date.slice(0, 7), Number(a.hours))
+  }
+
+  // Desglose por posición: columnas del Excel visibles + consumos + provisionales + ampliaciones.
   const posNames = new Set<string>()
   for (const p of posicionesExcel) if (visible(allowed, p.position)) posNames.add(p.position)
-  for (const p of consumedByPos.keys()) posNames.add(p)
+  for (const p of consumedByPosMes.keys()) posNames.add(p)
   for (const p of provByPos.keys()) if (visible(allowed, p)) posNames.add(p)
+  for (const p of ampliadoByPosMes.keys()) posNames.add(p)
 
   const excelByPos = new Map(posicionesExcel.map((p) => [p.position, Number(p.hours)]))
   // Con asignación/actividad primero, "Sin asignación" al fondo (por severidad), luego nombre.
   const posiciones: BancoHorasRow[] = [...posNames]
-    .map((position) => {
-      // El asignado incluye las provisionales (transitorio), como en la lista.
-      const provTotal = (provByPos.get(position) ?? []).reduce((s, pm) => s + pm.assigned, 0)
-      const assigned = (excelByPos.get(position) ?? 0) + provTotal
-      const consumed = consumedByPos.get(position) ?? 0
-      const byMonth = new Map<string, BancoMensual>()
-      for (const m of mesesExcel) {
-        const h = m.positions.find((p) => p.position === position)?.hours ?? 0
-        if (h !== 0) byMonth.set(m.month, { month: m.month, assigned: h, consumed: 0 })
-      }
-      for (const pm of provByPos.get(position) ?? []) byMonth.set(pm.month, { ...pm })
-      for (const [month, h] of consumedByPosMes.get(position) ?? []) {
-        const acc = byMonth.get(month) ?? { month, assigned: 0, consumed: 0 }
-        acc.consumed += h
-        byMonth.set(month, acc)
-      }
-      const monthly = [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
-      const carry = carrySplit(monthly, currentMonth())
-      for (const cm of carry.porMes) {
-        const m = byMonth.get(cm.month)
-        if (m && (cm.libres > 0 || cm.inutilizables > 0)) { m.libres = cm.libres; m.inutilizables = cm.inutilizables }
-      }
-      return {
-        project: name, position, assigned, consumed,
-        remaining: assigned - consumed - carry.totales.inutilizables,
-        inutilizables: carry.totales.inutilizables,
-        carryNeto: carry.totales.carryNeto,
-        status: computeHorasStatus(assigned - carry.totales.inutilizables, consumed),
-        monthly,
-      }
-    })
+    .map((position) => ({
+      project: name, position,
+      ...armarPosicion(
+        excelByPos.get(position) ?? 0,
+        mesesExcel.map((m) => ({ month: m.month, hours: m.positions.find((p) => p.position === position)?.hours ?? 0 })),
+        provByPos.get(position) ?? [],
+        ampliadoByPosMes.get(position),
+        consumedByPosMes.get(position),
+      ),
+    }))
     .sort((a, b) => HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status] || a.position.localeCompare(b.position))
 
   const inScope = scope.role === 'admin' || posiciones.length > 0
 
-  // excelBase = solo real (Excel); provBase = provisional (transitorio); ambos suman al total.
+  // Todo sale de las posiciones: excelBase = solo real (Excel); provBase = provisional
+  // (transitorio); ampliado = ampliaciones activas. Los tres suman al total.
   const excelBase = posiciones.reduce((s, p) => s + (excelByPos.get(p.position) ?? 0), 0)
-  const asignadoPosiciones = posiciones.reduce((s, p) => s + p.assigned, 0) // real + provisional
-  const provBase = asignadoPosiciones - excelBase
+  const assigned = posiciones.reduce((s, p) => s + p.assigned, 0)
+  const ampliado = posiciones.reduce((s, p) => s + p.ampliado, 0)
+  const provBase = assigned - excelBase - ampliado
   const consumed = posiciones.reduce((s, p) => s + p.consumed, 0)
   const inutilizables = posiciones.reduce((s, p) => s + p.inutilizables, 0)
   const carryNeto = posiciones.reduce((s, p) => s + p.carryNeto, 0)
-  const ampliaciones = (amps ?? []) as AmpliacionHoras[]
-  const ampActiveSum = ampliaciones.filter((a) => a.active).reduce((s, a) => s + Number(a.hours), 0)
-  const assigned = asignadoPosiciones + ampActiveSum
 
-  // Cifras del proyecto por mes: Excel visible + ampliaciones del mes (spec §4.3).
+  // Cifras del proyecto por mes: Excel/provisional visible + ampliaciones del mes.
   const detalleByMonth = new Map<string, BancoDetalleMensual>()
   const monthEntry = (month: string) => {
     let e = detalleByMonth.get(month)
@@ -387,16 +444,14 @@ export async function getBancoHorasDetalle(
   for (const p of posiciones) {
     for (const m of p.monthly) {
       const e = monthEntry(m.month)
+      const amp = m.ampliado ?? 0
       e.consumed += m.consumed
       e.inutilizables += m.inutilizables ?? 0
       e.libres += m.libres ?? 0
-      if (m.provisional) e.provisional += m.assigned
-      else e.excelAssigned += m.assigned
+      e.ampliado += amp
+      if (m.provisional) e.provisional += m.assigned - amp
+      else e.excelAssigned += m.assigned - amp
     }
-  }
-  for (const a of ampliaciones) {
-    if (!a.active) continue
-    monthEntry(a.entry_date.slice(0, 7)).ampliado += Number(a.hours)
   }
   const monthly = [...detalleByMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
 
@@ -423,6 +478,7 @@ export async function getBancoHorasDetalle(
     excelBase,
     provisional: provBase,
     ampliaciones,
+    posicionesAlcance: catalogo,
     movimientos: buildMovimientos(
       excelBase,
       consumosVisibles,

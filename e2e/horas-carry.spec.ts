@@ -65,6 +65,30 @@ test('los excesos nunca dejan el carry negativo', () => {
   expect(totales.carryNeto).toBe(0)
 })
 
+// Ampliaciones por posición (spec 2026-10-15): lo ampliado va dentro de `assigned` pero no
+// entra en el corte. Ejemplo de la spec: 16 Excel + 10 ampliadas, 12 consumidas.
+test('lo ampliado no sufre el corte: 16 Excel + 10 ampliadas, 12 consumidas → 1 libre, 3 inútiles', () => {
+  const { porMes, totales } = carrySplit([{ month: '2026-09', assigned: 26, ampliado: 10, consumed: 12 }], '2026-10')
+  expect(porMes[0].libres).toBeCloseTo(1)
+  expect(porMes[0].inutilizables).toBeCloseTo(3)
+  expect(porMes[0].exceso).toBe(0)
+  expect(totales.inutilizables).toBeCloseTo(3)
+})
+
+test('el consumo sale primero del Excel: lo que pasa de la base es exceso aunque haya ampliado', () => {
+  // 16 Excel + 10 ampliadas, 20 consumidas: la base se agota (sin sobrante) y 4 son exceso.
+  const { porMes } = carrySplit([{ month: '2026-09', assigned: 26, ampliado: 10, consumed: 20 }], '2026-10')
+  expect(porMes[0].libres).toBe(0)
+  expect(porMes[0].inutilizables).toBe(0)
+  expect(porMes[0].exceso).toBe(4)
+})
+
+test('un mes solo con ampliado no genera libres ni inutilizables', () => {
+  const { porMes, totales } = carrySplit([{ month: '2026-09', assigned: 8, ampliado: 8, consumed: 0 }], '2026-10')
+  expect(porMes[0]).toEqual({ month: '2026-09', libres: 0, inutilizables: 0, exceso: 0 })
+  expect(totales).toEqual({ inutilizables: 0, carryBruto: 0, carryNeto: 0 })
+})
+
 test('la constante del corte es 25%', () => {
   expect(CARRY_FORWARD_PCT).toBe(0.25)
 })

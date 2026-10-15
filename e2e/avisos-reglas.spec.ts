@@ -183,7 +183,7 @@ test('diaMes: dd-mm sin año', () => {
 // --- capacidad -------------------------------------------------------------
 
 const fila = (p: Partial<BancoHorasRow> & Pick<BancoHorasRow, 'project' | 'position'>): BancoHorasRow => ({
-  assigned: 0, consumed: 0, remaining: 0, inutilizables: 0, carryNeto: 0, status: 'sin_asignacion',
+  assigned: 0, ampliado: 0, consumed: 0, remaining: 0, inutilizables: 0, carryNeto: 0, status: 'sin_asignacion',
   monthly: [], projectEstado: 'Activo', manager: 'Carlos Ruiz', ...p,
 })
 
@@ -199,22 +199,28 @@ test('porcentajeDisponible: lo que falta hasta 100, con un decimal, y null sin b
   expect(porcentajeDisponible(null)).toBeNull()
 })
 
-test('nivelesDeBancos: posición con banco, total con ampliaciones, sin inactivos', () => {
+// Las ampliaciones son de una posición (spec 2026-10-15): vienen dentro de su fila, la
+// mejoran a ella y el total del proyecto las suma.
+test('nivelesDeBancos: ampliaciones por posición, el total las suma, sin inactivos', () => {
   const rows = [
     fila({ project: 'A', position: 'SEO Strategist', assigned: 40, consumed: 33.5, remaining: 6.5, status: 'bajo' }),
-    fila({ project: 'A', position: 'CRM', assigned: 0, consumed: 2, remaining: -2, status: 'excedido' }),
+    fila({ project: 'A', position: 'CRM', assigned: 20, ampliado: 20, consumed: 2, remaining: 18, status: 'disponible' }),
+    fila({ project: 'A', position: 'Paid Media', assigned: 0, consumed: 2, remaining: -2, status: 'excedido' }),
     fila({ project: 'B', position: 'CRM', assigned: 100, consumed: 100, remaining: 0, status: 'consumido' }),
     fila({ project: 'C', position: 'CRM', assigned: 10, consumed: 10, remaining: 0, status: 'consumido', projectEstado: 'Finalizado' }),
   ]
-  const n = nivelesDeBancos(rows, new Map([['A', 20]]))
+  const n = nivelesDeBancos(rows)
   expect(n.map((x) => [x.clave, x.nivel])).toEqual([
     ['banco:A:SEO Strategist', 'bajo'],
-    ['banco:A:*', 'disponible'], // 40 + 20 ampliadas = 60; consumidas 35,5 → quedan 24,5
+    ['banco:A:CRM', 'disponible'], // solo ampliadas: 20, consumidas 2
+    ['banco:A:*', 'disponible'], // 40 + 20 ampliadas = 60; consumidas 37,5 → quedan 22,5
     ['banco:B:CRM', 'consumido'],
     ['banco:B:*', 'consumido'],
   ])
+  const crmA = n.find((x) => x.clave === 'banco:A:CRM')!
+  expect(crmA.horas).toEqual({ asignadas: 20, ampliadas: 20, consumidas: 2, inutilizables: 0, disponibles: 18 })
   const totalA = n.find((x) => x.clave === 'banco:A:*')!
-  expect(totalA.horas).toEqual({ asignadas: 60, ampliadas: 20, consumidas: 35.5, inutilizables: 0, disponibles: 24.5 })
+  expect(totalA.horas).toEqual({ asignadas: 60, ampliadas: 20, consumidas: 37.5, inutilizables: 0, disponibles: 22.5 })
   expect(totalA.alcance).toBe('proyecto')
   expect(totalA.posicion).toBeNull()
   expect(totalA.managerExcel).toBe('Carlos Ruiz')
@@ -254,15 +260,15 @@ test('rankingCapacidad: rankea HUCHA por el presupuesto disponible', () => {
 // sale del Excel (el estado del banco) llega si Graph respondió, y si no, en null. Un hipo
 // de Graph nunca se come el aviso de una ampliación (decisión de Roberto, 2026-09-18).
 test('datosAmpliacionHoras: con el Excel trae el banco; sin él, null pero el aviso sale', () => {
-  const amp = { project: 'P', hours: 20, reason: 'Venta al cliente', entry_date: '2026-09-18' }
+  const amp = { project: 'P', position: 'CRM', hours: 20, reason: 'Venta al cliente', entry_date: '2026-09-18' }
   const actor = { nombre: 'Marta López', email: 'marta@ejemplo.com', equipo: 'RRHH', slack_id: 'U01MARTA001' }
   const total = nivelesDeBancos(
-    [fila({ project: 'P', position: 'CRM', assigned: 100, consumed: 40, remaining: 60, status: 'disponible' })],
-    new Map([['P', 20]]),
+    [fila({ project: 'P', position: 'CRM', assigned: 120, ampliado: 20, consumed: 40, remaining: 80, status: 'disponible' })],
   ).find((n) => n.alcance === 'proyecto')
 
   const con = datosAmpliacionHoras(amp, actor, total, null, 'https://app.test/bancos/P')
   expect(con.horas_ampliacion).toBe(20)
+  expect(con.posicion).toBe('CRM')
   expect(con.horas).toEqual({ asignadas: 120, ampliadas: 20, consumidas: 40, inutilizables: 0, disponibles: 80 })
   expect(con.nivel).toBe('disponible')
   expect(con.porcentaje_consumido).toBe(33.3)
@@ -273,7 +279,7 @@ test('datosAmpliacionHoras: con el Excel trae el banco; sin él, null pero el av
   expect(sin.porcentaje_consumido).toBeNull()
   // Lo que no depende del Excel sigue ahí.
   expect(sin).toMatchObject({
-    proyecto: 'P', horas_ampliacion: 20, motivo: 'Venta al cliente', dia: '2026-09-18', actor,
+    proyecto: 'P', posicion: 'CRM', horas_ampliacion: 20, motivo: 'Venta al cliente', dia: '2026-09-18', actor,
     enlace: 'https://app.test/bancos/P',
   })
 })

@@ -71,8 +71,9 @@ export interface DatosBanco {
 //
 // `horas_ampliacion` son las horas de ESTA ampliación; `horas.ampliadas`, el total
 // ampliado del proyecto, ésta incluida. Van con nombres distintos a propósito.
+// `posicion` (2026-10-15): la posición a la que se sumaron; `horas` sigue siendo el total.
 export interface DatosBancoAmpliacion {
-  proyecto: string; horas_ampliacion: number; motivo: string; dia: string; actor: ActorAviso
+  proyecto: string; posicion: string; horas_ampliacion: number; motivo: string; dia: string; actor: ActorAviso
   horas: HorasAviso | null; nivel: Nivel | null; porcentaje_consumido: number | null
   manager_proyecto: ManagerAviso | null; enlace: string
 }
@@ -144,7 +145,7 @@ export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
     // El caso con el Excel respondiendo, que es el normal. Que `horas`, `nivel` y
     // `manager_proyecto` puedan llegar en null lo cuenta el contrato, no la prueba.
     'banco.ampliacion': {
-      proyecto: 'Proyecto Ejemplo', horas_ampliacion: 20, motivo: 'Ampliación aprobada por el cliente', dia: '2026-09-18',
+      proyecto: 'Proyecto Ejemplo', posicion: 'CRM', horas_ampliacion: 20, motivo: 'Ampliación aprobada por el cliente', dia: '2026-09-18',
       actor: marta,
       horas: { asignadas: 180, ampliadas: 20, consumidas: 120, inutilizables: 0, disponibles: 60 },
       nivel: 'disponible', porcentaje_consumido: 66.7,

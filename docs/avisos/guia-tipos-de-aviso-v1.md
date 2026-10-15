@@ -408,7 +408,7 @@ Qué avisos genera cada cambio:
 | `nivel` | texto | Nivel nuevo |
 | `nivel_anterior` | texto | Nivel que tenía antes |
 | `horas.asignadas` | número | Horas del banco. En el total del proyecto incluye las ampliaciones |
-| `horas.ampliadas` | número | Horas ampliadas. Solo en el total del proyecto; `0` en una posición |
+| `horas.ampliadas` | número | Horas ampliadas. En una posición, las de esa posición; en el total, todas las del proyecto |
 | `horas.consumidas` | número | Horas registradas |
 | `horas.inutilizables` | número | Horas que se perdieron al cerrar meses anteriores (reparto 75/25) |
 | `horas.disponibles` | número | Lo que queda: asignadas − consumidas − inutilizables. Negativo si el banco está `excedido` |

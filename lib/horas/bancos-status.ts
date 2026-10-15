@@ -8,6 +8,7 @@ export interface BancoMensual {
   assigned: number
   consumed: number
   provisional?: boolean // true si `assigned` es un estimado provisional (no confirmado)
+  ampliado?: number // parte de `assigned` que es ampliación: fuera del corte 75/25
   libres?: number // carry forward: 25% del sobrante (solo meses cerrados)
   inutilizables?: number // 75% del sobrante que se pierde al cerrar el mes
 }
@@ -15,7 +16,8 @@ export interface BancoMensual {
 export interface BancoHorasRow {
   project: string
   position: string // posición = columna del Excel (CRM, SEO, Growth Strategists…)
-  assigned: number // horas del Excel para esa posición
+  assigned: number // Excel + provisional + ampliado de esa posición
+  ampliado: number // Σ ampliaciones activas de la posición (incluidas en assigned)
   consumed: number // horas registradas por usuarios de esa posición en el proyecto
   remaining: number // disponible real: assigned − consumed − inutilizables
   inutilizables: number // Σ 75% de sobrantes de meses cerrados (carry forward)
@@ -30,10 +32,12 @@ export interface BancoHorasRow {
 export interface AmpliacionHoras {
   id: string
   project: string
+  position: string
   hours: number
   reason: string
   entry_date: string
   actor_name: string
+  created_by: string | null
   active: boolean
 }
 
@@ -50,7 +54,7 @@ export interface MovimientoBanco {
 }
 
 // Cifras mensuales del proyecto en el detalle: asignado Excel del mes + ampliaciones
-// del mes (a nivel proyecto, spec §4.3) frente al consumido del mes.
+// del mes (de las posiciones visibles) frente al consumido del mes.
 export interface BancoDetalleMensual {
   month: string // 'YYYY-MM'
   excelAssigned: number
@@ -66,9 +70,10 @@ export interface BancoHorasDetalle {
   posiciones: BancoHorasRow[] // desglose por posición (acotado al alcance del que mira)
   excelBase: number // Σ horas del Excel real de las posiciones visibles
   provisional: number // Σ horas provisionales (estimadas, transitorias) sumadas al total
-  ampliaciones: AmpliacionHoras[]
+  ampliaciones: AmpliacionHoras[] // las de las posiciones visibles (activas y anuladas)
+  posicionesAlcance: string[] // catálogo de posiciones de quien mira: dónde puede ampliar
   movimientos: MovimientoBanco[] // historial consumo + ampliación (más reciente primero)
-  assigned: number // excelBase + provisional + Σ ampliaciones activas
+  assigned: number // excelBase + provisional + Σ ampliaciones activas (de las posiciones visibles)
   consumed: number
   remaining: number // disponible real del proyecto (assigned − consumed − inutilizables)
   inutilizables: number // Σ de las posiciones visibles
@@ -170,6 +175,7 @@ export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[
         acc.assigned += m.assigned
         acc.consumed += m.consumed
         if (m.provisional) acc.provisional = true
+        if (m.ampliado) acc.ampliado = (acc.ampliado ?? 0) + m.ampliado
         if (m.libres) acc.libres = (acc.libres ?? 0) + m.libres
         if (m.inutilizables) acc.inutilizables = (acc.inutilizables ?? 0) + m.inutilizables
         byMonth.set(m.month, acc)

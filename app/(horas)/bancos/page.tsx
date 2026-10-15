@@ -2,8 +2,8 @@ import { redirect } from 'next/navigation'
 import { getBancosHoras, type BancosScope } from '@/lib/horas/bancos'
 import type { BancoHorasRow } from '@/lib/horas/bancos-status'
 import { getViewerScope } from '@/lib/horas/scope'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { casarPorNombre } from '@/lib/casar-nombre'
+import { esManagerDelProyecto } from '@/lib/horas/ampliar-permisos'
+import { candidatosManager } from '@/lib/horas/candidatos-manager'
 import BancosHorasClient from '@/components/horas/BancosHorasClient'
 
 // El «Manager del proyecto» del Excel que es el manager en sesión, para dejarlo puesto en
@@ -11,11 +11,10 @@ import BancosHorasClient from '@/components/horas/BancosHorasClient'
 // los avisos, pero solo contra quien puede abrir esta página (managers y admins activos):
 // así "Estefania" no choca con una operativa del mismo nombre. Sin casado único, Todos.
 async function managerDelViewer(userId: string, rows: BancoHorasRow[]): Promise<string | undefined> {
-  const { data } = await createAdminClient()
-    .from('profiles').select('id, full_name').in('role', ['manager', 'admin']).eq('status', 'activo')
-  const perfiles = (data ?? []) as { id: string; full_name: string | null }[]
+  let candidatos
+  try { candidatos = await candidatosManager() } catch { return undefined }
   const nombres = [...new Set(rows.map((r) => (r.manager ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))
-  return nombres.find((n) => casarPorNombre(n, perfiles, (p) => p.full_name ?? '')?.id === userId)
+  return nombres.find((n) => esManagerDelProyecto(n, userId, candidatos))
 }
 
 export default async function BancosPage() {

@@ -4,6 +4,10 @@ import type { BancoMensual } from '@/lib/horas/bancos-status'
 // conserva como horas libres y el 75% se inutiliza; los excesos de meses cerrados
 // descuentan del carry acumulado. El mes en curso no sufre el corte. Aplica a TODO mes
 // cerrado sin distinción de origen (real, provisional o setup): recalculable siempre.
+//
+// Lo ampliado (spec 2026-10-15) va dentro de `assigned` pero queda FUERA del corte: no se
+// recorta ni caduca. El sobrante y el exceso del mes se miden contra la base (assigned −
+// ampliado), así que el consumo sale primero del Excel/provisional.
 export const CARRY_FORWARD_PCT = 0.25
 
 export interface CarryMes {
@@ -20,7 +24,7 @@ export interface CarryTotales {
 }
 
 export function carrySplit(
-  monthly: Pick<BancoMensual, 'month' | 'assigned' | 'consumed'>[],
+  monthly: Pick<BancoMensual, 'month' | 'assigned' | 'consumed' | 'ampliado'>[],
   mesActual: string,
 ): { porMes: CarryMes[]; totales: CarryTotales } {
   const porMes: CarryMes[] = []
@@ -29,8 +33,9 @@ export function carrySplit(
   let excesos = 0
   for (const m of monthly) {
     if (m.month >= mesActual) continue // mes en curso (o futuro): sin corte
-    const sobrante = Math.max(m.assigned - m.consumed, 0)
-    const exceso = Math.max(m.consumed - m.assigned, 0)
+    const base = m.assigned - (m.ampliado ?? 0)
+    const sobrante = Math.max(base - m.consumed, 0)
+    const exceso = Math.max(m.consumed - base, 0)
     const libres = CARRY_FORWARD_PCT * sobrante
     const inutil = sobrante - libres // complemento exacto (evita drift de flotantes)
     porMes.push({ month: m.month, libres, inutilizables: inutil, exceso })

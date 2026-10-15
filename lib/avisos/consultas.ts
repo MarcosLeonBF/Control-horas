@@ -21,7 +21,7 @@ import type { ManagerAviso, PersonaAviso } from '@/lib/avisos/contrato'
 // hora asignada ni consumida (sin_asignacion), porque no hay nada que ordenar.
 export async function resumenCapacidad() {
   const db = createAdminClient()
-  const [niveles, perfiles] = await Promise.all([nivelesActuales(db), perfilesPorId(db)])
+  const [niveles, perfiles] = await Promise.all([nivelesActuales(), perfilesPorId(db)])
   const r = rankingCapacidad(niveles.filter((n) => n.alcance === 'proyecto'), (n) => n.horas.disponibles)
   const item = (n: NivelBanco) => ({
     proyecto: n.proyecto, horas: n.horas, porcentaje_consumido: n.porcentajeConsumido,

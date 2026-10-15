@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 // Amplía y luego anula (auto-limpiante: no deja horas sumando en un proyecto real).
-test('el admin amplía y anula horas de un proyecto', async ({ page }) => {
+test('el admin amplía horas de una posición y las anula', async ({ page }) => {
   page.on('dialog', (d) => d.accept()) // aceptar el confirm() de anular
 
   await page.goto('/bancos')
@@ -23,6 +23,13 @@ test('el admin amplía y anula horas de un proyecto', async ({ page }) => {
     await expect(dialogo.getByRole('heading', { name: 'Ampliar horas' })).toBeVisible({ timeout: 1500 })
   }).toPass({ timeout: 15000 })
 
+  // Toda ampliación es de una posición (spec 2026-10-15): la primera de la lista (el índice 0
+  // es el «Elige la posición…» deshabilitado).
+  const selectorPosicion = dialogo.getByLabel('Posición')
+  await selectorPosicion.selectOption({ index: 1 })
+  const posicion = await selectorPosicion.inputValue()
+  expect(posicion).not.toBe('')
+
   const motivo = `E2E ampliación ${Date.now()}`
   await dialogo.getByLabel('Horas').fill('3')
   await dialogo.getByLabel('Motivo').fill(motivo)
@@ -35,6 +42,7 @@ test('el admin amplía y anula horas de un proyecto', async ({ page }) => {
   const fila = seccionAmpliaciones.getByRole('row').filter({ hasText: motivo })
   await expect(fila).toBeVisible({ timeout: 10000 })
   await expect(fila.getByText('+3,00h')).toBeVisible()
+  await expect(fila.getByRole('cell', { name: posicion, exact: true })).toBeVisible()
 
   // anular → la fila queda como "anulada"
   await fila.getByRole('button', { name: /anular/i }).click()

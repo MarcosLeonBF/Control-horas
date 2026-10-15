@@ -1,5 +1,5 @@
 // Niveles del banco de horas por posición y por proyecto, y ranking de capacidad.
-// Puro, sin IO: parte de las filas de getBancosHoras y de las ampliaciones activas.
+// Puro, sin IO: parte de las filas de getBancosHoras, que ya traen las ampliaciones.
 import { computeHorasStatus, type BancoHorasRow } from '@/lib/horas/bancos-status'
 import { centesimas, comoNivel, type Nivel } from '@/lib/avisos/reglas'
 import type { ActorAviso, DatosBancoAmpliacion, ManagerAviso } from '@/lib/avisos/contrato'
@@ -34,10 +34,10 @@ export function esProyectoActivo(estado: string | undefined): boolean {
   return (estado ?? '').trim().toLowerCase() === 'activo'
 }
 
-// rows = getBancosHoras({ role: 'admin' }); ampliadas = Σ ampliaciones activas por proyecto.
-// El total del proyecto suma las ampliaciones, como el detalle de /bancos: tras vender
-// horas, un proyecto no debe seguir "al tope". Por posición no hay ampliaciones.
-export function nivelesDeBancos(rows: BancoHorasRow[], ampliadas: Map<string, number>): NivelBanco[] {
+// rows = getBancosHoras({ role: 'admin' }). Las ampliaciones son de una posición (spec
+// 2026-10-15) y ya vienen dentro de cada fila (`assigned` las incluye, `ampliado` dice
+// cuántas): la posición ampliada mejora, y el total del proyecto, que las suma, también.
+export function nivelesDeBancos(rows: BancoHorasRow[]): NivelBanco[] {
   const porProyecto = new Map<string, BancoHorasRow[]>()
   for (const r of rows) {
     if (!esProyectoActivo(r.projectEstado)) continue
@@ -53,7 +53,7 @@ export function nivelesDeBancos(rows: BancoHorasRow[], ampliadas: Map<string, nu
       out.push({
         clave: `banco:${proyecto}:${r.position}`, proyecto, alcance: 'posicion', posicion: r.position, nivel,
         horas: {
-          asignadas: centesimas(r.assigned), ampliadas: 0, consumidas: centesimas(r.consumed),
+          asignadas: centesimas(r.assigned), ampliadas: centesimas(r.ampliado), consumidas: centesimas(r.consumed),
           inutilizables: centesimas(r.inutilizables), disponibles: centesimas(r.remaining),
         },
         porcentajeConsumido: porcentajeConsumido(r.assigned - r.inutilizables, r.consumed),
@@ -61,8 +61,8 @@ export function nivelesDeBancos(rows: BancoHorasRow[], ampliadas: Map<string, nu
       })
     }
 
-    const amp = ampliadas.get(proyecto) ?? 0
-    const asignadas = centesimas(filas.reduce((s, r) => s + r.assigned, 0) + amp)
+    const amp = filas.reduce((s, r) => s + r.ampliado, 0)
+    const asignadas = centesimas(filas.reduce((s, r) => s + r.assigned, 0))
     const consumidas = centesimas(filas.reduce((s, r) => s + r.consumed, 0))
     const inutilizables = centesimas(filas.reduce((s, r) => s + r.inutilizables, 0))
     const nivel = comoNivel(computeHorasStatus(centesimas(asignadas - inutilizables), consumidas))
@@ -80,8 +80,8 @@ export function nivelesDeBancos(rows: BancoHorasRow[], ampliadas: Map<string, nu
   return out
 }
 
-// Una ampliación de horas tal como quedó guardada (horas_ampliaciones, migración 0014).
-export interface AmpliacionHoras { project: string; hours: number; reason: string; entry_date: string }
+// Una ampliación de horas tal como quedó guardada (horas_ampliaciones, migraciones 0014 y 0062).
+export interface AmpliacionHoras { project: string; position: string; hours: number; reason: string; entry_date: string }
 
 // Datos de banco.ampliacion. `total` es el banco del proyecto tras ampliar (nivelesDeBancos,
 // alcance 'proyecto'); llega undefined si el Excel no respondió, y entonces horas, nivel y
@@ -91,7 +91,7 @@ export function datosAmpliacionHoras(
   manager: ManagerAviso | null, enlace: string,
 ): DatosBancoAmpliacion {
   return {
-    proyecto: amp.project, horas_ampliacion: centesimas(Number(amp.hours)), motivo: amp.reason, dia: amp.entry_date, actor,
+    proyecto: amp.project, posicion: amp.position, horas_ampliacion: centesimas(Number(amp.hours)), motivo: amp.reason, dia: amp.entry_date, actor,
     horas: total?.horas ?? null, nivel: total?.nivel ?? null, porcentaje_consumido: total?.porcentajeConsumido ?? null,
     manager_proyecto: manager, enlace,
   }

@@ -1,7 +1,6 @@
 // Detector de bancos de horas: compara el nivel de cada banco (por posición y total del
 // proyecto) con el último anotado en avisos_estado y avisa cuando empeora. Usa el mismo
 // cálculo que /bancos (getBancosHoras: carry forward, provisionales e histórico).
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBancosHoras } from '@/lib/horas/bancos'
 import { emitirAviso } from '@/lib/avisos/bandeja'
@@ -12,23 +11,12 @@ import { leerEstados, guardarEstados } from '@/lib/avisos/estado'
 import { perfilesPorId, managerPorNombre, actorDe, type Perfil } from '@/lib/avisos/personas'
 import type { DatosBanco, PersonaAviso } from '@/lib/avisos/contrato'
 
-async function ampliacionesActivas(db: SupabaseClient): Promise<Map<string, number>> {
-  const { data, error } = await db.from('horas_ampliaciones').select('project, hours').eq('active', true)
-  if (error) throw new Error(`horas_ampliaciones: ${error.message}`)
-  const out = new Map<string, number>()
-  for (const a of data ?? []) {
-    const p = String(a.project).trim()
-    out.set(p, (out.get(p) ?? 0) + Number(a.hours))
-  }
-  return out
-}
-
 // Niveles actuales de los bancos de proyectos activos. También los usa el resumen de capacidad.
 // Modo estricto: con el Excel o los perfiles a medias lanza en vez de calcular bancos
 // falsos; evaluarBancos lo captura y no avisa ni anota nada, y el resumen responde 500.
-export async function nivelesActuales(db: SupabaseClient = createAdminClient()): Promise<NivelBanco[]> {
-  const [rows, amps] = await Promise.all([getBancosHoras({ role: 'admin' }, { estricto: true }), ampliacionesActivas(db)])
-  return nivelesDeBancos(rows, amps)
+// Las ampliaciones vienen dentro de las filas (por posición, spec 2026-10-15).
+export async function nivelesActuales(): Promise<NivelBanco[]> {
+  return nivelesDeBancos(await getBancosHoras({ role: 'admin' }, { estricto: true }))
 }
 
 // Tras ampliar horas: avisa de la ampliación (banco.ampliacion) y re-evalúa el banco, que
@@ -44,7 +32,7 @@ export async function alAmpliarHoras(ampliacionId: string, project: string): Pro
     const db = createAdminClient()
     const { data: amp, error } = await db
       .from('horas_ampliaciones')
-      .select('project, hours, reason, entry_date, actor_name, created_by')
+      .select('project, position, hours, reason, entry_date, actor_name, created_by')
       .eq('id', ampliacionId)
       .single()
     if (error || !amp) throw new Error(`horas_ampliaciones ${ampliacionId}: ${error?.message ?? 'no encontrada'}`)
@@ -56,13 +44,13 @@ export async function alAmpliarHoras(ampliacionId: string, project: string): Pro
       let total: NivelBanco | undefined
       try {
         const nombre = String(amp.project).trim()
-        total = (await nivelesActuales(db)).find((n) => n.alcance === 'proyecto' && n.proyecto === nombre)
+        total = (await nivelesActuales()).find((n) => n.alcance === 'proyecto' && n.proyecto === nombre)
       } catch (e) {
         console.warn(`[avisos] alAmpliarHoras ${ampliacionId}: sin estado del banco (Excel):`, e instanceof Error ? e.message : e)
       }
       const perfiles = await perfilesPorId(db)
       const datos = datosAmpliacionHoras(
-        { project: amp.project as string, hours: Number(amp.hours), reason: amp.reason as string, entry_date: String(amp.entry_date) },
+        { project: amp.project as string, position: amp.position as string, hours: Number(amp.hours), reason: amp.reason as string, entry_date: String(amp.entry_date) },
         actor, total, managerPorNombre(total?.managerExcel, perfiles), enlaceBanco(String(amp.project).trim()),
       )
       // Clave por el id de la ampliación, como hucha.ampliacion con el del movimiento: si el
@@ -89,7 +77,7 @@ export async function evaluarBancos(proyectos?: string[], origen?: OrigenRegistr
   try {
     const db = createAdminClient()
     const filtro = proyectos ? new Set(proyectos.map((p) => p.trim())) : null
-    const niveles = (await nivelesActuales(db)).filter((n) => !filtro || filtro.has(n.proyecto))
+    const niveles = (await nivelesActuales()).filter((n) => !filtro || filtro.has(n.proyecto))
     if (!niveles.length) return
     const previos = await leerEstados(db, 'banco:')
     const aGuardar: { clave: string; nivel: Nivel }[] = []

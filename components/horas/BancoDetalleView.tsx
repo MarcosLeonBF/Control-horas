@@ -6,6 +6,7 @@ import { Clock, ChevronRight, ChevronDown, Info } from 'lucide-react'
 import type { BancoHorasDetalle } from '@/lib/horas/bancos-status'
 import { computeHorasStatus, estadoProyectoBadgeClass, HORAS_BAR_COLOR } from '@/lib/horas/bancos-status'
 import { formatHoras, formatFechaISO, currentMonth, mesCorto } from '@/lib/horas/format'
+import { puedeAnular, type RolApp } from '@/lib/horas/ampliar-permisos'
 import { cn } from '@/lib/utils'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import VistaPeriodo, { periodoEnPalabras, type Vista } from '@/components/horas/VistaPeriodo'
@@ -47,7 +48,11 @@ function ComoSeLee({ children }: { children: ReactNode }) {
   )
 }
 
-export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDetalle; isAdmin: boolean; meta?: MetaProyecto }) {
+// Quién mira: decide si ve «Ampliar horas» (el admin o el manager del proyecto, lo calcula
+// la página) y qué ampliaciones puede anular (el admin, todas; el manager, las suyas).
+export interface ViewerBanco { role: RolApp; userId: string; puedeAmpliar: boolean }
+
+export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDetalle; viewer: ViewerBanco; meta?: MetaProyecto }) {
   // Como la lista: se entra en Mensual, en el mes en curso; Total si no hay meses.
   const [vista, setVista] = useState<Vista>(() => (d.monthly.length > 0 ? 'mensual' : 'total'))
 
@@ -107,7 +112,6 @@ export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDe
 
   // Matriz posición × mes (vista Mensual): cada celda lleva el BancoMensual completo
   // (para la micro-barra de composición del cierre) además de las cifras.
-  const cmAct = currentMonth()
   const matriz = useMemo(
     () =>
       d.posiciones.map((p) => {
@@ -129,6 +133,8 @@ export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDe
 
   // Ampliaciones y movimientos: en Mensual, solo los de los meses elegidos.
   const ampliaciones = esMensual ? d.ampliaciones.filter((a) => selSet.has(a.entry_date.slice(0, 7))) : d.ampliaciones
+  const anulable = (a: { created_by: string | null }) => puedeAnular(viewer.role, viewer.userId, a.created_by)
+  const conAccion = ampliaciones.some(anulable)
   const movimientos = esMensual ? d.movimientos.filter((m) => selSet.has(m.date.slice(0, 7))) : d.movimientos
   // Del más reciente al más antiguo, como un extracto; de entrada solo los últimos.
   const [verTodosMovs, setVerTodosMovs] = useState(false)
@@ -138,16 +144,15 @@ export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDe
   // Celda de un mes en la matriz: GASTADO (consumido + inutilizables) / asignado —
   // la diferencia es siempre lo disponible ("restante y disponible son lo mismo",
   // Marcos 2026-07-14). La micro-barra reparte la distribución; excedido en rojo.
-  const celdaMes = (month: string, m?: BancoMensual) => {
+  const celdaMes = (m?: BancoMensual) => {
     if (!m || (m.assigned === 0 && m.consumed === 0)) return <span className="text-muted-foreground/40">—</span>
-    const enCurso = month >= cmAct
     const excedido = m.consumed > m.assigned
     return (
       <span className="inline-flex flex-col items-center gap-1">
         <span className={cn('tabular-money', excedido && 'text-(--status-excedido)')}>
           {formatHoras(m.consumed + (m.inutilizables ?? 0))} <span className="text-muted-foreground/60">/ {formatHoras(m.assigned)}</span>
         </span>
-        <BarraMes m={m} enCurso={enCurso} className="h-1.5 w-24 max-w-full" />
+        <BarraMes m={m} className="h-1.5 w-24 max-w-full" />
       </span>
     )
   }
@@ -181,10 +186,16 @@ export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDe
 
       {/* Barra de controles: Mensual | Total + selector de meses (solo si el Excel ya trae
           meses) y, a continuación, Ampliar horas (ocasional: un botón, no un formulario fijo). */}
-      {(hayMensual || isAdmin) && (
+      {(hayMensual || viewer.puedeAmpliar) && (
         <div className="mb-8 flex flex-wrap items-center gap-3">
           {hayMensual && <VistaPeriodo vista={vista} onVista={setVista} meses={meses} mesesSel={mesesSel} onMesesSel={setMesesSel} />}
-          {isAdmin && <AmpliarHorasDialog project={d.project} />}
+          {viewer.puedeAmpliar && (
+            <AmpliarHorasDialog
+              project={d.project}
+              posicionesProyecto={d.posiciones.map((p) => p.position)}
+              posicionesAlcance={d.posicionesAlcance}
+            />
+          )}
         </div>
       )}
 
@@ -251,11 +262,11 @@ export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDe
           {hayCierre && <LeyendaCierre />}
         </div>
         {mesUnico ? (
-          <ComoSeLee>Disponible real = asignado − consumido − inutilizables. En los meses cerrados, lo que sobra se reparte: 75% inutilizables y 25% libres, que pasan como carry forward. El asignado puede ser provisional (estimado) si el mes aún no está cargado.</ComoSeLee>
+          <ComoSeLee>Disponible real = asignado − consumido − inutilizables. En los meses cerrados, lo que sobra se reparte: 75% inutilizables y 25% libres, que pasan como carry forward. El asignado puede ser provisional (estimado) si el mes aún no está cargado. Las horas ampliadas se suman a su posición y no sufren el corte: siguen disponibles hasta que se consumen.</ComoSeLee>
         ) : esMensual ? (
-          <ComoSeLee>Cada mes muestra gastado (consumido + inutilizables) / asignado: la diferencia es lo disponible — en meses cerrados, las horas libres del carry, como reparte su barra. El asignado puede ser provisional (estimado) en los meses aún no cargados.</ComoSeLee>
+          <ComoSeLee>Cada mes muestra gastado (consumido + inutilizables) / asignado: la diferencia es lo disponible — en meses cerrados, las horas libres del carry, como reparte su barra. El asignado puede ser provisional (estimado) en los meses aún no cargados. Las horas ampliadas se suman a su posición y no sufren el corte: siguen disponibles hasta que se consumen.</ComoSeLee>
         ) : hayCierre ? (
-          <ComoSeLee>Desplegá una posición para ver su cierre mes a mes: consumido, inutilizables (75% del sobrante) y libres (25%, arrastran como carry forward). El mes en curso aún no sufre el corte.</ComoSeLee>
+          <ComoSeLee>Desplegá una posición para ver su cierre mes a mes: consumido, inutilizables (75% del sobrante) y libres (25%, arrastran como carry forward). El mes en curso aún no sufre el corte. Las horas ampliadas se suman a su posición y no sufren el corte: siguen disponibles hasta que se consumen.</ComoSeLee>
         ) : (
           <div className="mb-4" />
         )}
@@ -291,7 +302,7 @@ export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDe
                     <tr key={p.position} className="border-t border-border">
                       <td className="px-4 py-2.5">
                         <div className="font-medium">{p.position}</div>
-                        {!sinDatos && <BarraMes m={m} enCurso={mesUnico >= cmAct} className="mt-1.5 h-1.5 w-48 max-w-full" />}
+                        {!sinDatos && <BarraMes m={m} className="mt-1.5 h-1.5 w-48 max-w-full" />}
                       </td>
                       <td className="tabular-money px-4 py-2.5 text-right">{sinDatos ? <span className="text-muted-foreground/40">—</span> : formatHoras(m.assigned)}</td>
                       <td className="tabular-money px-4 py-2.5 text-right">{sinDatos ? <span className="text-muted-foreground/40">—</span> : celdaResta(m.consumed)}</td>
@@ -331,7 +342,7 @@ export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDe
                   <tr key={row.position} className="border-t border-border">
                     <td className="sticky left-0 bg-card px-4 py-2.5 font-medium whitespace-nowrap">{row.position}</td>
                     {row.porMes.map((c) => (
-                      <td key={c.month} className="px-3 py-2.5 text-center whitespace-nowrap">{celdaMes(c.month, c.m)}</td>
+                      <td key={c.month} className="px-3 py-2.5 text-center whitespace-nowrap">{celdaMes(c.m)}</td>
                     ))}
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">
                       {row.sinDatos
@@ -416,22 +427,24 @@ export default function BancoDetalleView({ d, isAdmin, meta }: { d: BancoHorasDe
               <thead>
                 <tr className="bg-(--muted-surface) text-left text-muted-foreground">
                   <th className="px-4 py-2.5 font-medium">Fecha</th>
+                  <th className="px-4 py-2.5 font-medium">Posición</th>
                   <th className="px-4 py-2.5 font-medium text-right">Horas</th>
                   <th className="px-4 py-2.5 font-medium">Motivo</th>
                   <th className="px-4 py-2.5 font-medium">Por</th>
-                  {isAdmin && <th className="px-4 py-2.5 font-medium text-right">Acción</th>}
+                  {conAccion && <th className="px-4 py-2.5 font-medium text-right">Acción</th>}
                 </tr>
               </thead>
               <tbody>
                 {ampliaciones.map((a) => (
                   <tr key={a.id} className={`border-t border-border ${a.active ? '' : 'text-muted-foreground line-through'}`}>
                     <td className="tabular-money px-4 py-2.5 whitespace-nowrap">{formatFechaISO(a.entry_date)}</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap">{a.position}</td>
                     <td className="tabular-money px-4 py-2.5 text-right whitespace-nowrap">+{formatHoras(Number(a.hours))}</td>
                     <td className="px-4 py-2.5">{a.reason}</td>
                     <td className="px-4 py-2.5 whitespace-nowrap">{a.actor_name}</td>
-                    {isAdmin && (
+                    {conAccion && (
                       <td className="px-4 py-2.5 text-right">
-                        {a.active ? <AnularAmpliacionButton id={a.id} project={d.project} /> : <span className="text-xs">anulada</span>}
+                        {!a.active ? <span className="text-xs">anulada</span> : anulable(a) && <AnularAmpliacionButton id={a.id} project={d.project} />}
                       </td>
                     )}
                   </tr>

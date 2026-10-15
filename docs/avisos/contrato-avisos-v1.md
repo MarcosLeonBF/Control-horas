@@ -278,7 +278,7 @@ nivel (pasa a `bajo`, `consumido` o `excedido`). Solo proyectos activos. Si el b
 | `posicion` | La posición (`SEO Strategist`, `CRM`…) o `null` si el alcance es `proyecto` |
 | `nivel` / `nivel_anterior` | Nivel nuevo y el que tenía |
 | `horas.asignadas` | Horas del banco (en el total del proyecto incluye las ampliaciones) |
-| `horas.ampliadas` | Horas ampliadas (solo en el total del proyecto; `0` por posición) |
+| `horas.ampliadas` | Horas ampliadas: en una posición, las ampliadas en esa posición; en el total, todas las del proyecto |
 | `horas.consumidas` | Horas registradas |
 | `horas.inutilizables` | Horas perdidas en el cierre de meses anteriores (reparto 75/25) |
 | `horas.disponibles` | Lo que queda de verdad |
@@ -361,17 +361,19 @@ enlace, igual que en `banco.nivel`. Llega en `null` si el tope no lo provocó un
 
 ### `banco.ampliacion`
 
-Cuando alguien amplía las horas del banco de un proyecto. Es el equivalente en horas de
+Cuando alguien amplía las horas del banco de un proyecto. Toda ampliación es de una
+posición del banco (desde el 15/10/2026). Es el equivalente en horas de
 `hucha.ampliacion`. Solo avisa al ampliar: anular una ampliación no envía nada.
 
 | Campo | Qué es |
 |---|---|
 | `proyecto` | Nombre del proyecto |
+| `posicion` | Posición a la que se sumaron las horas (por ejemplo, `CRM`) |
 | `horas_ampliacion` | Horas de **esta** ampliación |
 | `motivo` | El motivo que se escribió al ampliar |
 | `dia` | Día de la ampliación (`YYYY-MM-DD`) |
 | `actor` | Quien amplió: `{ nombre, email, equipo }` |
-| `horas` | El banco del proyecto **después** de ampliar (mismo objeto que en `banco.nivel`) |
+| `horas` | El banco del **proyecto** (el total, no la posición) **después** de ampliar (mismo objeto que en `banco.nivel`) |
 | `nivel` | Nivel del banco después de ampliar |
 | `porcentaje_consumido` | Sobre la base efectiva, igual que en `banco.nivel` |
 | `manager_proyecto` | Manager del proyecto según el Excel |
@@ -383,13 +385,14 @@ ampliado del proyecto, esta incluida).
 **`horas`, `nivel`, `porcentaje_consumido` y `manager_proyecto` pueden llegar en `null`.**
 Salen del Excel de SharePoint: si en ese momento no responde, o si el proyecto no está
 activo, el aviso llega igual con esos cuatro campos en `null`. Lo que no depende del Excel
-(proyecto, horas de la ampliación, motivo, día, quién la hizo y el enlace) llega siempre.
+(proyecto, posición, horas de la ampliación, motivo, día, quién la hizo y el enlace) llega siempre.
 
 ```json
 {
   "tipo": "banco.ampliacion",
   "datos": {
     "proyecto": "Proyecto Ejemplo",
+    "posicion": "CRM",
     "horas_ampliacion": 20,
     "motivo": "Ampliación aprobada por el cliente",
     "dia": "2026-09-18",
@@ -829,3 +832,16 @@ del último cambio de ese registro, y reflejan cómo quedó: si la persona corri
 las horas en ese rato, llega ya corregido; si lo anula, no llega. Cada corrección dentro de
 esos 5 minutos vuelve a empezar la espera. Lo demás (HUCHA, ampliaciones, consultas) sigue
 llegando al momento.
+
+**15/10/2026** · Las ampliaciones de horas pasan a ser **de una posición** del banco (quien
+amplía elige la posición). Campo nuevo y un cambio de comportamiento; sigue `version: 1`:
+
+- **`banco.ampliacion` trae `posicion`**: la posición a la que se sumaron las horas. `horas`,
+  `nivel` y `porcentaje_consumido` siguen siendo los del total del proyecto.
+- **`banco.nivel` con `alcance: "posicion"`**: `horas.ampliadas` ya no es siempre `0`,
+  trae lo ampliado en esa posición, y una ampliación mejora el nivel de su posición (antes
+  solo el del total). El total del proyecto se calcula igual que antes.
+- Las horas ampliadas no entran en el reparto 75/25 del cierre de mes: no se vuelven
+  `inutilizables` y siguen disponibles hasta que se consumen.
+- Ahora también puede ampliar el manager del proyecto, así que `actor` puede ser un
+  manager, no solo un administrador.
