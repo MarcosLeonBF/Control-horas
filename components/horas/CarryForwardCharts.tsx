@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import type { BancoHorasRow, BancoMensual } from '@/lib/horas/bancos-status'
 import { formatHoras, mesCorto } from '@/lib/horas/format'
+import { reglaCarry } from '@/lib/horas/carry-forward'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 
@@ -213,18 +214,26 @@ export function BarraComposicion({ posicion, className }: { posicion: BancoHoras
 }
 
 // Panel desplegado de una posición dentro de la tabla "Por posición": resumen del
-// carry acumulado + una barrita por mes (el 16/16 de la spec).
+// carry acumulado + la regla de corte de la posición + una barrita por mes (el 16/16 de
+// la spec).
 export function CierrePosicionPanel({ posicion }: { posicion: BancoHorasRow }) {
   const meses = posicion.monthly.filter((m) => m.assigned > 0 || m.consumed > 0)
   if (meses.length === 0) return null
+  const regla = reglaCarry(posicion.position)
+  const pctLibres = Math.round(regla.libres * 100)
   return (
     <div>
-      <p className="mb-2.5 text-xs tabular-money text-foreground/50">
-        {posicion.carryNeto > 0 && <span className="font-medium text-(--status-disponible)">+{formatHoras(posicion.carryNeto)} libres</span>}
-        {posicion.carryNeto > 0 && posicion.inutilizables > 0 && ' · '}
-        {posicion.inutilizables > 0 && <>{formatHoras(posicion.inutilizables)} inutilizables</>}
-        {posicion.carryNeto <= 0 && posicion.inutilizables <= 0 && <span className="text-muted-foreground/60">Sin cierre aún: no hay meses cerrados con sobrante.</span>}
-      </p>
+      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-xs tabular-money text-foreground/50">
+        <p>
+          {posicion.carryNeto > 0 && <span className="font-medium text-(--status-disponible)">+{formatHoras(posicion.carryNeto)} libres</span>}
+          {posicion.carryNeto > 0 && posicion.inutilizables > 0 && ' · '}
+          {posicion.inutilizables > 0 && <>{formatHoras(posicion.inutilizables)} inutilizables</>}
+          {posicion.carryNeto <= 0 && posicion.inutilizables <= 0 && <span className="text-muted-foreground/60">Sin cierre aún: no hay meses cerrados con sobrante.</span>}
+        </p>
+        <p title="Cómo se reparte lo que sobra de cada mes cerrado: inutilizables / libres">
+          Corte {100 - pctLibres}/{pctLibres}{regla.primerMesSinCorte && ' · 1er mes sin corte'}
+        </p>
+      </div>
       <ul className="space-y-2">
         {meses.map((m) => (
           <MesBar key={m.month} m={m} />

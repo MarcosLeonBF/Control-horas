@@ -4,7 +4,7 @@ import { computeHorasStatus, HORAS_SEVERITY, type BancoHorasRow, type BancoHoras
 import type { BancoHorasProyecto } from '@/lib/types'
 import { currentMonth, finDeMes } from '@/lib/horas/format'
 import { ultimoRegistroGlobal, mesesVentana, provisionalPorPosicion } from '@/lib/horas/provisionales'
-import { carrySplit } from '@/lib/horas/carry-forward'
+import { carrySplit, reglaCarry } from '@/lib/horas/carry-forward'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 // Banco de horas POR POSICIÓN (PDF + lógica nueva):
@@ -102,15 +102,17 @@ function sumaMes(porMes: Map<string, number>, month: string, hours: number) {
 // Cifras de una posición de un proyecto. Una sola receta para la lista y el detalle:
 //   - asignado = Excel + provisional + ampliado;
 //   - monthly: Excel real y provisional (disjuntos por mes) + ampliado + consumo;
-//   - carry forward (spec 2026-07-14): corte 75/25 de meses cerrados, que deja fuera lo
-//     ampliado (spec 2026-10-15); el disponible real y el estado descuentan los
-//     inutilizables, y cada mes anota su desglose.
+//   - carry forward (spec 2026-07-14): corte de meses cerrados con el reparto de la
+//     posición y su regla del primer mes (2026-10-16), que deja fuera lo ampliado (spec
+//     2026-10-15); el disponible real y el estado descuentan los inutilizables, y cada
+//     mes anota su desglose.
 function armarPosicion(
   excelTotal: number,
   excelPorMes: { month: string; hours: number }[],
   prov: BancoMensual[],
   ampliadoPorMes: Map<string, number> | undefined,
   consumoPorMes: Map<string, number> | undefined,
+  corte: { position: string; mesInicio: string },
 ) {
   const byMonth = new Map<string, BancoMensual>()
   for (const m of excelPorMes) if (m.hours !== 0) byMonth.set(m.month, { month: m.month, assigned: m.hours, consumed: 0 })
@@ -134,7 +136,7 @@ function armarPosicion(
   }
   const monthly = [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
 
-  const carry = carrySplit(monthly, currentMonth())
+  const carry = carrySplit(monthly, currentMonth(), { regla: reglaCarry(corte.position), mesInicio: corte.mesInicio })
   for (const cm of carry.porMes) {
     const m = byMonth.get(cm.month)
     if (m && (cm.libres > 0 || cm.inutilizables > 0)) { m.libres = cm.libres; m.inutilizables = cm.inutilizables }
@@ -285,6 +287,8 @@ export async function getBancosHoras(scope: BancosScope, opciones: { estricto?: 
       ...(posAmpliadaPorProyecto.get(project) ?? []),
     ])
     const excelByPos = new Map((proj?.positions ?? []).map((p) => [p.position, Number(p.hours)]))
+    // Primer mes del proyecto = el de la Fecha Inicio Contable (el del setup).
+    const mesInicio = (meta?.inicioContable ?? '').slice(0, 7)
 
     for (const position of positions) {
       if (!visible(allowed, position)) continue
@@ -295,6 +299,7 @@ export async function getBancosHoras(scope: BancosScope, opciones: { estricto?: 
         provByPos.get(position) ?? [],
         ampliadoMes.get(k),
         consumedMes.get(k),
+        { position, mesInicio },
       )
       if (cifras.assigned === 0 && cifras.consumed === 0) continue // nada que mostrar
 
@@ -408,6 +413,7 @@ export async function getBancoHorasDetalle(
   for (const p of ampliadoByPosMes.keys()) posNames.add(p)
 
   const excelByPos = new Map(posicionesExcel.map((p) => [p.position, Number(p.hours)]))
+  const mesInicio = (meta?.inicioContable ?? '').slice(0, 7) // primer mes del proyecto (setup)
   // Con asignación/actividad primero, "Sin asignación" al fondo (por severidad), luego nombre.
   const posiciones: BancoHorasRow[] = [...posNames]
     .map((position) => ({
@@ -418,6 +424,7 @@ export async function getBancoHorasDetalle(
         provByPos.get(position) ?? [],
         ampliadoByPosMes.get(position),
         consumedByPosMes.get(position),
+        { position, mesInicio },
       ),
     }))
     .sort((a, b) => HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status] || a.position.localeCompare(b.position))

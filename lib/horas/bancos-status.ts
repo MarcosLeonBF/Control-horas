@@ -8,9 +8,9 @@ export interface BancoMensual {
   assigned: number
   consumed: number
   provisional?: boolean // true si `assigned` es un estimado provisional (no confirmado)
-  ampliado?: number // parte de `assigned` que es ampliación: fuera del corte 75/25
-  libres?: number // carry forward: 25% del sobrante (solo meses cerrados)
-  inutilizables?: number // 75% del sobrante que se pierde al cerrar el mes
+  ampliado?: number // parte de `assigned` que es ampliación: fuera del corte de cierre
+  libres?: number // carry forward: la parte del sobrante que conserva la posición (solo meses cerrados)
+  inutilizables?: number // el resto del sobrante, que se pierde al cerrar el mes
 }
 
 export interface BancoHorasRow {
@@ -20,7 +20,7 @@ export interface BancoHorasRow {
   ampliado: number // Σ ampliaciones activas de la posición (incluidas en assigned)
   consumed: number // horas registradas por usuarios de esa posición en el proyecto
   remaining: number // disponible real: assigned − consumed − inutilizables
-  inutilizables: number // Σ 75% de sobrantes de meses cerrados (carry forward)
+  inutilizables: number // Σ inutilizables de meses cerrados (carry forward)
   carryNeto: number // Σ libres − Σ excesos de meses cerrados, con piso en 0
   status: HorasStatus
   monthly: BancoMensual[] // desglose mensual (ascendente); [] si no hay datos por mes

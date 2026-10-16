@@ -10,7 +10,7 @@ export default defineConfig({
   projects: [
     {
       name: 'puros',
-      testMatch: ['**/hub-*.spec.ts', '**/ruta-segura.spec.ts', '**/slack-id.spec.ts', '**/horas-alta-campos.spec.ts'],
+      testMatch: ['**/hub-*.spec.ts', '**/ruta-segura.spec.ts', '**/slack-id.spec.ts', '**/horas-alta-campos.spec.ts', '**/horas-carry.spec.ts'],
     },
   ],
 })
