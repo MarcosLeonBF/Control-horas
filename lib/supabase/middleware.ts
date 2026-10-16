@@ -5,6 +5,12 @@ import { rutaInternaSegura } from '@/lib/ruta-segura'
 
 // Helper que refresca la sesión del usuario en cada request
 export async function updateSession(request: NextRequest) {
+  // Entrada por Acceso (docs/acceso.md): /auth/hub/* abre o rechaza la sesión por su cuenta
+  // y tiene que verse sin sesión. Si pasara por aquí, mandarla al login sería un bucle (el
+  // login, con Acceso activo, manda justo a /auth/hub/entrar), y las cookies que tocara el
+  // refresco de abajo podrían pisar las de la sesión nueva que deja el callback.
+  if (request.nextUrl.pathname.startsWith('/auth/hub/')) return NextResponse.next({ request })
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(

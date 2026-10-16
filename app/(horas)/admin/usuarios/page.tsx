@@ -8,6 +8,8 @@ import DesactivarAusenciaBoton from '@/components/horas/DesactivarAusenciaBoton'
 import { filasAusenciaDeHoy } from '@/lib/avisos/personas'
 import { ausenciasHoy, ausenciasSinDesactivar, ausenciasSinUsuario, etiquetaAusencia } from '@/lib/avisos/vacaciones'
 import { diaMadrid } from '@/lib/horas/auditoria-types'
+import { buttonVariants } from '@/components/ui/button'
+import { urlAcceso } from '@/lib/hub/config'
 
 interface RawUsuario {
   id: string; full_name: string; email: string; position_id: string | null
@@ -28,6 +30,7 @@ export default async function UsuariosPage() {
   const esAdmin = me?.role === 'admin'
   // Usuarios con permiso delegado (p. ej. RRHH): entran en modo lectura + alta.
   if (!esAdmin && !me?.can_create_users) redirect('/registrar')
+  const acceso = urlAcceso() // con Acceso, el alta se hace allí (null sin Acceso)
 
   const { areas } = await getCatalogos()
   const { data: pos } = await supabase.from('positions').select('id, name').eq('active', true).order('name')
@@ -125,7 +128,22 @@ export default async function UsuariosPage() {
 
       <section className="space-y-4">
         <h2 className="font-display text-xl">Alta de usuario</h2>
-        <UsuarioForm areas={areas} posiciones={posiciones} equipos={equipos} allowAdminRole={esAdmin} />
+        {/* Con Acceso (docs/acceso.md) el alta es allí: crea la cuenta con su contraseña
+            temporal y, por el conector, la ficha de esta app con los mismos campos que el
+            formulario de aquí. Al guardarla aparece en la lista de arriba. */}
+        {acceso ? (
+          <div className="max-w-3xl rounded-xl border border-border bg-card p-5 shadow-sm">
+            <p className="text-sm text-muted-foreground">
+              Las altas se hacen en Acceso: allí se crea la cuenta, con su contraseña temporal, y se completan sus datos de
+              Control de Rentabilidad. Después aparece en esta lista y aquí se puede seguir editando su rol, sus áreas y lo demás.
+            </p>
+            <a href={`${acceso}/admin/usuarios/nuevo`} className={buttonVariants({ size: 'lg', className: 'mt-4 px-4' })}>
+              Dar de alta en Acceso
+            </a>
+          </div>
+        ) : (
+          <UsuarioForm areas={areas} posiciones={posiciones} equipos={equipos} allowAdminRole={esAdmin} />
+        )}
       </section>
     </div>
   )

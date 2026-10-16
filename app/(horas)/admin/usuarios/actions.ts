@@ -5,6 +5,7 @@ import { normalizarSlackId } from '@/lib/slack-id'
 import { cierreManual, type FilaAusencia } from '@/lib/avisos/vacaciones'
 import { diaMadrid } from '@/lib/horas/auditoria-types'
 import { errorCamposAlta } from '@/lib/horas/alta-usuario'
+import { hubActivo } from '@/lib/hub/config'
 
 export interface NuevoUsuario {
   full_name: string; email: string; password: string; positionId: string
@@ -44,6 +45,11 @@ function errorPerfil(e: { message: string; code?: string }): string {
 }
 
 export async function crearUsuario(input: NuevoUsuario): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Con Acceso las altas se hacen allí (cuenta + contraseña temporal + ficha de esta app por
+  // el conector, lib/hub/conector.ts). Un alta aquí crearía una persona que Acceso no conoce
+  // y que no podría entrar. La acción es pública: se cierra aquí, no solo en el formulario.
+  if (hubActivo()) return { ok: false, error: 'Las altas de usuario se hacen en Acceso.' }
+
   // Actor válido: admin, o usuario activo con permiso delegado de alta (can_create_users).
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

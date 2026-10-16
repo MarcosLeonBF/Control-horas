@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import CambiarContrasenaForm from '@/components/horas/CambiarContrasenaForm'
+import { buttonVariants } from '@/components/ui/button'
+import { urlAcceso } from '@/lib/hub/config'
 
 export default async function PerfilPage() {
   const supabase = await createClient()
@@ -21,6 +23,7 @@ export default async function PerfilPage() {
   }
 
   const roleLabels: Record<string, string> = { operativo: 'Operativo', manager: 'Manager', admin: 'Administrador' }
+  const acceso = urlAcceso() // null sin Acceso: el formulario de siempre
 
   return (
     <div className="space-y-6">
@@ -50,10 +53,20 @@ export default async function PerfilPage() {
         <p className="mt-4 text-xs text-muted-foreground">Para cambiar estos datos, contactá a un administrador.</p>
       </div>
 
-      {/* Cambio de contraseña */}
+      {/* Cambio de contraseña. Con Acceso (docs/acceso.md) la contraseña es la de Acceso, la
+          misma para todas las apps, y se cambia allí, en "Mi cuenta". */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Cambiar contraseña</h2>
-        <CambiarContrasenaForm />
+        {acceso ? (
+          <>
+            <p className="mb-4 text-sm text-muted-foreground">Entras con tu cuenta de Acceso: la contraseña es la misma para todas las apps.</p>
+            <a href={`${acceso}/cuenta`} className={buttonVariants({ size: 'lg', className: 'px-4' })}>
+              Cambiar contraseña en Acceso
+            </a>
+          </>
+        ) : (
+          <CambiarContrasenaForm />
+        )}
       </div>
     </div>
   )
