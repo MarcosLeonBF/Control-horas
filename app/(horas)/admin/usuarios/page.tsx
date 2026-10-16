@@ -135,7 +135,7 @@ export default async function UsuariosPage() {
           <div className="max-w-3xl rounded-xl border border-border bg-card p-5 shadow-sm">
             <p className="text-sm text-muted-foreground">
               Las altas se hacen en Acceso: allí se crea la cuenta, con su contraseña temporal, y se completan sus datos de
-              Control de Gestión. Después aparece en esta lista y aquí se puede seguir editando su rol, sus áreas y lo demás.
+              Control de Rentabilidad. Después aparece en esta lista y aquí se puede seguir editando su rol, sus áreas y lo demás.
             </p>
             <a href={`${acceso}/admin/usuarios/nuevo`} className={buttonVariants({ size: 'lg', className: 'mt-4 px-4' })}>
               Dar de alta en Acceso

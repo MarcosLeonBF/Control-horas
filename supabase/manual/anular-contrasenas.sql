@@ -4,7 +4,7 @@
 -- NO es una migración y no va en supabase/migrations: se ejecuta UNA vez, a mano, en el
 -- SQL Editor de Supabase, con el usuario delante. Ver docs/acceso.md (corte a producción).
 --
--- Para qué: con Acceso, Control de Gestión ya no pide contraseña (se entra por Acceso y la
+-- Para qué: con Acceso, Control de Rentabilidad ya no pide contraseña (se entra por Acceso y la
 -- sesión de Supabase se abre sin ella). Pero las contraseñas viejas siguen en auth.users, y
 -- con la clave pública de Supabase cualquiera podría seguir entrando con ellas llamando a la
 -- API de Supabase directamente, saltándose Acceso (y sus bajas). Esto las cambia todas por

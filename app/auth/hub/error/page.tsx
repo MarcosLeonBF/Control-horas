@@ -11,15 +11,15 @@ import { cn } from '@/lib/utils'
 const MENSAJES: Record<MotivoError, { titulo: string; texto: string }> = {
   'sin-ficha': {
     titulo: 'Aún no tienes acceso',
-    texto: 'Tu cuenta aún no tiene ficha en Control de Gestión. Pide a un administrador que te dé acceso desde Acceso.',
+    texto: 'Tu cuenta aún no tiene ficha en Control de Rentabilidad. Pide a un administrador que te dé acceso desde Acceso.',
   },
   inactivo: {
     titulo: 'Acceso desactivado',
-    texto: 'Tu acceso a Control de Gestión está desactivado. Si crees que es un error, habla con un administrador.',
+    texto: 'Tu acceso a Control de Rentabilidad está desactivado. Si crees que es un error, habla con un administrador.',
   },
   'sin-acceso': {
     titulo: 'Sin acceso',
-    texto: 'No tienes acceso a Control de Gestión. Pide a un administrador que te lo dé desde Acceso.',
+    texto: 'No tienes acceso a Control de Rentabilidad. Pide a un administrador que te lo dé desde Acceso.',
   },
   caducada: {
     titulo: 'La entrada caducó',

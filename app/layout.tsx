@@ -4,8 +4,8 @@ import { fraunces, geistSans, geistMono } from '@/lib/fonts'
 import { Toaster } from '@/components/ui/sonner'
 
 export const metadata: Metadata = {
-  title: 'Control de Gestión — Bastida & Farina',
-  description: 'Sistema interno de control y gestión del equipo de Bastida & Farina',
+  title: 'Control de Rentabilidad — Bastida & Farina',
+  description: 'Sistema interno de control de rentabilidad del equipo de Bastida & Farina',
   // Favicon: ícono cuadrado generado en app/icon.tsx (el logo es un wordmark ancho que
   // se veía ilegible aplastado en la pestaña).
 }

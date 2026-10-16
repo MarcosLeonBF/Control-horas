@@ -1,4 +1,4 @@
-// Ficha de Control de Gestión en el conector de Acceso (docs/integrar-una-app.md §5): qué
+// Ficha de Control de Rentabilidad en el conector de Acceso (docs/integrar-una-app.md §5): qué
 // datos de la app pide Acceso al dar de alta o editar a una persona, cómo se validan y cómo
 // se guardan en profiles + user_areas.
 //

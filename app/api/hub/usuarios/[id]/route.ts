@@ -1,4 +1,4 @@
-// GET y PUT /api/hub/usuarios/{id} — la ficha de Control de Gestión de una persona, para
+// GET y PUT /api/hub/usuarios/{id} — la ficha de Control de Rentabilidad de una persona, para
 // Acceso. {id} es el `sub` de Acceso (= id de auth.users). Ver lib/hub/conector.ts.
 import { errorInterno, guardarFicha, leerFicha, rechazoConector } from '@/lib/hub/conector'
 import { esUuid } from '@/lib/hub/ficha'

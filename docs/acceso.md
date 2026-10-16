@@ -1,6 +1,6 @@
-# Control de Gestión con Acceso (login centralizado)
+# Control de Rentabilidad con Acceso (login centralizado)
 
-Acceso es el proveedor de identidad (OIDC) de las apps internas de Bastida&Farina. Con él, Control de Gestión deja de pedir contraseña: se entra por Acceso y la app abre la sesión de Supabase de esa misma persona. RLS, RPC y tablas no cambian.
+Acceso es el proveedor de identidad (OIDC) de las apps internas de Bastida&Farina. Con él, Control de Rentabilidad deja de pedir contraseña: se entra por Acceso y la app abre la sesión de Supabase de esa misma persona. RLS, RPC y tablas no cambian.
 
 Todo depende de `ACCESO_ISSUER`:
 
@@ -26,7 +26,7 @@ Panel de Acceso → Apps → Nueva:
 | Campo | Valor |
 |---|---|
 | Identificador (`client_id`) | `control-horas` |
-| Nombre visible | Control de Gestión |
+| Nombre visible | Control de Rentabilidad |
 | URL de inicio | `<APP_URL>/` |
 | Redirect URI | `<APP_URL>/auth/hub/callback` |
 | URL del conector | `<APP_URL>/api/hub` |

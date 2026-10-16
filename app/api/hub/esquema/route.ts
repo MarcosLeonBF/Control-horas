@@ -1,4 +1,4 @@
-// GET /api/hub/esquema — los campos de la ficha de Control de Gestión que Acceso pinta al dar
+// GET /api/hub/esquema — los campos de la ficha de Control de Rentabilidad que Acceso pinta al dar
 // de alta o editar a una persona, con las opciones vivas de la app. Ver lib/hub/conector.ts.
 import { errorInterno, opcionesVivas, rechazoConector } from '@/lib/hub/conector'
 import { construirEsquema } from '@/lib/hub/ficha'

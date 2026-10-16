@@ -1,5 +1,5 @@
 // Conector de fichas para Acceso (docs/integrar-una-app.md §5, rutas en app/api/hub/*):
-// Acceso crea, lee, edita y da de baja la ficha de Control de Gestión de cada persona. El
+// Acceso crea, lee, edita y da de baja la ficha de Control de Rentabilidad de cada persona. El
 // {id} es el `sub` de Acceso, que aquí es el id de auth.users y de profiles.
 //
 // Esta app es la dueña de los datos y valida con autoridad (lib/hub/ficha.ts). Aquí solo
@@ -34,7 +34,7 @@ export function rechazoConector(req: Request): Response | null {
 // deja el acceso "pendiente" y ofrece reintentar.
 export function errorInterno(e: unknown): Response {
   console.error('[acceso] conector', e)
-  return Response.json({ error: 'Error interno de Control de Gestión' }, { status: 500 })
+  return Response.json({ error: 'Error interno de Control de Rentabilidad' }, { status: 500 })
 }
 
 export async function opcionesVivas(db: Db): Promise<OpcionesVivas> {
@@ -71,7 +71,7 @@ async function usuarioAuth(db: Db, id: string): Promise<User | null> {
 // El correo ya es de otra cuenta de Supabase: es un dato de la persona, no un fallo (422).
 function errorCorreo(e: { code?: string; message: string }): Errores | null {
   return e.code === 'email_exists' || /already (been )?registered|already exists/i.test(e.message)
-    ? { email: 'Ese correo ya lo usa otra cuenta de Control de Gestión.' }
+    ? { email: 'Ese correo ya lo usa otra cuenta de Control de Rentabilidad.' }
     : null
 }
 
