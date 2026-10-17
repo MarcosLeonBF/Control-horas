@@ -111,6 +111,11 @@
 }
 .animate-fade-up { animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+/* Barra de saldo: al entrar se llena desde la izquierda hasta el scaleX de su style. */
+@keyframes meter-fill {
+  from { transform: scaleX(0); }
+}
+
 .dark {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);

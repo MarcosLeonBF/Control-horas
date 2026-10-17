@@ -8,6 +8,7 @@ test('un admin anula una ampliación y aparece el asiento de reversión', async 
   await page.goto(`/presupuestos/${fixture.projectAssignedId}`)
 
   // crear una ampliación para luego anularla (self-contained)
+  await page.getByRole('button', { name: /ampliar presupuesto/i }).click()
   await page.getByLabel('Monto').fill('300')
   await page.getByLabel('Motivo').fill('Para anular E2E')
   await page.getByRole('button', { name: /^ampliar$/i }).click()

@@ -53,7 +53,7 @@ export async function getProjectWithBank(id: string): Promise<ProjectWithBank | 
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('projects')
-    .select('id, name, client, hucha_banks!inner(id, project_id, currency, assigned_total, consumed_total, remaining, status)')
+    .select('id, name, client, hucha_banks!inner(id, project_id, currency, assigned_total, consumed_total, remaining, status, excel_hucha)')
     .eq('id', id)
     .maybeSingle()
   if (error) throw error

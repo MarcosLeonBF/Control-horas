@@ -8,6 +8,8 @@ export interface HuchaBankRow {
   consumed_total: number
   remaining: number
   status: HuchaStatus
+  // Presupuesto que trae el Excel, sin ampliaciones. Solo lo pide el detalle.
+  excel_hucha?: number
 }
 
 export interface ProjectWithBank {

@@ -5,6 +5,7 @@ const fixture = JSON.parse(fs.readFileSync('e2e/.fixture.json', 'utf8'))
 
 test('un admin amplía el presupuesto y sube el asignado/restante', async ({ page }) => {
   await page.goto(`/presupuestos/${fixture.projectAssignedId}`)
+  await page.getByRole('button', { name: /ampliar presupuesto/i }).click()
   await expect(page.getByRole('heading', { name: /ampliar presupuesto/i })).toBeVisible()
   await page.getByLabel('Monto').fill('250')
   await page.getByLabel('Motivo').fill('Paquete extra E2E')
