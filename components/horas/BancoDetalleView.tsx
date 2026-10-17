@@ -264,9 +264,9 @@ export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDet
         {mesUnico ? (
           <ComoSeLee>Disponible real = asignado − consumido − inutilizables. En los meses cerrados, lo que sobra se reparte entre inutilizables y libres (carry forward) según la posición. El asignado puede ser provisional (estimado) si el mes aún no está cargado. Las horas ampliadas no se pierden al cerrar el mes.</ComoSeLee>
         ) : esMensual ? (
-          <ComoSeLee>Cada mes muestra gastado (consumido + inutilizables) / asignado: la diferencia es lo disponible — en meses cerrados, las horas libres del carry, como reparte su barra. El asignado puede ser provisional (estimado) en los meses aún no cargados. Las horas ampliadas no se pierden al cerrar el mes.</ComoSeLee>
+          <ComoSeLee>Cada mes muestra gastado (consumido + inutilizables) / asignado: la diferencia es lo disponible, que en los meses cerrados son las horas libres del carry, como reparte su barra. El asignado puede ser provisional (estimado) en los meses aún no cargados. Las horas ampliadas no se pierden al cerrar el mes.</ComoSeLee>
         ) : hayCierre ? (
-          <ComoSeLee>Desplegá una posición para ver su reparto y su cierre mes a mes: consumido, inutilizables y libres, que arrastran como carry forward. Según la posición, el primer mes del proyecto no se recorta. El mes en curso aún no sufre el corte. Las horas ampliadas no se pierden al cerrar el mes.</ComoSeLee>
+          <ComoSeLee>Despliega una posición para ver su reparto y su cierre mes a mes: consumido, inutilizables y libres, que arrastran como carry forward. Según la posición, el primer mes del proyecto no se recorta. El mes en curso aún no sufre el corte. Las horas ampliadas no se pierden al cerrar el mes.</ComoSeLee>
         ) : (
           <div className="mb-4" />
         )}
@@ -456,10 +456,7 @@ export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDet
       </section>
 
       <section className="mt-10">
-        <h2 className="font-display mb-1 text-xl font-semibold">Movimientos</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Consumos y ampliaciones, del más reciente al más antiguo, con el saldo de horas disponibles antes y después.
-        </p>
+        <h2 className="font-display mb-4 text-xl font-semibold">Movimientos</h2>
         {movimientos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {esMensual ? 'Sin movimientos en los meses elegidos.' : 'Sin movimientos todavía.'}

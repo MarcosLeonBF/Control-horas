@@ -105,7 +105,7 @@ function DescripcionesSection({ descripciones, posiciones }: { descripciones: De
                     {/* Una específica sin posiciones existe y no la ve nadie: se dice, no se
                         deduce del hueco donde deberían estar las posiciones. */}
                     {huerfana ? (
-                      <Badge className="bg-amber-50 text-amber-700">Sin posiciones — no la ve nadie</Badge>
+                      <Badge className="bg-amber-50 text-amber-700">Sin posiciones: no la ve nadie</Badge>
                     ) : d.alcance === 'posicion' ? (
                       <Badge className="bg-(--brand)/10 text-(--brand-strong)">{d.positionIds.map(nombrePosicion).filter(Boolean).join(' · ')}</Badge>
                     ) : (
@@ -129,7 +129,7 @@ function DescripcionesSection({ descripciones, posiciones }: { descripciones: De
                         {d.active ? <EyeOff /> : <Eye />}
                       </AccionIcono>
                       <AccionIcono label="Eliminar" destructivo disabled={busy}
-                        onClick={() => { if (confirm(`¿Eliminar "${d.name}" definitivamente? Esta acción no se puede deshacer.`)) run(eliminarDescripcion(d.id), 'Eliminada') }}>
+                        onClick={() => { if (confirm(`¿Eliminar "${d.name}"? No se puede deshacer.`)) run(eliminarDescripcion(d.id), 'Eliminada') }}>
                         <Trash2 />
                       </AccionIcono>
                     </div>
@@ -249,7 +249,7 @@ function Seccion({ title, hint, rows, ops, addPlaceholder }: { title: string; hi
                       {r.active ? <EyeOff /> : <Eye />}
                     </AccionIcono>
                     <AccionIcono label="Eliminar" destructivo disabled={busy}
-                      onClick={() => { if (confirm(`¿Eliminar "${r.name}" definitivamente? Esta acción no se puede deshacer.`)) run(ops.eliminar(r.id), 'Eliminado') }}>
+                      onClick={() => { if (confirm(`¿Eliminar "${r.name}"? No se puede deshacer.`)) run(ops.eliminar(r.id), 'Eliminado') }}>
                       <Trash2 />
                     </AccionIcono>
                   </div>
@@ -346,7 +346,7 @@ function PosicionesSection({ posiciones, areas, etapas, departamentos, departmen
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <SeccionHeader
         title="Posiciones" total={posiciones.length} destacada
-        hint="Es la pieza que manda: una posición decide qué áreas, etapas, departamentos y descripciones puede usar quien la tenga, y el banco de horas va por ella (columnas del Excel). Ábrela para configurarla."
+        hint="El banco de horas va por posición (columnas del Excel). Ábrela para configurarla."
       />
 
       <div className="mt-4 flex gap-2">
@@ -485,7 +485,6 @@ function PosicionesSection({ posiciones, areas, etapas, departamentos, departmen
                       Puede escribir la descripción a mano
                       <span className="mt-0.5 block text-xs text-muted-foreground">
                         Sin esto, en &quot;Departamento&quot; solo puede elegir de la lista (generales + las específicas de su posición).
-                        En los proyectos de cliente la descripción siempre se escribe libre.
                       </span>
                     </span>
                   </label>
@@ -533,7 +532,7 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <SeccionHeader
         title="Departamentos" total={departamentos.length}
-        hint='Solo aplican al proyecto interno "Departamento". Ábrelos para definir sus etapas; las descripciones se gestionan en su propia sección.'
+        hint='Solo para el proyecto interno "Departamento". Ábrelos para definir sus etapas.'
       />
 
       <div className="mt-4 flex gap-2">
@@ -632,7 +631,7 @@ export default function CatalogosPanel({ areas, etapas, descripciones, departame
             parece peligrosamente al de Departamentos. Merece el espacio para decirlo. */}
         <Seccion
           title="Equipos"
-          hint="Los equipos de la empresa (el organigrama: Clientes, RRHH…). Se asignan persona por persona en Usuarios y viajan en los avisos automáticos, que los usan para decidir a qué canal va cada mensaje. No confundir con Departamentos: aquello es lo que se elige al registrar horas en el proyecto «Departamento», y son dos listas distintas aunque algún nombre coincida."
+          hint="El organigrama (Clientes, RRHH…). Se asigna a cada persona en Usuarios y los avisos lo usan para elegir el canal de cada mensaje. No es lo mismo que Departamentos, que es lo que se elige al registrar en el proyecto «Departamento»."
           rows={equipos}
           addPlaceholder="Nuevo equipo…"
           ops={{ crear: crearEquipo, renombrar: renombrarEquipo, toggle: toggleEquipo, eliminar: eliminarEquipo }} />

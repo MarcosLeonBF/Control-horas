@@ -50,9 +50,9 @@ export function primerErrorLinea(lines: LineInput[]): string | null {
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i]
     const n = i + 1
-    if (!l.project) return `Línea ${n}: elegí un proyecto.`
-    if (!l.area_id) return `Línea ${n}: tu posición no tiene un área asignada. Pedile al administrador que le asigne un área a tu posición en Catálogos → Posiciones.`
-    if (!l.etapa_id) return `Línea ${n}: falta la etapa. Elegí una o, si el desplegable está vacío, pedile al admin que asigne etapas a tu posición.`
+    if (!l.project) return `Línea ${n}: elige un proyecto.`
+    if (!l.area_id) return `Línea ${n}: tu posición no tiene área. Pide a un administrador que se la asigne.`
+    if (!l.etapa_id) return `Línea ${n}: falta la etapa. Si no hay ninguna para elegir, pide al admin que asigne etapas a tu posición.`
   }
   return null
 }
@@ -369,7 +369,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
               no, la propia frase ya la distingue. */}
           {descripcionLibre && (
             <option value={OTRA} style={{ color: 'var(--brand-strong)', fontWeight: 500 }}>
-              ✎ Otra — escribir a mano
+              ✎ Otra: escribir a mano
             </option>
           )}
         </NativeSelect>
@@ -498,8 +498,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
                 ? 'tiene el banco de horas de tu posición excedido.'
                 : projectWarning?.finished
                 ? 'está marcado como finalizado en el Excel.'
-                : 'está pausado en el Excel.'}{' '}
-              ¿Deseas registrar horas de todas formas?
+                : 'está pausado en el Excel.'}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

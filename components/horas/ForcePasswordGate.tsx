@@ -37,9 +37,9 @@ export default function ForcePasswordGate({ displayName }: { displayName: string
         {/* Alerta */}
         <div className="rounded-2xl border border-(--status-bajo)/30 bg-(--status-bajo)/5 p-4 text-center">
           <ShieldAlert className="mx-auto mb-2 size-8 text-(--status-bajo)" />
-          <h1 className="font-display text-xl font-semibold text-foreground">Cambiá tu contraseña</h1>
+          <h1 className="font-display text-xl font-semibold text-foreground">Cambia tu contraseña</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Hola <strong className="font-medium text-foreground">{displayName}</strong>, por seguridad necesitás establecer una contraseña personal antes de continuar.
+            Hola, <strong className="font-medium text-foreground">{displayName}</strong>. Antes de continuar, elige una contraseña personal.
           </p>
         </div>
 

@@ -54,7 +54,7 @@ export default function LoginForm() {
   return (
     <div className="grid min-h-screen md:grid-cols-[1.05fr_1fr]">
       {/* ── Panel de marca ───────────────────────────────────────────── */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-[#BD0842] via-[#A0073A] to-[#54123D] p-14 text-white md:flex">
+      <aside className="relative hidden flex-col overflow-hidden bg-gradient-to-br from-[#BD0842] via-[#A0073A] to-[#54123D] p-14 text-white md:flex">
         {/* atmósfera: glow radial + anillos finos + grano */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_75%_15%,rgba(255,255,255,0.16),transparent_55%)]" />
         <div className="pointer-events-none absolute -bottom-48 -left-40 size-[34rem] rounded-full border border-white/12" />
@@ -69,18 +69,14 @@ export default function LoginForm() {
           Bienvenido a
         </p>
 
-        <div className="animate-fade-up relative flex flex-col items-center text-center [animation-delay:120ms]">
+        <div className="animate-fade-up relative my-auto flex flex-col items-center text-center [animation-delay:120ms]">
           <Image src="/logo-blanco.png" alt="Bastida &amp; Farina" width={400} height={140} priority className="h-20 w-auto" />
           <p className="font-display mt-7 text-2xl">Control de Rentabilidad</p>
           <div className="mt-5 h-px w-12 bg-white/40" />
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/75">
-            Registro de horas, bancos y HUCHA del equipo de Bastida &amp; Farina.
+            Registro de horas, bancos y HUCHA.
           </p>
         </div>
-
-        <p className="animate-fade-up relative text-xs text-white/60 [animation-delay:200ms]">
-          Bastida &amp; Farina · Sistema interno
-        </p>
       </aside>
 
       {/* ── Panel del formulario ─────────────────────────────────────── */}
@@ -94,9 +90,6 @@ export default function LoginForm() {
           <h1 className="animate-fade-up font-display mt-2 text-4xl font-semibold tracking-tight text-(--brand) [animation-delay:60ms]">
             Iniciar sesión
           </h1>
-          <p className="animate-fade-up mt-2 text-sm text-muted-foreground [animation-delay:100ms]">
-            Ingresá tus credenciales para continuar.
-          </p>
 
           <form onSubmit={handleLogin} className="mt-9 space-y-6">
             <div className="animate-fade-up space-y-1.5 [animation-delay:140ms]">
@@ -134,10 +127,6 @@ export default function LoginForm() {
               {loading ? 'Ingresando…' : 'Ingresar'}
             </Button>
           </form>
-
-          <p className="animate-fade-up mt-8 text-xs italic text-muted-foreground [animation-delay:280ms]">
-            *No compartas tus credenciales con nadie.
-          </p>
         </div>
       </main>
     </div>

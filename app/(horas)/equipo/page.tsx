@@ -94,10 +94,9 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-10">
       <header>
-        <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-(--brand)">Bastida &amp; Farina</p>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Estructura</h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Quién es quién por área —managers y operativos— y los registros de toda la operación.
+          Managers y operativos por área, y los registros de toda la operación.
         </p>
       </header>
 
@@ -174,8 +173,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
       <section>
         <h2 className="font-display mb-1 border-b border-border pb-2 text-lg font-semibold">Registros del equipo</h2>
         <p className="mb-4 mt-2 text-sm text-muted-foreground">
-          Cada registro se despliega para ver sus líneas: proyecto, área/departamento, etapa, horas y el motivo.
-          Se muestra el mes en curso; amplía el rango de fechas para ver registros anteriores.
+          Se muestra el mes en curso; amplía las fechas para ver registros anteriores. Abre un registro para ver sus líneas.
         </p>
         <EquipoRegistros logs={registros} isAdmin={viewer.role === 'admin'} from={from} to={to} />
       </section>

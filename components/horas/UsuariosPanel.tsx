@@ -338,7 +338,7 @@ export default function UsuariosPanel({ usuarios, areas, posiciones, managers, e
   }
 
   async function eliminar(u: UsuarioRow) {
-    if (!confirm(`¿Eliminar a "${u.full_name}" definitivamente? No se puede deshacer. Si tiene registros de horas, desactívalo en su lugar.`)) return
+    if (!confirm(`¿Eliminar a "${u.full_name}"? No se puede deshacer. Si tiene registros de horas, desactívalo en su lugar.`)) return
     setBusy(u.id)
     const res = await eliminarUsuario(u.id)
     setBusy(null)

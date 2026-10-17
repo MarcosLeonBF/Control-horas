@@ -31,7 +31,7 @@ export default function CambiarContrasenaForm() {
     const res = await cambiarContrasena(currentPassword, newPassword)
     setSaving(false)
     if (!res.ok) { toast.error(res.error); return }
-    toast.success('Contraseña actualizada correctamente.')
+    toast.success('Contraseña actualizada.')
     setCurrentPassword(''); setNewPassword(''); setConfirmPassword('')
     // Forzado o no, se queda en la página actual. El cambio forzado (ForcePasswordGate) se
     // pinta EN la URL a la que iba la persona, así que refrescar la deja justo ahí: si
@@ -83,7 +83,7 @@ export default function CambiarContrasenaForm() {
         </Label>
         <Input id="confirm-password" type={showNew ? 'text' : 'password'} autoComplete="new-password"
           required minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="Repetí la nueva contraseña" />
+          placeholder="Repite la nueva contraseña" />
       </div>
 
       <Button type="submit" disabled={saving} className="w-full sm:w-auto">

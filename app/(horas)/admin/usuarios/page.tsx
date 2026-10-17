@@ -91,8 +91,8 @@ export default async function UsuariosPage() {
           <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
             <p className="font-medium">No llegó el desactivar a tiempo ({sinDesactivar.length})</p>
             <p className="mt-1 text-xs">
-              Su Fecha fin ya pasó y siguen de vacaciones: las fechas no desactivan a nadie solas. Si la ausencia se
-              alargó, no hay que hacer nada (llegará el desactivar con la fecha nueva). Si ya volvió, desactívala aquí.
+              Su Fecha fin ya pasó y siguen de vacaciones: las fechas no desactivan solas. Si la ausencia se alargó,
+              llegará el desactivar con la fecha nueva; si ya volvió, desactívala aquí.
             </p>
             <ul className="mt-2 space-y-1">
               {sinDesactivar.map((a) => (
@@ -111,8 +111,8 @@ export default async function UsuariosPage() {
               Ausentes hoy sin usuario en la plataforma ({sinUsuario.length})
             </summary>
             <p className="mt-2 max-w-2xl text-xs text-muted-foreground">
-              Llegan del flujo de ausencias con un ID de Slack que no es de ningún usuario. Si alguno es de un usuario de
-              la plataforma, cárgale ese ID de Slack en su ficha: hasta entonces su ausencia no cuenta.
+              Llegan del flujo de ausencias con un ID de Slack que no tiene ningún usuario. Si es de alguien de la
+              plataforma, añade ese ID a su ficha: hasta entonces su ausencia no cuenta.
             </p>
             <ul className="mt-2 space-y-1">
               {sinUsuario.map((a) => (
@@ -134,8 +134,8 @@ export default async function UsuariosPage() {
         {acceso ? (
           <div className="max-w-3xl rounded-xl border border-border bg-card p-5 shadow-sm">
             <p className="text-sm text-muted-foreground">
-              Las altas se hacen en Acceso: allí se crea la cuenta, con su contraseña temporal, y se completan sus datos de
-              Control de Rentabilidad. Después aparece en esta lista y aquí se puede seguir editando su rol, sus áreas y lo demás.
+              Las altas se hacen en Acceso, con su contraseña temporal y sus datos de Control de Rentabilidad. Después
+              aparecen en esta lista para seguir editándolos.
             </p>
             <a href={`${acceso}/admin/usuarios/nuevo`} className={buttonVariants({ size: 'lg', className: 'mt-4 px-4' })}>
               Dar de alta en Acceso

@@ -50,7 +50,7 @@ export default async function PerfilPage() {
             <dd className="mt-0.5 text-sm font-medium text-foreground">{positionName || '—'}</dd>
           </div>
         </dl>
-        <p className="mt-4 text-xs text-muted-foreground">Para cambiar estos datos, contactá a un administrador.</p>
+        <p className="mt-4 text-xs text-muted-foreground">Para cambiar estos datos, habla con un administrador.</p>
       </div>
 
       {/* Cambio de contraseña. Con Acceso (docs/acceso.md) la contraseña es la de Acceso, la

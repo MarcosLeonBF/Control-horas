@@ -157,7 +157,7 @@ export default function AvisosPanel({ url, tiposActivos, envios, consultas, falt
       <section className="space-y-3">
         <h2 className="font-display text-lg">Consultas</h2>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Las pide el flujo cuando quiera, con la cabecera <code>Authorization: Bearer</code> y la clave <code>AVISOS_API_KEY</code> de Vercel.
+          Las pide el flujo con la cabecera <code>Authorization: Bearer</code> y la clave <code>AVISOS_API_KEY</code> de Vercel.
         </p>
         <ul className="space-y-1">
           {consultas.map((c) => <li key={c} className="break-all font-mono text-xs text-foreground/80">GET {c}</li>)}

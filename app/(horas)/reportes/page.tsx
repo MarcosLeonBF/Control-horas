@@ -24,7 +24,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">Reportes</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Horas registradas por el equipo. Ajusta el rango y agrupa como necesites.
+            Horas registradas por el equipo.
           </p>
         </div>
         <form className="flex w-full flex-wrap items-end gap-2 sm:w-auto">

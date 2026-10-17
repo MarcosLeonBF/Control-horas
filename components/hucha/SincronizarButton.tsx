@@ -36,7 +36,7 @@ export default function SincronizarButton() {
             <div className="mt-2">
               <p className="text-(--status-excedido)">Managers no encontrados ({report.managersNoEncontrados.length}):</p>
               <ul className="mt-1 list-disc pl-5 text-muted-foreground">
-                {report.managersNoEncontrados.map((m, i) => <li key={i}>{m.proyecto} — "{m.manager}"</li>)}
+                {report.managersNoEncontrados.map((m, i) => <li key={i}>{m.proyecto}: "{m.manager}"</li>)}
               </ul>
             </div>
           )}

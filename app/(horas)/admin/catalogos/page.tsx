@@ -65,10 +65,8 @@ export default async function CatalogosPage() {
         {/* Antes esto era el inventario de las secciones de abajo, que ya se ven. Decir
             cómo encajan entre sí es lo que no se puede deducir mirando la página. */}
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Una posición define qué puede registrar cada persona: sus áreas, sus etapas, sus departamentos y sus
-          descripciones. Lo demás son las listas de las que se nutre. Los proyectos y los bancos vienen del Excel.
-          Aparte va Equipos, que no decide nada de lo que se registra: es el organigrama, y sirve para que los
-          avisos automáticos sepan a quién corresponde cada persona.
+          Una posición decide qué áreas, etapas, departamentos y descripciones usa quien la tenga. Los proyectos y
+          los bancos vienen del Excel.
         </p>
       </header>
 

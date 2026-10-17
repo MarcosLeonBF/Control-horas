@@ -43,7 +43,6 @@ export default async function MisRegistrosPage() {
       <header>
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-(--brand)">Control de Rentabilidad</p>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Mis registros</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Tu historial de horas registradas por proyecto, de la más reciente a la más antigua.</p>
       </header>
       <MisRegistros rows={rows} />
     </div>

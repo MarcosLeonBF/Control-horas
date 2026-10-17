@@ -39,8 +39,7 @@ export default async function AvisosPage() {
       <header>
         <h1 className="font-display text-2xl">Avisos</h1>
         <p className="text-sm text-muted-foreground">
-          Salen hacia el webhook de los flujos de Zapier o n8n, que deciden a qué canal va cada uno. Abajo, en
-          Recibidos, lo que esos flujos le mandan a la plataforma.
+          Salen hacia el webhook de Zapier o n8n; el flujo decide a qué canal va cada uno.
         </p>
       </header>
       <AvisosPanel

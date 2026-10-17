@@ -11,7 +11,7 @@ export interface LineInput {
 export async function guardarRegistro(
   lines: LineInput[], logId: string | null = null
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  if (!lines.length) return { ok: false, error: 'Agregá al menos una línea.' }
+  if (!lines.length) return { ok: false, error: 'Añade al menos una línea.' }
   const supabase = await createClient()
 
   // Toda la validación de alcance por posición (área, etapa, departamento y descripción)

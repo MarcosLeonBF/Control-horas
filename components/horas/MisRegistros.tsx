@@ -39,9 +39,9 @@ export default function MisRegistros({ rows }: { rows: RegistroRow[] }) {
   if (!rows.length) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-card/40 px-6 py-16 text-center">
-        <p className="text-sm text-muted-foreground">Todavía no registraste horas.</p>
+        <p className="text-sm text-muted-foreground">Aún no has registrado horas.</p>
         <Link href="/registrar" className="mt-3 inline-block text-sm font-medium text-(--brand) transition-colors hover:text-(--brand-strong)">
-          Registrar mi primera jornada →
+          Registrar horas
         </Link>
       </div>
     )

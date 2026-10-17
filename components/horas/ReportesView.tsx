@@ -423,7 +423,7 @@ export default function ReportesView({
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              {selected ? `${labelDe(groupBy, selected)} — ${formatHorasTotal(selected.hours)}` : ''}
+              {selected ? `${labelDe(groupBy, selected)} · ${formatHorasTotal(selected.hours)}` : ''}
             </DialogTitle>
             <DialogDescription>
               Desglose por {GROUP_LABELS[subGroupBy].toLowerCase()}. Abre una fila para ver sus registros.

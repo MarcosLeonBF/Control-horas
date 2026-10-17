@@ -11,7 +11,7 @@ const ym = (year: number, monthIdx: number) => `${year}-${String(monthIdx + 1).p
 
 // Resumen para el disparador: un mes → "Julio 2026"; varios → "N meses"; nada → placeholder.
 function resumen(selected: string[]): string {
-  if (selected.length === 0) return 'Elegí meses'
+  if (selected.length === 0) return 'Elige meses'
   if (selected.length === 1) return formatMes(selected[0])
   const years = new Set(selected.map((m) => m.slice(0, 4)))
   return years.size === 1 ? `${selected.length} meses · ${[...years][0]}` : `${selected.length} meses`
