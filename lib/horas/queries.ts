@@ -6,7 +6,9 @@ export async function getCatalogos(): Promise<{ areas: AreaRow[]; etapas: EtapaR
   const [{ data: areas }, { data: etapas }, { data: descripciones }, { data: deps }, { data: depEtapas }] = await Promise.all([
     supabase.from('areas').select('id,name,is_internal').eq('active', true).order('name'),
     supabase.from('etapas').select('id,name').eq('active', true).order('name'),
-    supabase.from('descripciones').select('name').eq('active', true).order('name'),
+    // Solo las generales: las específicas (0044) llegan por getCatalogoDePosicion, y sin
+    // este filtro las de RRHH le salían a todo el mundo bajo "Generales".
+    supabase.from('descripciones').select('name').eq('active', true).eq('alcance', 'general').order('name'),
     supabase.from('departamentos').select('id,name,active').eq('active', true).order('name'),
     supabase.from('departamento_etapas').select('departamento_id,etapa_id')
   ])
