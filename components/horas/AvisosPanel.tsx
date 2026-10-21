@@ -29,7 +29,7 @@ const ESTADO_CLASE: Record<EnvioRow['estado'], string> = {
   pendiente: 'bg-(--status-bajo)/12 text-(--status-bajo)',
   enviando: 'bg-(--status-bajo)/12 text-(--status-bajo)',
   fallido: 'bg-(--status-excedido)/12 text-(--status-excedido)',
-  descartado: 'bg-neutral-100 text-neutral-500',
+  descartado: 'bg-muted text-muted-foreground',
 }
 
 // La hora que ve el admin es la de Madrid, no la del servidor (UTC).

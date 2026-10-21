@@ -96,7 +96,7 @@ export default async function RegistrarPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl">{heading}</h1>
+      <h1 className="font-display text-3xl font-semibold tracking-tight">{heading}</h1>
       <RegistroForm projects={projects} finishedProjects={finishedProjects} pausedProjects={pausedProjects} exceededProjects={exceededProjects} areas={selectableAreas} etapas={etapas} clientEtapas={clientEtapas} descripciones={descripciones} descripcionesPosicion={posicion.descripciones} descripcionLibre={posicion.descripcionLibre} departamentos={allowedDepartamentos} internalAreaId={internal.id} canBackdate={me?.role === 'admin'} diasAtras={me?.registro_dias_atras ?? DIAS_REGISTRO_POR_DEFECTO} initial={initial} returnTo={returnTo} />
     </div>
   )

@@ -3,14 +3,14 @@ import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { guardarRegistro, type LineInput } from '@/app/(horas)/registrar/actions'
-import { formatHoras, hmAHoras, horasAHM } from '@/lib/horas/format'
+import { formatFechaISO, formatHoras, hmAHoras, horasAHM } from '@/lib/horas/format'
 import type { AreaRow, EtapaRow, DepartamentoRow } from '@/lib/horas/types'
 import { DIAS_REGISTRO_POR_DEFECTO } from '@/lib/horas/ventana-registro'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
-import { TriangleAlert, CircleHelp, List } from 'lucide-react'
+import { TriangleAlert, CircleHelp, List, Plus, X } from 'lucide-react'
 import ProjectCombobox from '@/components/horas/ProjectCombobox'
 import DepartamentoSelect from '@/components/horas/DepartamentoSelect'
 import NativeSelect from '@/components/ui/native-select'
@@ -58,7 +58,7 @@ export function primerErrorLinea(lines: LineInput[]): string | null {
 }
 
 const field =
-  'w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+  'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
 
 // La cabecera de Tiempo explica el formato al pasar por encima. El circulito es la
 // señal de que hay algo que leer: apagado hasta que el puntero llega a la etiqueta, para
@@ -297,7 +297,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
       // del contenido ("0:00h") porque el tiempo es un dato corto, no una frase.
       // El padding horizontal va aquí y no en las casillas: con box-border, un pl-2.5
       // dentro de un w-[2ch] se comería la cifra.
-      <div className="inline-flex w-fit items-center rounded-lg border border-border bg-background px-2.5 focus-within:border-transparent focus-within:ring-2 focus-within:ring-ring">
+      <div className="inline-flex h-9 w-fit items-center rounded-lg border border-input bg-background px-2.5 focus-within:border-transparent focus-within:ring-2 focus-within:ring-ring">
         <input
           aria-label="Horas"
           type="number" inputMode="numeric" min="0" step="1" placeholder="0"
@@ -339,7 +339,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
           <input aria-label="Descripción" type="text" value={l.description} autoFocus
             onChange={(e) => update(i, { description: e.target.value })} placeholder="Escribe la descripción…" className={field} />
           <Button type="button" variant="ghost" size="icon-sm" aria-label="Elegir de la lista"
-            className="shrink-0 text-foreground/55 hover:text-foreground"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
             onClick={() => { setDescLibres((p) => p.map((v, idx) => (idx === i ? false : v))); update(i, { description: '' }) }}>
             <List />
           </Button>
@@ -384,7 +384,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
 
   const removeBtn = (i: number) => (
     <Button type="button" variant="ghost" size="icon-sm" onClick={() => { setLines((p) => p.filter((_, idx) => idx !== i)); setTiempos((p) => p.filter((_, idx) => idx !== i)); setDescLibres((p) => p.filter((_, idx) => idx !== i)) }}
-      disabled={lines.length === 1} aria-label="Eliminar línea" className="text-foreground/40 hover:text-(--status-excedido)">✕</Button>
+      disabled={lines.length === 1} aria-label="Eliminar línea" className="text-muted-foreground hover:text-(--status-excedido)"><X /></Button>
   )
 
   return (
@@ -455,7 +455,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
 
       <div className="mt-4 flex items-start justify-between border-t border-border pt-4">
         <Button type="button" variant="link" size="sm" className="px-0" onClick={() => { setLines((p) => [...p, emptyLine(areas[0]?.id ?? '', defaultDate)]); setTiempos((p) => [...p, { h: '', m: '' }]); setDescLibres((p) => [...p, false]) }}>
-          + Añadir línea
+          <Plus /> Añadir línea
         </Button>
         <div className="text-right">
           <span className="text-sm text-muted-foreground">
@@ -463,7 +463,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
           </span>
           {dates.length > 1 && (
             <div className="mt-1 text-xs text-muted-foreground">
-              {dates.map((d) => `${d}: ${formatHoras(byDate[d])}`).join(' · ')}
+              {dates.map((d) => `${formatFechaISO(d)}: ${formatHoras(byDate[d])}`).join(' · ')}
             </div>
           )}
         </div>

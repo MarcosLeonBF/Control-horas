@@ -105,7 +105,7 @@ function DescripcionesSection({ descripciones, posiciones }: { descripciones: De
                     {/* Una específica sin posiciones existe y no la ve nadie: se dice, no se
                         deduce del hueco donde deberían estar las posiciones. */}
                     {huerfana ? (
-                      <Badge className="bg-amber-50 text-amber-700">Sin posiciones: no la ve nadie</Badge>
+                      <Badge className="bg-(--status-bajo)/10 text-(--status-bajo)">Sin posiciones: no la ve nadie</Badge>
                     ) : d.alcance === 'posicion' ? (
                       <Badge className="bg-(--brand)/10 text-(--brand-strong)">{d.positionIds.map(nombrePosicion).filter(Boolean).join(' · ')}</Badge>
                     ) : (
@@ -378,11 +378,11 @@ function PosicionesSection({ posiciones, areas, etapas, departamentos, departmen
                         : <>{p.areaIds.length} {p.areaIds.length === 1 ? 'área' : 'áreas'}</>}
                       <span className="px-1 text-foreground/25">·</span>
                       {p.etapaIds.length === 0
-                        ? <span className="text-foreground/40">Sin etapas</span>
+                        ? <span className="text-muted-foreground">Sin etapas</span>
                         : <>{p.etapaIds.length} {p.etapaIds.length === 1 ? 'etapa' : 'etapas'}</>}
                       <span className="px-1 text-foreground/25">·</span>
                       {p.departamentoIds.length === 0
-                        ? <span className="text-foreground/40">Sin departamentos</span>
+                        ? <span className="text-muted-foreground">Sin departamentos</span>
                         : <>{p.departamentoIds.length} {p.departamentoIds.length === 1 ? 'departamento' : 'departamentos'}</>}
                     </span>
                     {/* La libertad de descripción (0044) también es configuración de la
@@ -560,7 +560,7 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
                     <span className={`text-sm font-medium ${d.active ? '' : 'text-muted-foreground line-through'}`}>{d.name}</span>
                     <span className="text-xs text-muted-foreground">
                       {d.etapaIds.length === 0
-                        ? <span className="text-foreground/40">Sin etapas</span>
+                        ? <span className="text-muted-foreground">Sin etapas</span>
                         : <>{d.etapaIds.length} {d.etapaIds.length === 1 ? 'etapa' : 'etapas'}</>}
                     </span>
                     {!d.active && <Badge variant="outline" className="text-muted-foreground">inactivo</Badge>}

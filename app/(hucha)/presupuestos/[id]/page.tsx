@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { getProjectWithBank, getMovements } from '@/lib/hucha/queries'
 import { formatEUR } from '@/lib/hucha/format'
 import type { HuchaStatus } from '@/lib/hucha/types'
@@ -24,9 +25,9 @@ const BAR_COLOR: Record<HuchaStatus, string> = {
 function Cifra({ label, value, caption, excedido }: { label: string; value: string; caption?: string; excedido?: boolean }) {
   return (
     <div className="p-5">
-      <dt className="text-xs text-foreground/50">{label}</dt>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className={cn('tabular-money mt-1 text-2xl font-semibold', excedido && 'text-(--status-excedido)')}>{value}</dd>
-      {caption && <dd className="mt-1 text-xs text-foreground/45">{caption}</dd>}
+      {caption && <dd className="mt-1 text-xs text-muted-foreground">{caption}</dd>}
     </div>
   )
 }
@@ -56,7 +57,7 @@ export default async function DetallePage({ params }: { params: Promise<{ id: st
 
   return (
     <div>
-      <Link href="/presupuestos" className="text-xs text-foreground/55 hover:text-foreground">← HUCHA</Link>
+      <Link href="/presupuestos" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft aria-hidden className="size-3.5" />HUCHA</Link>
 
       <header className="mt-3 mb-8">
         <h1 className="font-display text-3xl font-semibold tracking-tight">{project.name}</h1>

@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Clock, ChevronRight, ChevronDown, Info } from 'lucide-react'
+import { ArrowLeft, Clock, ChevronRight, ChevronDown, Info } from 'lucide-react'
 import type { BancoHorasDetalle } from '@/lib/horas/bancos-status'
 import { computeHorasStatus, estadoProyectoBadgeClass, HORAS_BAR_COLOR } from '@/lib/horas/bancos-status'
 import { formatHoras, formatFechaISO, currentMonth, mesCorto } from '@/lib/horas/format'
@@ -26,9 +26,9 @@ const MOVIMIENTOS_INICIALES = 10
 function Cifra({ label, extra, value, caption, excedido }: { label: string; extra?: ReactNode; value: string; caption?: string; excedido?: boolean }) {
   return (
     <div className="p-5">
-      <dt className="flex items-center gap-1.5 text-xs text-foreground/50">{label}{extra}</dt>
+      <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">{label}{extra}</dt>
       <dd className={cn('tabular-money mt-1 text-2xl font-semibold', excedido && 'text-(--status-excedido)')}>{value}</dd>
-      {caption && <dd className="mt-1 text-xs text-foreground/45">{caption}</dd>}
+      {caption && <dd className="mt-1 text-xs text-muted-foreground">{caption}</dd>}
     </div>
   )
 }
@@ -163,7 +163,7 @@ export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDet
 
   return (
     <div>
-      <Link href="/bancos" className="text-xs text-foreground/55 hover:text-foreground">← Bancos de horas</Link>
+      <Link href="/bancos" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft aria-hidden className="size-3.5" />Bancos de horas</Link>
 
       <header className="mt-3 mb-8">
         <div className="min-w-0">
@@ -244,13 +244,13 @@ export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDet
               <span aria-hidden className="size-2.5 shrink-0 rounded-[3px] bg-(--status-disponible)" />
               Libres (carry)
               <strong className="tabular-money font-semibold text-(--status-disponible)">+{formatHoras(cab.libres)}</strong>
-              <span className="text-foreground/45">ya sumadas al disponible real</span>
+              <span className="text-muted-foreground">ya sumadas al disponible real</span>
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span aria-hidden className="size-2.5 shrink-0 rounded-[3px] bg-foreground/10" style={HATCH} />
               Inutilizables
               <strong className="tabular-money font-semibold text-foreground/70">{formatHoras(cab.inutilizables)}</strong>
-              <span className="text-foreground/45">ya descontadas del disponible real</span>
+              <span className="text-muted-foreground">ya descontadas del disponible real</span>
             </span>
           </div>
         )}
@@ -283,7 +283,7 @@ export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDet
                   <th className="px-4 py-2.5 font-medium text-right">
                     <span className="inline-flex items-center gap-1">
                       Asignado
-                      {mesEsProvisional(mesUnico) && <span className="rounded-full bg-(--brand)/10 px-1 py-px text-[0.55rem] font-medium text-(--brand)">prov</span>}
+                      {mesEsProvisional(mesUnico) && <span className="rounded-full bg-(--brand)/10 px-1 py-px text-[0.65rem] font-medium text-(--brand)">prov</span>}
                     </span>
                   </th>
                   <th className="px-4 py-2.5 font-medium text-right">Consumido</th>
@@ -330,7 +330,7 @@ export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDet
                     <th key={month} className="px-3 py-2.5 text-center font-medium whitespace-nowrap">
                       <span className="inline-flex items-center gap-1">
                         {mesCorto(month)}
-                        {mesEsProvisional(month) && <span className="rounded-full bg-(--brand)/10 px-1 py-px text-[0.55rem] font-medium text-(--brand)">prov</span>}
+                        {mesEsProvisional(month) && <span className="rounded-full bg-(--brand)/10 px-1 py-px text-[0.65rem] font-medium text-(--brand)">prov</span>}
                       </span>
                     </th>
                   ))}
@@ -488,7 +488,7 @@ export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDet
                       <td className={`tabular-money px-4 py-2.5 text-right whitespace-nowrap ${m.kind === 'ampliacion' ? 'text-(--brand)' : ''}`}>
                         {m.kind === 'ampliacion' ? '+' : '−'}{formatHoras(m.hours)}
                       </td>
-                      <td className="tabular-money px-4 py-2.5 text-right text-foreground/55 whitespace-nowrap">{formatHoras(m.saldoAntes)}</td>
+                      <td className="tabular-money px-4 py-2.5 text-right text-muted-foreground whitespace-nowrap">{formatHoras(m.saldoAntes)}</td>
                       <td className={`tabular-money px-4 py-2.5 text-right whitespace-nowrap ${m.saldoDespues < 0 ? 'text-(--status-excedido)' : ''}`}>{formatHoras(m.saldoDespues)}</td>
                       <td className="px-4 py-2.5 whitespace-nowrap">{m.actor}</td>
                       <td className="px-4 py-2.5 text-foreground/70">{m.detail}</td>

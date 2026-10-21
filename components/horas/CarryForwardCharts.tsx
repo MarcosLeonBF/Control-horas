@@ -152,7 +152,7 @@ function MesBar({ m }: { m: BancoMensual }) {
     <li className="flex items-center gap-3">
       <span className="flex w-24 shrink-0 items-center gap-1.5 text-xs whitespace-nowrap text-foreground/60">
         {mesCorto(m.month)}
-        {m.provisional && <span className="rounded-full bg-(--brand)/10 px-1 py-px text-[0.55rem] font-medium text-(--brand)">prov</span>}
+        {m.provisional && <span className="rounded-full bg-(--brand)/10 px-1 py-px text-[0.65rem] font-medium text-(--brand)">prov</span>}
       </span>
       <BarraMes m={m} className="flex-1" />
       <span className="w-24 shrink-0 text-right text-xs tabular-money whitespace-nowrap">
@@ -223,7 +223,7 @@ export function CierrePosicionPanel({ posicion }: { posicion: BancoHorasRow }) {
   const pctLibres = Math.round(regla.libres * 100)
   return (
     <div>
-      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-xs tabular-money text-foreground/50">
+      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-xs tabular-money text-muted-foreground">
         <p>
           {posicion.carryNeto > 0 && <span className="font-medium text-(--status-disponible)">+{formatHoras(posicion.carryNeto)} libres</span>}
           {posicion.carryNeto > 0 && posicion.inutilizables > 0 && ' · '}

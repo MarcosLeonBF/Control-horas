@@ -83,12 +83,12 @@ export default async function UsuariosPage() {
   return (
     <div className="space-y-10">
       <section className="space-y-4">
-        <h1 className="font-display text-2xl">Usuarios</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Usuarios</h1>
         <UsuariosPanel usuarios={usuarios} areas={areas} posiciones={posiciones} managers={managers} equipos={equipos} readOnly={!esAdmin} />
         {/* Plegado: casi siempre será gente de Slack que no usa la plataforma. Lo que importa
             es encontrar a un usuario al que le falta cargar su ID de Slack. */}
         {sinDesactivar.length > 0 && (
-          <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+          <div className="rounded-xl bg-(--status-bajo)/10 px-4 py-3 text-sm text-(--status-bajo) ring-1 ring-(--status-bajo)/25">
             <p className="font-medium">No llegó el desactivar a tiempo ({sinDesactivar.length})</p>
             <p className="mt-1 text-xs">
               Su Fecha fin ya pasó y siguen de vacaciones: las fechas no desactivan solas. Si la ausencia se alargó,

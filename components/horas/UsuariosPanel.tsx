@@ -440,14 +440,14 @@ export default function UsuariosPanel({ usuarios, areas, posiciones, managers, e
                               CSS): es el contrato que ya afirman los E2E del panel. */}
                           <div className="flex flex-col items-start gap-1">
                             {inactivo ? (
-                              <Badge className="bg-neutral-100 capitalize text-neutral-500">{u.status}</Badge>
+                              <Badge className="bg-muted capitalize text-muted-foreground">{u.status}</Badge>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 text-sm text-foreground/70">
-                                <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" />
+                                <span aria-hidden className="size-1.5 rounded-full bg-(--status-disponible)" />
                                 <span className="capitalize">{u.status}</span>
                               </span>
                             )}
-                            {u.ausencia && <Badge className="bg-amber-50 text-amber-800">{u.ausencia}</Badge>}
+                            {u.ausencia && <Badge className="bg-(--status-bajo)/10 text-(--status-bajo)">{u.ausencia}</Badge>}
                           </div>
                         </TableCell>
                         {!readOnly && (

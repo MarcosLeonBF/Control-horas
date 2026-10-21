@@ -41,7 +41,6 @@ export default async function MisRegistrosPage() {
   return (
     <div className="space-y-7">
       <header>
-        <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-(--brand)">Control de Rentabilidad</p>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Mis registros</h1>
       </header>
       <MisRegistros rows={rows} />

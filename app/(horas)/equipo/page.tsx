@@ -29,8 +29,8 @@ function PersonaChip({ m, manager = false }: { m: MiembroEquipo; manager?: boole
     >
       <span
         className={cn(
-          'grid size-6 shrink-0 place-items-center rounded-full text-[0.55rem] font-semibold',
-          manager ? 'bg-(--brand) text-white' : 'bg-background text-foreground/55 ring-1 ring-border',
+          'grid size-6 shrink-0 place-items-center rounded-full text-[0.65rem] font-semibold',
+          manager ? 'bg-(--brand) text-white' : 'bg-background text-muted-foreground ring-1 ring-border',
         )}
       >
         {initials(m.name)}
@@ -38,7 +38,7 @@ function PersonaChip({ m, manager = false }: { m: MiembroEquipo; manager?: boole
       <span className={cn('truncate text-sm', manager ? 'font-medium text-foreground' : 'text-foreground/85', inactive && 'text-muted-foreground')}>
         {m.name}
       </span>
-      {inactive && <span className="text-[0.55rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">Inactivo</span>}
+      {inactive && <span className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Inactivo</span>}
     </span>
   )
 }
@@ -145,16 +145,16 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
                   <div className="space-y-4">
                     {a.managers.length > 0 && (
                       <div>
-                        <p className="mb-2 text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Managers</p>
+                        <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Managers</p>
                         <div className="flex flex-wrap gap-2">
                           {a.managers.map((m, i) => <PersonaChip key={i} m={m} manager />)}
                         </div>
                       </div>
                     )}
                     <div>
-                      <p className="mb-2 text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Operativos</p>
+                      <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Operativos</p>
                       {a.operativos.length === 0 ? (
-                        <p className="text-sm text-muted-foreground/60">Sin operativos en esta área.</p>
+                        <p className="text-sm text-muted-foreground">Sin operativos en esta área.</p>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {a.operativos.map((m, i) => <PersonaChip key={i} m={m} />)}

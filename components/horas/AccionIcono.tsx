@@ -25,7 +25,7 @@ export default function AccionIcono({ label, tooltip, onClick, disabled, destruc
           <Button
             variant="ghost" size="icon-sm" aria-label={label} disabled={disabled} onClick={onClick}
             className={cn(
-              'text-foreground/55 hover:text-foreground',
+              'text-muted-foreground hover:text-foreground',
               destructivo && 'hover:bg-destructive/10 hover:text-destructive',
               activo && 'bg-(--brand)/10 text-(--brand-strong) hover:bg-(--brand)/15 hover:text-(--brand-strong)',
             )}

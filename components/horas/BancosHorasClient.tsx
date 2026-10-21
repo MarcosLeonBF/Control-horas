@@ -44,7 +44,7 @@ function excedidoTitle(g: BancoHorasProyecto): string | undefined {
 }
 
 const selectClass =
-  'h-10 min-w-40 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
+  'h-9 min-w-40 rounded-lg border border-input bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
 // `hint`: a qué periodo se refiere la cifra, para que no se lea como el total del banco
 // cuando la vista es Mensual.
@@ -206,7 +206,7 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl">Bancos de horas</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Bancos de horas</h1>
         <p className="text-sm text-muted-foreground">Horas asignadas (Excel) frente a las registradas, por proyecto y posición.</p>
       </div>
 
@@ -251,7 +251,7 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               aria-label="Buscar proyecto" placeholder="Buscar proyecto…"
-              value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 pl-9"
+              value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 pl-9"
             />
           </div>
           <span className="shrink-0 text-sm text-muted-foreground">
@@ -284,12 +284,12 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
           </FilterField>
           <FilterField label="Fecha de auditoría">
             <div className="flex items-center gap-1.5">
-              <Input aria-label="Auditoría desde" type="date" value={auditFrom} max={auditTo || undefined} onChange={(e) => setAuditFrom(e.target.value)} className="h-10 w-34" />
+              <Input aria-label="Auditoría desde" type="date" value={auditFrom} max={auditTo || undefined} onChange={(e) => setAuditFrom(e.target.value)} className="h-9 w-34" />
               <span aria-hidden className="text-muted-foreground/60">–</span>
-              <Input aria-label="Auditoría hasta" type="date" value={auditTo} min={auditFrom || undefined} onChange={(e) => setAuditTo(e.target.value)} className="h-10 w-34" />
+              <Input aria-label="Auditoría hasta" type="date" value={auditTo} min={auditFrom || undefined} onChange={(e) => setAuditTo(e.target.value)} className="h-9 w-34" />
             </div>
           </FilterField>
-          <label className="inline-flex h-10 cursor-pointer select-none items-center gap-2 self-end rounded-lg border border-border bg-card px-3 text-sm text-foreground transition-colors hover:bg-(--muted-surface)">
+          <label className="inline-flex h-9 cursor-pointer select-none items-center gap-2 self-end rounded-lg border border-border bg-card px-3 text-sm text-foreground transition-colors hover:bg-(--muted-surface)">
             <input
               type="checkbox"
               checked={mostrarFinalizados}
@@ -301,7 +301,7 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
           {(search || estado !== 'todos' || posicion !== 'todas' || manager !== 'todos' || auditFrom || auditTo || mostrarFinalizados) && (
             <button
               onClick={() => { setSearch(''); setEstado('todos'); setPosicion('todas'); setManager('todos'); setAuditFrom(''); setAuditTo(''); setMostrarFinalizados(false) }}
-              className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:text-(--brand)"
+              className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:text-(--brand)"
             >
               <X className="size-3.5" /> Limpiar filtros
             </button>
@@ -310,11 +310,11 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
           <div className="ml-auto flex items-center gap-2 self-end text-sm">
             <span className="text-muted-foreground">Descargar</span>
             <button onClick={() => void downloadXlsx(`${fileBase}.xlsx`, buildRows(), 'Bancos')}
-              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-foreground/80 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-foreground/80 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
               <Download className="size-3.5" /> Excel
             </button>
             <button onClick={() => downloadCsv(`${fileBase}.csv`, buildRows())}
-              className="inline-flex h-10 items-center rounded-lg border border-border bg-card px-3 text-foreground/80 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
+              className="inline-flex h-9 items-center rounded-lg border border-border bg-card px-3 text-foreground/80 transition-colors hover:bg-(--muted-surface) hover:text-foreground">
               CSV
             </button>
           </div>
@@ -347,7 +347,7 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
                 <li key={g.project}>
                   <Link
                     href={`/bancos/${encodeURIComponent(g.project)}`}
-                    className="group flex w-full items-center gap-3 px-4 py-3.5 outline-none transition-colors hover:bg-(--muted-surface)/50 focus-visible:bg-(--muted-surface)/50 md:gap-4 md:px-5"
+                    className="group flex w-full items-center gap-3 px-4 py-3.5 outline-none transition-colors hover:bg-(--muted-surface)/50 focus-visible:bg-(--muted-surface)/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:gap-4 md:px-5"
                   >
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="flex items-center gap-2.5">
@@ -402,7 +402,7 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
                         ? <span aria-label="Sin datos este mes" className="text-sm text-muted-foreground/50">—</span>
                         : <HorasStatusBadge status={g.status} />}
                       {excedidoDetalle(g) && (
-                        <span className="max-w-full truncate text-[0.7rem] leading-none text-rose-700/80">{excedidoDetalle(g)}</span>
+                        <span className="max-w-full truncate text-[0.7rem] leading-none text-(--status-excedido)">{excedidoDetalle(g)}</span>
                       )}
                     </span>
                     <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-(--brand) md:block" />

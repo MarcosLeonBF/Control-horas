@@ -44,7 +44,7 @@ const BAR_COLOR: Record<HuchaStatus, string> = {
 const ESTADOS: HuchaStatus[] = ['excedido', 'bajo', 'disponible', 'consumido', 'sin_presupuesto']
 
 const selectClass =
-  'rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
+  'h-9 rounded-lg border border-input bg-card px-3 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
 function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'excedido' | 'bajo' }) {
   return (
@@ -141,7 +141,7 @@ export default function DashboardClient({ rows }: { rows: DashboardRow[] }) {
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             aria-label="Buscar proyecto" placeholder="Buscar proyecto o cliente…"
-            value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 pl-9"
+            value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 pl-9"
           />
         </div>
         <NativeSelect aria-label="Estado" value={estado} onChange={(e) => setEstado(e.target.value as HuchaStatus | 'todos')} className={selectClass}>
@@ -170,7 +170,7 @@ export default function DashboardClient({ rows }: { rows: DashboardRow[] }) {
           <span>–</span>
           <input aria-label="Hasta" type="date" value={toMov} min={fromMov || undefined}
             onChange={(e) => setToMov(e.target.value)} className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground" />
-          <span className="text-foreground/45">(consumos/ampliaciones)</span>
+          <span className="text-muted-foreground">(consumos/ampliaciones)</span>
         </span>
       </div>
 

@@ -82,10 +82,12 @@ export default function HistoricoMatriz({ lines }: { lines: ReporteLine[] }) {
             {DIMENSIONES.map((g) => (
               <button
                 key={g}
+                type="button"
+                aria-pressed={dim === g}
                 onClick={() => setDim(g)}
                 className={cn(
                   'shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
-                  dim === g ? 'bg-(--brand) text-white shadow-sm' : 'text-foreground/55 hover:text-foreground',
+                  dim === g ? 'bg-(--brand) text-white shadow-sm' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {GROUP_LABELS[g]}

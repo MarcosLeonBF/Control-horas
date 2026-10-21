@@ -52,7 +52,7 @@ export default function MonthPicker({ value, onChange, available, className }: M
     <Popover.Root>
       <Popover.Trigger
         className={cn(
-          'inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-foreground shadow-sm transition-colors hover:bg-(--muted-surface) focus:outline-none focus:ring-2 focus:ring-ring data-popup-open:ring-2 data-popup-open:ring-ring',
+          'inline-flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 text-sm text-foreground shadow-sm transition-colors hover:bg-(--muted-surface) focus:outline-none focus:ring-2 focus:ring-ring data-popup-open:ring-2 data-popup-open:ring-ring',
           className,
         )}
       >

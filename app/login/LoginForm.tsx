@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { rutaInternaSegura } from '@/lib/ruta-segura'
 
 const underline = cn(
-  'h-11 rounded-none border-0 border-b border-border bg-transparent px-0 text-sm',
+  'h-11 rounded-none border-0 border-b border-input bg-transparent px-0 text-sm',
   'shadow-none transition-colors placeholder:text-muted-foreground',
   'focus-visible:border-(--brand) focus-visible:ring-0',
 )
@@ -24,7 +24,6 @@ export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -65,10 +64,6 @@ export default function LoginForm() {
           <rect width="100%" height="100%" filter="url(#grain)" />
         </svg>
 
-        <p className="animate-fade-up relative text-xs font-medium uppercase tracking-[0.3em] text-white/70">
-          Bienvenido a
-        </p>
-
         <div className="animate-fade-up relative my-auto flex flex-col items-center text-center [animation-delay:120ms]">
           <Image src="/logo-blanco.png" alt="Bastida &amp; Farina" width={400} height={140} priority className="h-20 w-auto" />
           <p className="font-display mt-7 text-2xl">Control de Rentabilidad</p>
@@ -84,10 +79,7 @@ export default function LoginForm() {
         <div className="mx-auto w-full max-w-sm">
           <Image src="/logo-negro.png" alt="Bastida &amp; Farina" width={400} height={140} className="mb-10 h-9 w-auto md:hidden" />
 
-          <p className="animate-fade-up text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground">
-            Acceso
-          </p>
-          <h1 className="animate-fade-up font-display mt-2 text-4xl font-semibold tracking-tight text-(--brand) [animation-delay:60ms]">
+          <h1 className="animate-fade-up font-display text-4xl font-semibold tracking-tight text-(--brand) [animation-delay:60ms]">
             Iniciar sesión
           </h1>
 
@@ -103,7 +95,7 @@ export default function LoginForm() {
               <Label htmlFor="password" className="text-xs uppercase tracking-wide text-muted-foreground">Contraseña</Label>
               <div className="relative">
                 <Input id="password" aria-label="Contraseña" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required
-                  value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
+                  value={password} onChange={(e) => setPassword(e.target.value)}
                   className={cn(underline, 'pr-8')} />
                 <button type="button" onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? 'Ocultar clave' : 'Mostrar clave'}
@@ -113,14 +105,8 @@ export default function LoginForm() {
               </div>
             </div>
 
-            <label className="animate-fade-up flex items-center gap-2 text-sm text-muted-foreground [animation-delay:210ms]">
-              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
-                className="size-4 accent-(--brand)" />
-              Recordarme
-            </label>
-
             {error && (
-              <p className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-(--brand-strong)">{error}</p>
+              <p role="alert" className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-(--brand-strong)">{error}</p>
             )}
 
             <Button type="submit" disabled={loading} className="animate-fade-up h-11 w-full [animation-delay:240ms]">

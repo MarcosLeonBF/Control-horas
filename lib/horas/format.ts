@@ -16,6 +16,13 @@ export function formatHorasTotal(n: number): string {
   return HORAS.format(Number(n)) + 'h'
 }
 
+// Rol → cómo se nombra en pantalla (menú lateral y perfil).
+const ROL: Record<string, string> = { operativo: 'Operativo', manager: 'Manager', admin: 'Administrador' }
+
+export function formatRol(role: string): string {
+  return ROL[role] ?? role
+}
+
 // ISO "YYYY-MM-DD" → "DD/MM/YYYY" (sin desfase de zona horaria). Si no es una fecha
 // ISO válida, devuelve la entrada tal cual.
 export function formatFechaISO(iso: string): string {

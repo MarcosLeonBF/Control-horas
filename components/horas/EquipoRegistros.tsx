@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ChevronRight, Pencil, Ban } from 'lucide-react'
-import { formatHoras } from '@/lib/horas/format'
+import { formatFechaISO, formatHoras } from '@/lib/horas/format'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { anularRegistroEquipo } from '@/app/(horas)/equipo/actions'
@@ -35,7 +35,7 @@ export interface EquipoLog {
 
 type Estado = 'todos' | 'guardado' | 'editado' | 'anulado'
 
-const inputCls = 'rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
+const inputCls = 'rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring'
 
 // Registros del equipo: una fila por registro diario que se despliega para ver sus líneas.
 // El admin ve acciones Editar/Anular en el panel desplegado.
@@ -176,10 +176,10 @@ export default function EquipoRegistros({
                     type="button"
                     onClick={() => toggle(l.id)}
                     aria-expanded={open}
-                    className="group flex w-full items-center gap-4 px-4 py-3 text-left outline-none transition-colors hover:bg-(--muted-surface)/50 focus-visible:bg-(--muted-surface)/50"
+                    className="group flex w-full items-center gap-4 px-4 py-3 text-left outline-none transition-colors hover:bg-(--muted-surface)/50 focus-visible:bg-(--muted-surface)/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
                     <ChevronRight className={cn('size-4 shrink-0 text-muted-foreground/60 transition-transform duration-300 group-hover:text-(--brand)', open && 'rotate-90')} />
-                    <span className="w-28 shrink-0 tabular-money text-sm whitespace-nowrap text-foreground/70">{l.entry_date}</span>
+                    <span className="w-28 shrink-0 tabular-money text-sm whitespace-nowrap text-foreground/70">{formatFechaISO(l.entry_date)}</span>
                     <span className="min-w-0 flex-1 truncate text-sm text-foreground/85">{l.user}</span>
                     <span className="w-20 shrink-0 text-right tabular-money text-sm font-medium">{formatHoras(l.total_hours)}</span>
                     <span className="w-24 shrink-0 text-right">

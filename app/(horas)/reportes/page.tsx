@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getReporteLines, getReporteOptions } from '@/lib/horas/reportes'
 import { getViewerScope } from '@/lib/horas/scope'
 import ReportesView from '@/components/horas/ReportesView'
+import { buttonVariants } from '@/components/ui/button'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const localISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -30,13 +31,13 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
         <form className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
           <label className="flex flex-1 flex-col gap-1 sm:flex-none">
             <span className="text-xs text-muted-foreground">Desde</span>
-            <input type="date" name="from" defaultValue={from} max={to} className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm sm:w-auto" />
+            <input type="date" name="from" defaultValue={from} max={to} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm sm:w-auto" />
           </label>
           <label className="flex flex-1 flex-col gap-1 sm:flex-none">
             <span className="text-xs text-muted-foreground">Hasta</span>
-            <input type="date" name="to" defaultValue={to} max={localISO(now)} className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm sm:w-auto" />
+            <input type="date" name="to" defaultValue={to} max={localISO(now)} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm sm:w-auto" />
           </label>
-          <button type="submit" className="h-9 shrink-0 rounded-lg bg-(--wine) px-4 text-sm font-medium text-white transition-opacity hover:opacity-90">
+          <button type="submit" className={buttonVariants({ size: 'lg', className: 'shrink-0 px-4' })}>
             Aplicar
           </button>
         </form>

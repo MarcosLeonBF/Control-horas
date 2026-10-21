@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { formatRol } from '@/lib/horas/format'
 
 type Icon = ComponentType<{ className?: string }>
 interface Item { href: string; label: string; icon: Icon; show: boolean }
@@ -69,6 +70,12 @@ export default function AppShell({ displayName, role, canCreateUsers = false, ur
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => { setMobileOpen(false) }, [pathname])
+  useEffect(() => {
+    if (!mobileOpen) return
+    const cerrar = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileOpen(false) }
+    window.addEventListener('keydown', cerrar)
+    return () => window.removeEventListener('keydown', cerrar)
+  }, [mobileOpen])
 
   const sections = buildSections(role, canCreateUsers)
   const hrefs = sections.flatMap((s) => s.items.map((i) => i.href))
@@ -93,6 +100,7 @@ export default function AppShell({ displayName, role, canCreateUsers = false, ur
     return (
       <Link
         href={item.href}
+        aria-current={active ? 'page' : undefined}
         title={collapsed ? item.label : undefined}
         className={cn(
           'group relative flex items-center gap-3 rounded-lg py-2 text-sm transition-colors',
@@ -111,7 +119,7 @@ export default function AppShell({ displayName, role, canCreateUsers = false, ur
     <div className="min-h-screen bg-background text-foreground">
       {/* Barra superior solo móvil */}
       <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-card/85 px-4 backdrop-blur lg:hidden">
-        <button onClick={() => setMobileOpen(true)} aria-label="Abrir menú" className="text-foreground/70 hover:text-foreground">
+        <button onClick={() => setMobileOpen(true)} aria-label="Abrir menú" aria-expanded={mobileOpen} className="text-foreground/70 hover:text-foreground">
           <Menu className="size-5" />
         </button>
         <Image src="/logo-negro.png" alt="Bastida &amp; Farina" width={400} height={140} priority className="h-6 w-auto" />
@@ -146,12 +154,12 @@ export default function AppShell({ displayName, role, canCreateUsers = false, ur
         </div>
 
         {/* Navegación */}
-        <nav className="relative flex-1 overflow-y-auto px-3 pb-4">
+        <nav aria-label="Principal" className="relative flex-1 overflow-y-auto px-3 pb-4 [scrollbar-color:rgb(255_255_255/0.2)_transparent] [scrollbar-width:thin]">
           {sections.map((section, si) => (
             <div key={section.title}>
               {collapsed
                 ? si > 0 && <div className="mx-auto my-3 h-px w-8 bg-white/10" />
-                : <p className="px-3 pt-5 pb-1.5 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/30">{section.title}</p>}
+                : <p className="px-3 pt-5 pb-1.5 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/50">{section.title}</p>}
               <div className="space-y-0.5">
                 {section.items.map((item) => <NavLink key={item.href} item={item} />)}
               </div>
@@ -166,7 +174,7 @@ export default function AppShell({ displayName, role, canCreateUsers = false, ur
             {!collapsed && (
               <div className="min-w-0 flex-1">
                 <Link href="/perfil" className="block truncate text-sm font-medium text-white hover:underline">{displayName}</Link>
-                <p className="truncate text-xs capitalize text-white/45">{role}</p>
+                <p className="truncate text-xs text-white/55">{formatRol(role)}</p>
               </div>
             )}
             <button onClick={logout} title="Salir" aria-label="Salir" className={cn('text-white/50 transition-colors hover:text-white', collapsed && 'hidden')}>

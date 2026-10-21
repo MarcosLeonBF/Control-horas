@@ -17,7 +17,7 @@ export default function NativeSelect({
       <select
         {...props}
         className={cn(
-          'h-9 appearance-none rounded-lg border border-border bg-background pl-2.5 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+          'h-9 appearance-none rounded-lg border border-input bg-background pl-2.5 text-sm text-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
           fullWidth && 'w-full',
           className,
           'pr-9',

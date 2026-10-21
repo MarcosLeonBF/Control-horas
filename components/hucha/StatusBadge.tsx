@@ -1,12 +1,13 @@
 import type { HuchaStatus } from '@/lib/hucha/types'
 import { STATUS_LABELS } from '@/lib/hucha/format'
+import { TONO } from '@/components/ui/tono'
 
 const STYLES: Record<HuchaStatus, string> = {
-  disponible: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  bajo: 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  consumido: 'bg-slate-100 text-slate-600 ring-slate-500/20',
-  excedido: 'bg-rose-50 text-rose-700 ring-rose-600/20',
-  sin_presupuesto: 'bg-neutral-100 text-neutral-500 ring-neutral-400/20',
+  disponible: TONO.disponible,
+  bajo: TONO.bajo,
+  consumido: TONO.consumido,
+  excedido: TONO.excedido,
+  sin_presupuesto: TONO.sin,
 }
 
 export default function StatusBadge({ status }: { status: HuchaStatus }) {

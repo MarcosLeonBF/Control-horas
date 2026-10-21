@@ -61,7 +61,7 @@ function RankRow({
     <button
       type="button"
       onClick={onClick}
-      className={cn(base, 'cursor-pointer transition-colors hover:bg-(--muted-surface)/60 focus:outline-none focus-visible:bg-(--muted-surface)/60')}
+      className={cn(base, 'cursor-pointer transition-colors hover:bg-(--muted-surface)/60 focus:outline-none focus-visible:bg-(--muted-surface)/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring')}
     >
       {inner}
     </button>
@@ -254,10 +254,10 @@ export default function ReportesView({
     <div className="animate-fade-up space-y-7">
       {/* Resumen */}
       <div className="grid gap-5 rounded-2xl border border-border bg-card px-6 py-5 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Total de horas" value={formatHorasTotal(totals.total)} accent="brand" />
-        <Stat label="Horas cliente" value={formatHorasTotal(totals.cliente)} accent="wine" />
-        <Stat label="Horas internas" value={formatHorasTotal(totals.internas)} accent="muted" />
-        <Stat label="Líneas" value={String(totals.lineas)} accent="muted" />
+        <Stat label="Total de horas" value={formatHorasTotal(totals.total)} />
+        <Stat label="Horas cliente" value={formatHorasTotal(totals.cliente)} />
+        <Stat label="Horas internas" value={formatHorasTotal(totals.internas)} />
+        <Stat label="Líneas" value={String(totals.lineas)} />
       </div>
 
       {/* Filtros */}
@@ -313,12 +313,14 @@ export default function ReportesView({
             {GROUP_ORDER.map((g) => (
               <button
                 key={g}
+                type="button"
+                aria-pressed={groupBy === g}
                 // "Ordenar por horas" no significa lo mismo en Proyecto que en Mes:
                 // cambiar de dimensión vuelve al orden por defecto de la nueva.
                 onClick={() => { setGroupBy(g); setOrden(null) }}
                 className={cn(
                   'shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
-                  groupBy === g ? 'bg-(--brand) text-white shadow-sm' : 'text-foreground/55 hover:text-foreground',
+                  groupBy === g ? 'bg-(--brand) text-white shadow-sm' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {GROUP_LABELS[g]}

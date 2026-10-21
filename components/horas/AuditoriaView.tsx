@@ -16,15 +16,16 @@ import { formatHoras, formatFechaISO } from '@/lib/horas/format'
 import NativeSelect from '@/components/ui/native-select'
 import { Stat, selectFiltroClass } from '@/components/horas/Stat'
 import { cn } from '@/lib/utils'
+import { TONO } from '@/components/ui/tono'
 
 // Rejilla compartida por la cabecera de columnas y cada fila, para que no se
 // desalineen al plegar y desplegar grupos.
 const ROW_GRID = 'grid w-full grid-cols-[1.25rem_8.5rem_6rem_6.5rem_1fr_1fr_4.5rem] items-center gap-3'
 
 const ACTION_STYLE: Record<AuditAction, string> = {
-  crear: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  editar: 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  anular: 'bg-rose-50 text-rose-700 ring-rose-600/20',
+  crear: TONO.disponible,
+  editar: TONO.bajo,
+  anular: TONO.excedido,
 }
 
 function AccionBadge({ action }: { action: AuditAction }) {
@@ -108,10 +109,10 @@ export default function AuditoriaView({
     <div className="animate-fade-up space-y-6">
       {/* Resumen */}
       <div className="grid gap-5 rounded-2xl border border-border bg-card px-6 py-5 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Movimientos" value={String(resumen.movimientos)} accent="brand" />
-        <Stat label="Ediciones" value={String(resumen.ediciones)} accent="wine" />
-        <Stat label="Anulaciones" value={String(resumen.anulaciones)} accent="muted" />
-        <Stat label="Personas que editaron" value={String(resumen.personas)} accent="muted" />
+        <Stat label="Movimientos" value={String(resumen.movimientos)} />
+        <Stat label="Ediciones" value={String(resumen.ediciones)} />
+        <Stat label="Anulaciones" value={String(resumen.anulaciones)} />
+        <Stat label="Personas que editaron" value={String(resumen.personas)} />
       </div>
 
       {/* Filtros */}
@@ -161,10 +162,12 @@ export default function AuditoriaView({
             {AUDIT_GROUP_ORDER.map((g) => (
               <button
                 key={g}
+                type="button"
+                aria-pressed={groupBy === g}
                 onClick={() => cambiarAgrupacion(g)}
                 className={cn(
                   'shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
-                  groupBy === g ? 'bg-(--brand) text-white shadow-sm' : 'text-foreground/55 hover:text-foreground',
+                  groupBy === g ? 'bg-(--brand) text-white shadow-sm' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {AUDIT_GROUP_LABELS[g]}
@@ -256,7 +259,7 @@ function CabeceraGrupo({ grupo, abierto, onToggle }: { grupo: AuditGroup; abiert
       type="button"
       onClick={onToggle}
       aria-expanded={abierto}
-      className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-(--muted-surface)/60 focus:outline-none focus-visible:bg-(--muted-surface)/60"
+      className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-(--muted-surface)/60 focus:outline-none focus-visible:bg-(--muted-surface)/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     >
       <ChevronRight className={cn('size-4 shrink-0 text-muted-foreground transition-transform', abierto && 'rotate-90')} aria-hidden />
       <span className="min-w-0 flex-1 truncate font-medium text-foreground">{grupo.label}</span>
@@ -276,9 +279,9 @@ function CabeceraGrupo({ grupo, abierto, onToggle }: { grupo: AuditGroup; abiert
 }
 
 const MARK_STYLE: Record<DiffMark, string> = {
-  '+': 'text-emerald-700',
-  '-': 'text-rose-700',
-  '~': 'text-amber-700',
+  '+': 'text-(--status-disponible)',
+  '-': 'text-(--status-excedido)',
+  '~': 'text-(--status-bajo)',
   '=': 'text-muted-foreground',
 }
 
@@ -326,7 +329,7 @@ function Fila({ entry }: { entry: AuditEntry }) {
         aria-expanded={abierto}
         className={cn(
           ROW_GRID,
-          'px-5 py-3 text-left text-sm transition-colors hover:bg-(--muted-surface)/60 focus:outline-none focus-visible:bg-(--muted-surface)/60',
+          'px-5 py-3 text-left text-sm transition-colors hover:bg-(--muted-surface)/60 focus:outline-none focus-visible:bg-(--muted-surface)/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
         )}
       >
         <ChevronRight className={cn('size-3.5 text-muted-foreground transition-transform', abierto && 'rotate-90')} aria-hidden />
@@ -368,7 +371,7 @@ function ErrorDetalle({ mensaje }: { mensaje: string }) {
 // hueco que el desglose, para que abrir y cerrar no dé saltos de layout.
 function AvisoDetalle({ children, tono }: { children: ReactNode; tono?: 'error' }) {
   return (
-    <p className={cn(DETALLE_CAJA, 'py-4 text-xs', tono === 'error' ? 'text-rose-700' : 'text-muted-foreground')}>
+    <p className={cn(DETALLE_CAJA, 'py-4 text-xs', tono === 'error' ? 'text-(--status-excedido)' : 'text-muted-foreground')}>
       {children}
     </p>
   )

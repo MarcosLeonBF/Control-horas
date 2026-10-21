@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuditEntries, AUDIT_MAX_ROWS } from '@/lib/horas/auditoria'
 import type { AuditDateBase } from '@/lib/horas/auditoria-types'
 import { addDiasISO, diaMadrid } from '@/lib/horas/auditoria-types'
+import { buttonVariants } from '@/components/ui/button'
 import NativeSelect from '@/components/ui/native-select'
 import AuditoriaView from '@/components/horas/AuditoriaView'
 
@@ -40,7 +41,7 @@ export default async function AuditoriaPage({
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl">Auditoría</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Auditoría</h1>
           <p className="text-sm text-muted-foreground">Toda creación, edición o anulación de registros queda trazada.</p>
         </div>
         <form className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
@@ -53,20 +54,20 @@ export default async function AuditoriaPage({
           </label>
           <label className="flex flex-1 flex-col gap-1 sm:flex-none">
             <span className="text-xs text-muted-foreground">Desde</span>
-            <input type="date" name="from" defaultValue={from} max={to} className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm sm:w-auto" />
+            <input type="date" name="from" defaultValue={from} max={to} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm sm:w-auto" />
           </label>
           <label className="flex flex-1 flex-col gap-1 sm:flex-none">
             <span className="text-xs text-muted-foreground">Hasta</span>
-            <input type="date" name="to" defaultValue={to} max={hoyMadrid} className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm sm:w-auto" />
+            <input type="date" name="to" defaultValue={to} max={hoyMadrid} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm sm:w-auto" />
           </label>
-          <button type="submit" className="h-9 shrink-0 rounded-lg bg-(--wine) px-4 text-sm font-medium text-white transition-opacity hover:opacity-90">
+          <button type="submit" className={buttonVariants({ size: 'lg', className: 'shrink-0 px-4' })}>
             Aplicar
           </button>
         </form>
       </header>
 
       {truncado && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p className="rounded-lg border border-(--status-bajo)/25 bg-(--status-bajo)/10 px-4 py-3 text-sm text-(--status-bajo)">
           Mostrando los {AUDIT_MAX_ROWS.toLocaleString('es-ES')} movimientos más recientes del rango. Acota las fechas para verlo entero.
         </p>
       )}

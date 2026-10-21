@@ -37,7 +37,7 @@ export default async function AvisosPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-display text-2xl">Avisos</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Avisos</h1>
         <p className="text-sm text-muted-foreground">
           Salen hacia el webhook de Zapier o n8n; el flujo decide a qué canal va cada uno.
         </p>

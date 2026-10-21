@@ -60,12 +60,12 @@
     --secondary: #F4EFEC;
     --secondary-foreground: #1D1D1B;
     --muted: #F4EFEC;
-    --muted-foreground: #7A716B;
+    --muted-foreground: #6B635D;
     --accent: #F4EFEC;               /* hover neutro de shadcn (no es el acento de marca) */
     --accent-foreground: #1D1D1B;
     --destructive: #A0073A;
     --border: #ECE4DF;
-    --input: #ECE4DF;
+    --input: #978B84;                /* borde de controles: 3:1 sobre el papel */
     --ring: #BD0842;                 /* foco carmín */
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
@@ -94,8 +94,8 @@
     --muted-surface: #F4EFEC;  /* relleno sutil (cabeceras de tabla) */
 
     /* estados HUCHA */
-    --status-disponible: #157F5B;
-    --status-bajo: #B5760A;
+    --status-disponible: #127352;
+    --status-bajo: #8A5A08;
     --status-consumido: #6B6560;
     --status-excedido: #A0073A;
     --status-sin: #9A938D;
@@ -157,6 +157,8 @@
   body {
     @apply bg-background text-foreground;
     }
+  /* El placeholder de preflight (texto al 50%) no llega a 4.5:1 sobre el papel. */
+  input::placeholder, textarea::placeholder { color: var(--muted-foreground); }
   html {
     @apply font-sans;
     }
@@ -174,4 +176,15 @@
 /* Shimmer para skeletons de carga (barrido suave sobre el bloque). */
 @keyframes skeleton-shimmer {
   100% { transform: translateX(100%); }
+}
+
+::selection { background: color-mix(in srgb, var(--brand) 18%, transparent); }
+
+/* Con "reducir movimiento" las entradas, barras y skeletons aparecen ya en su sitio. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

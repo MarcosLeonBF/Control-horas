@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import CambiarContrasenaForm from '@/components/horas/CambiarContrasenaForm'
 import { buttonVariants } from '@/components/ui/button'
 import { urlAcceso } from '@/lib/hub/config'
+import { formatRol } from '@/lib/horas/format'
 
 export default async function PerfilPage() {
   const supabase = await createClient()
@@ -22,12 +23,11 @@ export default async function PerfilPage() {
     positionName = pos?.name ?? null
   }
 
-  const roleLabels: Record<string, string> = { operativo: 'Operativo', manager: 'Manager', admin: 'Administrador' }
   const acceso = urlAcceso() // null sin Acceso: el formulario de siempre
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl">Mi perfil</h1>
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Mi perfil</h1>
 
       {/* Datos informativos (solo lectura) */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
@@ -43,7 +43,7 @@ export default async function PerfilPage() {
           </div>
           <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">Rol</dt>
-            <dd className="mt-0.5 text-sm font-medium text-foreground capitalize">{roleLabels[profile.role] ?? profile.role}</dd>
+            <dd className="mt-0.5 text-sm font-medium text-foreground capitalize">{formatRol(profile.role)}</dd>
           </div>
           <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">Posición</dt>

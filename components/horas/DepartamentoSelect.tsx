@@ -25,7 +25,7 @@ export default function DepartamentoSelect({
       <Select.Trigger
         aria-label={ariaLabel}
         className={cn(
-          'flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-border bg-background px-2.5 text-left text-sm text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring data-popup-open:ring-2 data-popup-open:ring-ring',
+          'flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-input bg-background px-2.5 text-left text-sm text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring data-popup-open:ring-2 data-popup-open:ring-ring',
           className,
         )}
       >
