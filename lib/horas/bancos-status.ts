@@ -128,7 +128,7 @@ export interface BancoHorasProyecto {
   inutilizables: number
   carryNeto: number
   status: HorasStatus // estado del banco a nivel proyecto (calculado sobre los totales)
-  excedidas: string[] // posiciones concretas en estado 'excedido' (para matizar el badge)
+  causantes: string[] // posiciones que dejan al proyecto en bajo/excedido, la peor primero (matizan el badge)
   monthly: BancoMensual[]
 }
 
@@ -143,6 +143,13 @@ export function estadoProyectoBadgeClass(estado: string): string {
   return 'bg-(--muted-surface) text-muted-foreground'
 }
 
+// Estados de posición que explican el del proyecto. En bajo cuentan también las consumidas y
+// excedidas: si el total queda por debajo del 20%, al menos una posición está así.
+const CAUSAS: Partial<Record<HorasStatus, HorasStatus[]>> = {
+  excedido: ['excedido'],
+  bajo: ['bajo', 'consumido', 'excedido'],
+}
+
 // Agrupa las filas (proyecto+posición) por proyecto, sumando el banco total y
 // calculando el estado a nivel proyecto. Las posiciones quedan ordenadas por nombre.
 export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[] {
@@ -150,7 +157,7 @@ export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[
   for (const r of rows) {
     let g = map.get(r.project)
     if (!g) {
-      g = { project: r.project, projectEstado: r.projectEstado, manager: r.manager, fechaAuditoria: r.fechaAuditoria, positions: [], assigned: 0, consumed: 0, remaining: 0, inutilizables: 0, carryNeto: 0, status: 'sin_asignacion', excedidas: [], monthly: [] }
+      g = { project: r.project, projectEstado: r.projectEstado, manager: r.manager, fechaAuditoria: r.fechaAuditoria, positions: [], assigned: 0, consumed: 0, remaining: 0, inutilizables: 0, carryNeto: 0, status: 'sin_asignacion', causantes: [], monthly: [] }
       map.set(r.project, g)
     }
     g.positions.push(r)
@@ -164,9 +171,12 @@ export function groupBancosByProject(rows: BancoHorasRow[]): BancoHorasProyecto[
     g.remaining = g.assigned - g.consumed - g.inutilizables
     g.status = computeHorasStatus(g.assigned - g.inutilizables, g.consumed)
     g.positions.sort((a, b) => a.position.localeCompare(b.position))
-    // Qué posiciones están excedidas: permite distinguir "excedido en una" de
-    // "excedido en todas", que a nivel proyecto se ven igual sobre los totales.
-    g.excedidas = g.positions.filter((p) => p.status === 'excedido').map((p) => p.position)
+    // Sobre los totales, "Bajo" o "Excedido" no dicen en qué: se nombran las posiciones.
+    const peores = CAUSAS[g.status] ?? []
+    g.causantes = g.positions
+      .filter((p) => peores.includes(p.status))
+      .sort((a, b) => HORAS_SEVERITY[a.status] - HORAS_SEVERITY[b.status])
+      .map((p) => p.position)
     // Mensual del proyecto = suma de lo mensual de sus posiciones.
     const byMonth = new Map<string, BancoMensual>()
     for (const p of g.positions) {

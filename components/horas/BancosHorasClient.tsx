@@ -30,17 +30,19 @@ function estadoOrden(estado?: string): number {
 // badge, porque el estado se calcula sobre los totales. Cuando solo lo están algunas
 // se dice debajo del badge cuál (o cuántas posiciones de cuántas); si lo están todas,
 // "Excedido" a secas ya es exacto. El badge queda igual en todas las filas.
-function excedidoParcial(g: BancoHorasProyecto): boolean {
-  return g.status === 'excedido' && g.excedidas.length > 0 && g.excedidas.length < g.positions.length
+// En qué posiciones está bajo o excedido el proyecto, bajo el badge. Si lo están todas, el
+// badge ya lo dice solo.
+function causantesParcial(g: BancoHorasProyecto): boolean {
+  return g.causantes.length > 0 && g.causantes.length < g.positions.length
 }
-function excedidoDetalle(g: BancoHorasProyecto): string | undefined {
-  if (!excedidoParcial(g)) return undefined
-  return g.excedidas.length === 1
-    ? `en ${g.excedidas[0]}`
-    : `en ${g.excedidas.length} de ${g.positions.length} posiciones`
+function causantesDetalle(g: BancoHorasProyecto): string | undefined {
+  if (!causantesParcial(g)) return undefined
+  const [a, b, ...resto] = g.causantes
+  if (!b) return `en ${a}`
+  return resto.length === 0 ? `en ${a} y ${b}` : `en ${a}, ${b} y ${resto.length} más`
 }
-function excedidoTitle(g: BancoHorasProyecto): string | undefined {
-  return excedidoParcial(g) ? `Excedido en: ${g.excedidas.join(', ')}` : undefined
+function causantesTitle(g: BancoHorasProyecto): string | undefined {
+  return causantesParcial(g) ? `${HORAS_STATUS_LABELS[g.status]} en: ${g.causantes.join(', ')}` : undefined
 }
 
 const selectClass =
@@ -397,12 +399,12 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
                       <span className="text-muted-foreground">/{formatHoras(g.assigned)}</span>
                     </span>
 
-                    <span className="flex w-32 shrink-0 flex-col items-end justify-center gap-1 md:w-40" title={excedidoTitle(g)}>
+                    <span className="flex w-32 shrink-0 flex-col items-end justify-center gap-1 md:w-40" title={causantesTitle(g)}>
                       {vista === 'mensual' && g.assigned === 0 && g.consumed === 0 && !marcaProv
                         ? <span aria-label="Sin datos este mes" className="text-sm text-muted-foreground/50">—</span>
                         : <HorasStatusBadge status={g.status} />}
-                      {excedidoDetalle(g) && (
-                        <span className="max-w-full truncate text-[0.7rem] leading-none text-(--status-excedido)">{excedidoDetalle(g)}</span>
+                      {causantesDetalle(g) && (
+                        <span className={cn('max-w-full truncate text-[0.7rem] leading-none', g.status === 'excedido' ? 'text-(--status-excedido)' : 'text-(--status-bajo)')}>{causantesDetalle(g)}</span>
                       )}
                     </span>
                     <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-(--brand) md:block" />
