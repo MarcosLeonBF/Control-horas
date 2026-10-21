@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import NativeSelect from '@/components/ui/native-select'
 import { Badge } from '@/components/ui/badge'
+import { useConfirmar } from '@/components/ui/confirmar'
 import AccionIcono from '@/components/horas/AccionIcono'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -305,6 +306,7 @@ function Editor({ u, areas, posiciones, managers, equipos, onDone }: { u: Usuari
 
 export default function UsuariosPanel({ usuarios, areas, posiciones, managers, equipos, readOnly = false }: { usuarios: UsuarioRow[]; areas: AreaRow[]; posiciones: PosicionOpt[]; managers: PosicionOpt[]; equipos: PosicionOpt[]; readOnly?: boolean }) {
   const router = useRouter()
+  const confirmar = useConfirmar()
   const [editing, setEditing] = useState<string | null>(null)
   const [dias, setDias] = useState<UsuarioRow | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -329,6 +331,7 @@ export default function UsuariosPanel({ usuarios, areas, posiciones, managers, e
   }, [usuarios, posiciones, q, soloAmpliados])
 
   async function toggle(u: UsuarioRow) {
+    if (u.status === 'activo' && !(await confirmar({ titulo: `¿Desactivar a ${u.full_name}?`, texto: 'No podrá entrar en la app hasta que lo vuelvas a activar. Sus registros se conservan.', accion: 'Desactivar' }))) return
     setBusy(u.id)
     const res = await cambiarEstadoUsuario(u.id, u.status === 'activo' ? 'inactivo' : 'activo')
     setBusy(null)
@@ -338,7 +341,7 @@ export default function UsuariosPanel({ usuarios, areas, posiciones, managers, e
   }
 
   async function eliminar(u: UsuarioRow) {
-    if (!confirm(`¿Eliminar a "${u.full_name}"? No se puede deshacer. Si tiene registros de horas, desactívalo en su lugar.`)) return
+    if (!(await confirmar({ titulo: `¿Eliminar a ${u.full_name}?`, texto: 'No se puede deshacer. Si tiene registros de horas, desactívalo en su lugar.', accion: 'Eliminar' }))) return
     setBusy(u.id)
     const res = await eliminarUsuario(u.id)
     setBusy(null)

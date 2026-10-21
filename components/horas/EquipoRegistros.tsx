@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { ChevronRight, Pencil, Ban } from 'lucide-react'
 import { formatFechaISO, formatHoras } from '@/lib/horas/format'
 import { Badge } from '@/components/ui/badge'
+import { useConfirmar } from '@/components/ui/confirmar'
 import { cn } from '@/lib/utils'
 import { anularRegistroEquipo } from '@/app/(horas)/equipo/actions'
 
@@ -57,6 +58,7 @@ export default function EquipoRegistros({
   to: string
 }) {
   const router = useRouter()
+  const confirmar = useConfirmar()
   const pathname = usePathname()
   const [pending, startTransition] = useTransition()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -86,10 +88,11 @@ export default function EquipoRegistros({
       return next
     })
 
-  async function onAnular(id: string) {
-    if (!confirm('¿Anular este registro? Devolverá las horas al banco correspondiente.')) return
-    setBusy(id)
-    const res = await anularRegistroEquipo(id)
+  async function onAnular(log: EquipoLog) {
+    const texto = `Se anula el registro de ${log.user} del ${formatFechaISO(log.entry_date)} (${formatHoras(log.total_hours)}${log.lines.length > 1 ? `, ${log.lines.length} líneas` : ''}). Las horas vuelven a sus bancos.`
+    if (!(await confirmar({ titulo: '¿Anular este registro?', texto, accion: 'Anular' }))) return
+    setBusy(log.id)
+    const res = await anularRegistroEquipo(log.id)
     setBusy(null)
     if (!res.ok) { toast.error(res.error); return }
     toast.success('Registro anulado'); router.refresh()
@@ -230,7 +233,7 @@ export default function EquipoRegistros({
                               <Pencil className="size-4" /> Editar
                             </Link>
                             <button
-                              onClick={() => onAnular(l.id)}
+                              onClick={() => onAnular(l)}
                               disabled={busy === l.id}
                               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                             >

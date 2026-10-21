@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { hmAHoras, horasAHM, horasAMinutos, minutosAHoras } from '../lib/horas/format'
+import { formatHM, hmAHoras, horasAHM, horasAMinutos, minutosAHoras } from '../lib/horas/format'
 
 // El caso que motivó la feature: 10 minutos no caben exactos en centésimas de hora
 // (0,1666…), y la decisión tomada es redondear.
@@ -99,4 +99,11 @@ test('el viaje de ida y vuelta cierra para toda combinacion de una jornada', () 
       expect(horasAHM(hmAHoras(h, m))).toEqual({ h, m })
     }
   }
+})
+
+// El total de /registrar repite el formato del campo: 1 y 30 se lee "1:30h", no "1,50h".
+test('formatHM escribe horas y minutos como el campo', () => {
+  expect(formatHM(hmAHoras(1, 30))).toBe('1:30h')
+  expect(formatHM(minutosAHoras(10))).toBe('0:10h')
+  expect(formatHM(12)).toBe('12:00h')
 })

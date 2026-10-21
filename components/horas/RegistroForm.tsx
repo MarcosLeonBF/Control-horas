@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { guardarRegistro, type LineInput } from '@/app/(horas)/registrar/actions'
-import { formatFechaISO, formatHoras, hmAHoras, horasAHM } from '@/lib/horas/format'
+import { formatFechaISO, formatHM, hmAHoras, horasAHM } from '@/lib/horas/format'
 import type { AreaRow, EtapaRow, DepartamentoRow } from '@/lib/horas/types'
 import { DIAS_REGISTRO_POR_DEFECTO } from '@/lib/horas/ventana-registro'
 import { Input } from '@/components/ui/input'
@@ -459,11 +459,11 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
         </Button>
         <div className="text-right">
           <span className="text-sm text-muted-foreground">
-            Total: <strong className="tabular-money ml-1 text-base text-foreground">{formatHoras(total)}</strong>
+            Total: <strong className="tabular-money ml-1 text-base text-foreground">{formatHM(total)}</strong>
           </span>
           {dates.length > 1 && (
             <div className="mt-1 text-xs text-muted-foreground">
-              {dates.map((d) => `${formatFechaISO(d)}: ${formatHoras(byDate[d])}`).join(' · ')}
+              {dates.map((d) => `${formatFechaISO(d)}: ${formatHM(byDate[d])}`).join(' · ')}
             </div>
           )}
         </div>

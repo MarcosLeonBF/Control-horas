@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { fraunces, geistSans, geistMono } from '@/lib/fonts'
 import { Toaster } from '@/components/ui/sonner'
+import { ConfirmarProvider } from '@/components/ui/confirmar'
 
 export const metadata: Metadata = {
   title: 'Control de Rentabilidad',
@@ -18,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning className={`${fraunces.variable} ${geistSans.variable} ${geistMono.variable}`}>
       <body suppressHydrationWarning className="min-h-screen antialiased">
-        {children}
+        <ConfirmarProvider>{children}</ConfirmarProvider>
         <Toaster richColors position="top-center" />
       </body>
     </html>

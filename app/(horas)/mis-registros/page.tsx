@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { formatHoras } from '@/lib/horas/format'
+import { formatHM } from '@/lib/horas/format'
 import MisRegistros, { type RegistroRow } from '@/components/horas/MisRegistros'
 
 // Formateador determinista (locale + UTC fijos) → se calcula en el servidor.
@@ -32,7 +32,7 @@ export default async function MisRegistrosPage() {
         status,
         dateLabel,
         project: ln.project,
-        hoursLabel: formatHoras(Number(ln.hours)),
+        hoursLabel: formatHM(Number(ln.hours)),
         description: ln.description,
       })
     })

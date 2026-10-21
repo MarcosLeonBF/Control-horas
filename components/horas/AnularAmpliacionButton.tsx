@@ -4,13 +4,15 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { anularAmpliacionHoras } from '@/app/(horas)/bancos/[project]/actions'
 import { Button } from '@/components/ui/button'
+import { useConfirmar } from '@/components/ui/confirmar'
 
 export default function AnularAmpliacionButton({ id, project }: { id: string; project: string }) {
   const router = useRouter()
+  const confirmar = useConfirmar()
   const [busy, setBusy] = useState(false)
 
   async function onClick() {
-    if (!confirm('¿Anular esta ampliación de horas? Dejará de sumar al asignado.')) return
+    if (!(await confirmar({ titulo: '¿Anular esta ampliación?', texto: 'Las horas ampliadas dejarán de sumar al asignado del proyecto.', accion: 'Anular' }))) return
     setBusy(true)
     const res = await anularAmpliacionHoras(id, project)
     setBusy(false)

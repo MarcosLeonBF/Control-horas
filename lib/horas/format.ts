@@ -109,3 +109,10 @@ export function horasAHM(horas: number): { h: number; m: number } {
   const min = horasAMinutos(horas)
   return { h: Math.floor(min / 60), m: min % 60 }
 }
+
+// Horas → "1:30h", como se escriben en /registrar. Para lo que la persona teclea y relee
+// (su total al registrar, sus registros); bancos, reportes y exportaciones siguen en decimales.
+export function formatHM(horas: number): string {
+  const { h, m } = horasAHM(horas)
+  return `${h}:${String(m).padStart(2, '0')}h`
+}

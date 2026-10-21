@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import AccionIcono from '@/components/horas/AccionIcono'
+import { useConfirmar, type Pregunta } from '@/components/ui/confirmar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import {
   crearArea, renombrarArea, toggleArea, eliminarArea,
@@ -37,6 +38,7 @@ interface Ops {
 function useRun() {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
+  const confirmar = useConfirmar()
   async function run(p: Promise<Result>, okMsg: string): Promise<boolean> {
     setBusy(true)
     const res = await p
@@ -44,13 +46,17 @@ function useRun() {
     if (!res.ok) { toast.error(res.error); return false }
     toast.success(okMsg); router.refresh(); return true
   }
-  return { busy, run }
+  // Borrar siempre pregunta antes: la acción no se lanza hasta que se confirma.
+  async function runSiConfirma(pregunta: Pregunta, accion: () => Promise<Result>, okMsg: string): Promise<boolean> {
+    return (await confirmar(pregunta)) && run(accion(), okMsg)
+  }
+  return { busy, run, runSiConfirma }
 }
 
 // Descripciones del proyecto "Departamento" (0044). No usa `Seccion` porque cada fila
 // lleva algo que las demás no tienen: su alcance, y las posiciones que la ven.
 function DescripcionesSection({ descripciones, posiciones }: { descripciones: DescripcionRow[]; posiciones: PosicionRow[] }) {
-  const { busy, run } = useRun()
+  const { busy, run, runSiConfirma } = useRun()
   const [nuevo, setNuevo] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
@@ -129,7 +135,7 @@ function DescripcionesSection({ descripciones, posiciones }: { descripciones: De
                         {d.active ? <EyeOff /> : <Eye />}
                       </AccionIcono>
                       <AccionIcono label="Eliminar" destructivo disabled={busy}
-                        onClick={() => { if (confirm(`¿Eliminar "${d.name}"? No se puede deshacer.`)) run(eliminarDescripcion(d.id), 'Eliminada') }}>
+                        onClick={() => runSiConfirma({ titulo: `¿Eliminar «${d.name}»?`, texto: 'No se puede deshacer.', accion: 'Eliminar' }, () => eliminarDescripcion(d.id), 'Eliminada')}>
                         <Trash2 />
                       </AccionIcono>
                     </div>
@@ -197,7 +203,7 @@ function SeccionHeader({ title, hint, total, destacada }: { title: string; hint:
 }
 
 function Seccion({ title, hint, rows, ops, addPlaceholder }: { title: string; hint: string; rows: CatalogoRow[]; ops: Ops; addPlaceholder: string }) {
-  const { busy, run } = useRun()
+  const { busy, run, runSiConfirma } = useRun()
   const [nuevo, setNuevo] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
@@ -249,7 +255,7 @@ function Seccion({ title, hint, rows, ops, addPlaceholder }: { title: string; hi
                       {r.active ? <EyeOff /> : <Eye />}
                     </AccionIcono>
                     <AccionIcono label="Eliminar" destructivo disabled={busy}
-                      onClick={() => { if (confirm(`¿Eliminar "${r.name}"? No se puede deshacer.`)) run(ops.eliminar(r.id), 'Eliminado') }}>
+                      onClick={() => runSiConfirma({ titulo: `¿Eliminar «${r.name}»?`, texto: 'No se puede deshacer.', accion: 'Eliminar' }, () => ops.eliminar(r.id), 'Eliminado')}>
                       <Trash2 />
                     </AccionIcono>
                   </div>
@@ -306,7 +312,7 @@ function ChipCard({ dot, title, hint, chips, setChips, value, setValue, onSave, 
 }
 
 function PosicionesSection({ posiciones, areas, etapas, departamentos, departmentEtapaIds }: { posiciones: PosicionRow[]; areas: CatalogoRow[]; etapas: CatalogoRow[]; departamentos: DepartamentoRow[]; departmentEtapaIds: Set<string> }) {
-  const { busy, run } = useRun()
+  const { busy, run, runSiConfirma } = useRun()
   const selectableAreas = areas.filter((a) => !a.is_internal)
   // Etapas asignables a una posición = generales (activas). Se excluyen las etapas
   // de departamento, que son exclusivas del proyecto "Departamento".
@@ -399,7 +405,7 @@ function PosicionesSection({ posiciones, areas, etapas, departamentos, departmen
                       {p.active ? <EyeOff /> : <Eye />}
                     </AccionIcono>
                     <AccionIcono label="Eliminar" destructivo disabled={busy}
-                      onClick={() => { if (confirm(`¿Eliminar la posición "${p.name}"? Se desasignará de los usuarios que la tengan. No se puede deshacer.`)) run(eliminarPosicion(p.id), 'Posición eliminada') }}>
+                      onClick={() => runSiConfirma({ titulo: `¿Eliminar la posición «${p.name}»?`, texto: 'Se desasignará de los usuarios que la tengan. No se puede deshacer.', accion: 'Eliminar' }, () => eliminarPosicion(p.id), 'Posición eliminada')}>
                       <Trash2 />
                     </AccionIcono>
                   </div>
@@ -499,7 +505,7 @@ function PosicionesSection({ posiciones, areas, etapas, departamentos, departmen
 }
 
 function DepartamentosSection({ departamentos, etapas }: { departamentos: DepartamentoRow[]; etapas: CatalogoRow[] }) {
-  const { busy, run } = useRun()
+  const { busy, run, runSiConfirma } = useRun()
   const etapaName = (id: string) => etapas.find((e) => e.id === id)?.name ?? ''
   const [nuevo, setNuevo] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -574,7 +580,7 @@ function DepartamentosSection({ departamentos, etapas }: { departamentos: Depart
                       {d.active ? <EyeOff /> : <Eye />}
                     </AccionIcono>
                     <AccionIcono label="Eliminar" destructivo disabled={busy}
-                      onClick={() => { if (confirm(`¿Eliminar el departamento "${d.name}"? No se puede deshacer.`)) run(eliminarDepartamento(d.id), 'Departamento eliminado') }}>
+                      onClick={() => runSiConfirma({ titulo: `¿Eliminar el departamento «${d.name}»?`, texto: 'No se puede deshacer.', accion: 'Eliminar' }, () => eliminarDepartamento(d.id), 'Departamento eliminado')}>
                       <Trash2 />
                     </AccionIcono>
                   </div>

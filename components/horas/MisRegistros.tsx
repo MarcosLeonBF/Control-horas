@@ -8,6 +8,7 @@ import { anularRegistro } from '@/app/(horas)/mis-registros/actions'
 import { cn } from '@/lib/utils'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { useConfirmar } from '@/components/ui/confirmar'
 
 export interface RegistroRow {
   key: string
@@ -26,9 +27,15 @@ const STATUS_VARIANT: Record<string, 'secondary' | 'outline' | 'destructive'> = 
 export default function MisRegistros({ rows }: { rows: RegistroRow[] }) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
+  const confirmar = useConfirmar()
 
   async function onAnular(id: string) {
-    if (!confirm('¿Anular este registro? Devolverá las horas al banco correspondiente.')) return
+    // Cada fila es una línea, pero se anula el registro entero: con varias líneas, se dice.
+    const lineas = rows.filter((r) => r.registroId === id)
+    const texto = lineas.length > 1
+      ? `Se anula el registro entero del ${lineas[0].dateLabel}: sus ${lineas.length} líneas, no solo esta. Las horas vuelven a sus bancos.`
+      : 'Las horas vuelven al banco del proyecto.'
+    if (!(await confirmar({ titulo: '¿Anular este registro?', texto, accion: 'Anular' }))) return
     setBusy(id)
     const res = await anularRegistro(id)
     setBusy(null)
