@@ -5,7 +5,8 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { emitirAviso } from '@/lib/avisos/bandeja'
 import { esProduccion, esPersonaDePrueba, enlaceRegistro } from '@/lib/avisos/entorno'
-import { perfilesPorId, managerDe, sinAvisosPropios } from '@/lib/avisos/personas'
+import { perfilesPorId, managerDe, managerPorNombre, sinAvisosPropios } from '@/lib/avisos/personas'
+import { getCachedProyectosEstado } from '@/lib/graph/client'
 import { diaMadrid } from '@/lib/horas/auditoria-types'
 import {
   resumirPorDia, claveLlamativo, textoProyectos, descripcionLlamativo, registroPorProyecto,
@@ -98,6 +99,14 @@ export async function revisarGuardado(espera: EsperaGuardado): Promise<void> {
   // sí se hace, porque va de los proyectos, no de la persona.
   if (!sinAvisosPropios(dueno.persona.equipo) && !dueno.ausenteHoy) {
     const plan = planAvisosRegistro({ esAlta: espera.es_alta, lineas, totales })
+    // Manager del proyecto en proyecto_largo, del Excel como en los avisos de banco. Si el
+    // Excel no responde, el aviso sale igual con manager_proyecto null (como banco.ampliacion).
+    const excel = plan.llamativos.some((l) => l.motivo.proyecto)
+      ? await getCachedProyectosEstado().catch((e) => {
+        console.warn('[avisos] registro.llamativo sin manager del proyecto (Excel):', e instanceof Error ? e.message : e)
+        return []
+      })
+      : []
     for (const p of plan.pulsos) {
       // Clave por espera y día: si la espera se procesa otra vez (la función se cortó después
       // de emitir y antes de cerrarla), el pulso no se repite.
@@ -111,6 +120,8 @@ export async function revisarGuardado(espera: EsperaGuardado): Promise<void> {
     for (const { dia, motivo: m, horasDia } of plan.llamativos) {
       await emitir(`registro.llamativo ${duenoId} ${dia} ${m.regla}`, () => emitirAviso('registro.llamativo', {
         persona: dueno.persona, manager_directo: manager, dia,
+        // En dia_largo no hay proyecto: no casa con ninguna fila y sale null.
+        manager_proyecto: managerPorNombre(excel.find((e) => e.project.trim() === m.proyecto)?.manager, perfiles),
         regla: m.regla, valor: m.valor, limite: m.limite, proyecto: m.proyecto,
         horas_dia: horasDia, descripcion: descripcionLlamativo(m, dia),
         // El registro de este guardado que volvió llamativo el día (el día puede tener otros

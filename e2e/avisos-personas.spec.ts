@@ -61,10 +61,11 @@ test('managerPorNombre: el nombre de pila del Excel trae el manager entero, con 
   })
 })
 
-test('sinAvisosPropios: Dirección y Administración no reciben avisos sobre sí mismos', () => {
-  // No registran horas: ni recordatorios de días sin registrar ni avisos de sus registros.
+test('sinAvisosPropios: Dirección, Administración y Marketing no reciben avisos sobre sí mismos', () => {
+  // Ni recordatorios de días sin registrar ni avisos de sus registros.
   expect(sinAvisosPropios('Dirección')).toBe(true)
   expect(sinAvisosPropios('Administración')).toBe(true)
+  expect(sinAvisosPropios('Marketing')).toBe(true)
   expect(sinAvisosPropios(' direccion ')).toBe(true) // sin tildes ni mayúsculas
   expect(sinAvisosPropios('ADMINISTRACION')).toBe(true)
   expect(sinAvisosPropios('Clientes')).toBe(false)

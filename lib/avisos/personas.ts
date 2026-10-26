@@ -93,11 +93,12 @@ export async function actorDe(db: SupabaseClient, perfilId: string | null, nombr
   return { nombre, email: p?.email ?? null, equipo: nombreEquipo(p?.equipos ?? null), slack_id: p?.slack_id ?? null }
 }
 
-// Equipos cuya gente no registra horas (Roberto, 2026-09-29): no reciben avisos SOBRE sí
-// mismos (registro.enviado, registro.llamativo, días sin registrar). Como managers siguen
-// apareciendo: las escaladas de su gente les tienen que llegar. Por el nombre del equipo del
-// organigrama (0049), sin mayúsculas ni tildes; si se renombra el equipo, hay que tocar esto.
-const EQUIPOS_SIN_AVISOS_PROPIOS = ['direccion', 'administracion']
+// Equipos que no cuentan para los avisos (Roberto: Dirección y Administración el 2026-09-29,
+// Marketing el 2026-10-26): no reciben avisos SOBRE sí mismos (registro.enviado,
+// registro.llamativo, días sin registrar). Como managers siguen apareciendo: las escaladas
+// de su gente les tienen que llegar. Por el nombre del equipo del organigrama (0049), sin
+// mayúsculas ni tildes; si se renombra el equipo, hay que tocar esto.
+const EQUIPOS_SIN_AVISOS_PROPIOS = ['direccion', 'administracion', 'marketing']
 
 function sinTildes(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase()

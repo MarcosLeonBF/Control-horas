@@ -50,8 +50,10 @@ export interface DatosRegistroEnviado {
   proyectos: { proyecto: string; horas: number }[]; proyectos_texto: string
   enlace_registro: string
 }
+// `manager_proyecto` (2026-10-26): el del Excel, como en los avisos de banco. null en
+// dia_largo (no hay un proyecto) o si el Excel no respondió.
 export interface DatosRegistroLlamativo {
-  persona: PersonaAviso; manager_directo: ManagerAviso | null; dia: string
+  persona: PersonaAviso; manager_directo: ManagerAviso | null; manager_proyecto: ManagerAviso | null; dia: string
   regla: 'dia_largo' | 'proyecto_largo'; valor: number; limite: number; proyecto: string | null
   horas_dia: number; descripcion: string
   enlace_registro: string
@@ -133,7 +135,7 @@ export function ejemplos(base: string): { [K in TipoAviso]: DatosPorTipo[K] } {
     // Distinto del contrato a propósito: la prueba enseña el caso con proyecto (en dia_largo
     // `proyecto` siempre es null), que es el que Julián no podía ver.
     'registro.llamativo': {
-      persona, manager_directo: manager, dia: '2026-09-14', regla: 'proyecto_largo', valor: 6, limite: 5,
+      persona, manager_directo: manager, manager_proyecto: manager, dia: '2026-09-14', regla: 'proyecto_largo', valor: 6, limite: 5,
       proyecto: 'Proyecto Ejemplo', horas_dia: 8, descripcion: '6 h a Proyecto Ejemplo el 14/09 (límite: 5 h)',
       enlace_registro: enlaceRegistro,
     },

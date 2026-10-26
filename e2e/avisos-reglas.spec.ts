@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import {
-  resumirPorDia, motivosLlamativo, claveLlamativo, comoNivel, transicion, avisosDeBanco,
+  resumirPorDia, motivosLlamativo, claveLlamativo, comoNivel, transicion, avisoDeBanco,
   siguienteIntento, MAX_INTENTOS, textoProyectos, descripcionLlamativo, registroPorProyecto, type Nivel,
 } from '../lib/avisos/reglas'
 import {
@@ -68,15 +68,17 @@ test('transicion: línea base, empeora, cruza al tope, mejora e igual', () => {
   expect(transicion('bajo', 'bajo')).toEqual({ guardar: false, avisar: false, alTope: false })
 })
 
-test('avisosDeBanco: el tope solo sale para el total del proyecto', () => {
-  expect(avisosDeBanco(transicion('bajo', 'consumido'), 'posicion')).toEqual(['banco.nivel'])
-  expect(avisosDeBanco(transicion('bajo', 'consumido'), 'proyecto')).toEqual(['banco.nivel', 'banco.al_tope'])
-  expect(avisosDeBanco(transicion('consumido', 'excedido'), 'proyecto')).toEqual(['banco.nivel'])
+test('avisoDeBanco: el tope solo sale para el total del proyecto, y sin su banco.nivel', () => {
+  expect(avisoDeBanco(transicion('bajo', 'consumido'), 'posicion')).toBe('banco.nivel')
+  expect(avisoDeBanco(transicion('bajo', 'consumido'), 'proyecto')).toBe('banco.al_tope')
+  expect(avisoDeBanco(transicion('disponible', 'excedido'), 'proyecto')).toBe('banco.al_tope')
+  expect(avisoDeBanco(transicion('disponible', 'bajo'), 'proyecto')).toBe('banco.nivel')
+  expect(avisoDeBanco(transicion('consumido', 'excedido'), 'proyecto')).toBe('banco.nivel')
 })
 
-test('avisosDeBanco: la línea base y el rearme no avisan', () => {
-  expect(avisosDeBanco(transicion(null, 'excedido'), 'proyecto')).toEqual([])
-  expect(avisosDeBanco(transicion('excedido', 'disponible'), 'proyecto')).toEqual([])
+test('avisoDeBanco: la línea base y el rearme no avisan', () => {
+  expect(avisoDeBanco(transicion(null, 'excedido'), 'proyecto')).toBeNull()
+  expect(avisoDeBanco(transicion('excedido', 'disponible'), 'proyecto')).toBeNull()
 })
 
 test('siguienteIntento: 5 min, 30 min, 2 h, 12 h y luego nada', () => {

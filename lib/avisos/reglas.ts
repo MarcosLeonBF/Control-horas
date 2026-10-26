@@ -87,11 +87,13 @@ export function transicion(anterior: Nivel | null, actual: Nivel): Transicion {
   return { guardar: false, avisar: false, alTope: false }
 }
 
-// Qué avisos salen de una transición de banco. El tope es solo para el total del proyecto:
-// que se agote una posición no es «vender más horas al cliente».
-export function avisosDeBanco(t: Transicion, alcance: 'posicion' | 'proyecto'): ('banco.nivel' | 'banco.al_tope')[] {
-  if (!t.avisar) return []
-  return t.alTope && alcance === 'proyecto' ? ['banco.nivel', 'banco.al_tope'] : ['banco.nivel']
+// Qué aviso sale de una transición de banco (null: ninguno). El tope es solo para el total
+// del proyecto: que se agote una posición no es «vender más horas al cliente». Y sale en
+// lugar del banco.nivel, no junto a él: los dos a la vez llegaban como dos mensajes del
+// mismo cambio (Julián, 2026-10-26).
+export function avisoDeBanco(t: Transicion, alcance: 'posicion' | 'proyecto'): 'banco.nivel' | 'banco.al_tope' | null {
+  if (!t.avisar) return null
+  return t.alTope && alcance === 'proyecto' ? 'banco.al_tope' : 'banco.nivel'
 }
 
 // Qué registro enlazar en el aviso de banco de cada proyecto que tocó un guardado. Un

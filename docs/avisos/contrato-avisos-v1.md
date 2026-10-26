@@ -237,6 +237,7 @@ cambio y solo si el día sigue pasándose del límite en ese momento.
 | Campo | Qué es |
 |---|---|
 | `persona`, `manager_directo`, `dia` | Como en `registro.enviado` |
+| `manager_proyecto` | Manager del proyecto según el Excel, como en `banco.nivel`. `null` en `dia_largo` (no hay un proyecto) o si el Excel no respondió |
 | `regla` | `dia_largo` o `proyecto_largo` |
 | `valor` / `limite` | Lo registrado y el límite de la regla |
 | `proyecto` | El proyecto en `proyecto_largo`; `null` en `dia_largo` |
@@ -250,6 +251,7 @@ cambio y solo si el día sigue pasándose del límite en ese momento.
   "datos": {
     "persona": { "id": "a1b2…", "nombre": "Laura Gómez", "email": "laura.gomez@ejemplo.com", "posicion": "SEO Strategist", "equipo": "Clientes", "slack_id": "U01LAURA001", "rol": "operativo" },
     "manager_directo": { "id": "c3d4…", "nombre": "Carlos Ruiz", "email": "carlos.ruiz@ejemplo.com", "equipo": "Clientes", "slack_id": "U01CARLOS01" },
+    "manager_proyecto": null,
     "dia": "2026-09-14",
     "regla": "dia_largo",
     "valor": 11,
@@ -270,6 +272,7 @@ cambio y solo si el día sigue pasándose del límite en ese momento.
 Cuando el banco de horas de un proyecto, o de una posición dentro del proyecto, **empeora** de
 nivel (pasa a `bajo`, `consumido` o `excedido`). Solo proyectos activos. Si el banco mejora
 (por ejemplo, tras una ampliación) no se avisa, pero si vuelve a empeorar se avisa de nuevo.
+Cuando es el total del proyecto el que llega al 100%, llega `banco.al_tope` en su lugar.
 
 | Campo | Qué es |
 |---|---|
@@ -326,8 +329,8 @@ Cuando el **total** de un proyecto llega al 100% (`consumido`) o lo supera (`exc
 viniendo de un nivel más bajo. Pensado para avisar al manager y ofrecer más horas. Mismos
 campos que `banco.nivel` con `alcance: "proyecto"`.
 
-Llega **junto con** el `banco.nivel` de ese mismo cambio (con los mismos datos). Si en un
-flujo solo te interesa el tope, escucha este tipo y no el otro.
+Llega **en lugar del** `banco.nivel` de ese cambio, no junto a él: aunque el proyecto pase
+directamente de `disponible` o `bajo` a `excedido`, llega un solo aviso.
 
 Si el proyecto pasa de `consumido` a `excedido` llega un `banco.nivel`, pero no un segundo
 `banco.al_tope`. Si se amplía y más adelante vuelve a llegar al tope, se avisa otra vez.
@@ -836,6 +839,18 @@ amplía elige la posición). Campo nuevo y un cambio de comportamiento; sigue `v
   `inutilizables` y siguen disponibles hasta que se consumen.
 - Ahora también puede ampliar el manager del proyecto, así que `actor` puede ser un
   manager, no solo un administrador.
+
+**26/10/2026** · Un campo nuevo y dos cambios de comportamiento; sigue `version: 1`:
+
+- **`registro.llamativo` trae `manager_proyecto`**: el manager del proyecto según el Excel,
+  el mismo objeto que en `banco.nivel`. En `dia_largo` llega `null`.
+- **`banco.al_tope` ya no llega junto con un `banco.nivel`**: cuando el total del proyecto
+  llega al 100% sale solo `banco.al_tope`. Antes salían los dos del mismo cambio y llegaban
+  como dos mensajes seguidos. Si el proyecto pasa después de `consumido` a `excedido`, sigue
+  llegando ese `banco.nivel`.
+- **Marketing**, como Dirección y Administración, ya no aparece en `dias-sin-registrar` ni
+  genera `registro.enviado` ni `registro.llamativo`. Como manager de otras personas sigue
+  apareciendo.
 
 **26/10/2026** · **La entrada de vacaciones acepta tu formato nuevo**: sin `accion`, con
 `slack_id`, `fecha_inicio` y `fecha_fin`. La persona queda fuera desde el día en que llega

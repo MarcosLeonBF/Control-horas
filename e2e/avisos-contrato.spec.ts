@@ -70,6 +70,7 @@ test('toda persona del payload trae su equipo', () => {
   expect(e['registro.enviado'].persona.equipo).toBe('Clientes')
   expect(e['registro.enviado'].manager_directo?.equipo).toBe('Clientes')
   expect(e['registro.llamativo'].persona.equipo).toBe('Clientes')
+  expect(e['registro.llamativo'].manager_proyecto?.equipo).toBe('Clientes')
   expect(e['banco.nivel'].manager_proyecto?.equipo).toBe('Clientes')
   expect(e['hucha.ampliacion'].actor.equipo).toBe('RRHH')
   expect(e['banco.ampliacion'].actor.equipo).toBe('RRHH')

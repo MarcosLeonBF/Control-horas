@@ -6,7 +6,7 @@ import { getBancosHoras } from '@/lib/horas/bancos'
 import { emitirAviso } from '@/lib/avisos/bandeja'
 import { esProduccion, esPersonaDePrueba, enlaceBanco, enlaceRegistro } from '@/lib/avisos/entorno'
 import { nivelesDeBancos, datosAmpliacionHoras, type NivelBanco } from '@/lib/avisos/capacidad'
-import { transicion, avisosDeBanco, type Nivel } from '@/lib/avisos/reglas'
+import { transicion, avisoDeBanco, type Nivel } from '@/lib/avisos/reglas'
 import { leerEstados, guardarEstados } from '@/lib/avisos/estado'
 import { perfilesPorId, managerPorNombre, actorDe, type Perfil } from '@/lib/avisos/personas'
 import type { DatosBanco, PersonaAviso } from '@/lib/avisos/contrato'
@@ -88,11 +88,11 @@ export async function evaluarBancos(proyectos?: string[], origen?: OrigenRegistr
       const anterior = previo?.nivel ?? null
       const t = transicion(anterior, n.nivel)
       if (!t.guardar) continue
-      // Qué sale lo decide avisosDeBanco (puro y probado): al_tope solo en el total.
-      const tipos = avisosDeBanco(t, n.alcance)
-      // Línea base y rearme: se anotan sin avisar. Sin fila previa `tipos` ya viene vacío;
+      // Qué sale lo decide avisoDeBanco (puro y probado): al_tope solo en el total.
+      const tipo = avisoDeBanco(t, n.alcance)
+      // Línea base y rearme: se anotan sin avisar. Sin fila previa `tipo` ya viene null;
       // `!previo` está para que TypeScript sepa que abajo la hay.
-      if (!tipos.length || !previo) {
+      if (!tipo || !previo) {
         aGuardar.push({ clave: n.clave, nivel: n.nivel })
         continue
       }
@@ -111,9 +111,7 @@ export async function evaluarBancos(proyectos?: string[], origen?: OrigenRegistr
         // vez de la misma transición comparten clave y sale un solo aviso; un rearme
         // reescribe la fila, así que volver a cruzar el mismo día trae clave nueva y avisa.
         const base = `${n.clave}:${previo.nivel}>${n.nivel}:${previo.desde}`
-        for (const tipo of tipos) {
-          await emitirAviso(tipo, datos, { clave: `${base}:${tipo === 'banco.al_tope' ? 'tope' : 'nivel'}` })
-        }
+        await emitirAviso(tipo, datos, { clave: `${base}:${tipo === 'banco.al_tope' ? 'tope' : 'nivel'}` })
         // Solo se anota si el aviso salió: si falla, la próxima pasada lo reintenta con la
         // misma clave, así que lo que ya salió no se repite.
         aGuardar.push({ clave: n.clave, nivel: n.nivel })
