@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getBancoHorasDetalle, type BancosScope } from '@/lib/horas/bancos'
-import { getCachedProyectosEstado } from '@/lib/graph/client'
+import { getProyectoEstado } from '@/lib/graph/client'
 import { getViewerScope } from '@/lib/horas/scope'
 import { esManagerDelProyecto } from '@/lib/horas/ampliar-permisos'
 import { candidatosManager } from '@/lib/horas/candidatos-manager'
@@ -23,7 +23,7 @@ export default async function BancoDetallePage({ params }: { params: Promise<{ p
   // Metadatos del proyecto (Excel Clientes_Proyectos): estado, manager, auditoría.
   let meta: MetaProyecto | undefined
   try {
-    meta = (await getCachedProyectosEstado()).find((e) => e.project.trim() === project)
+    meta = await getProyectoEstado(project)
   } catch { /* Excel no disponible: sin metadatos */ }
 
   // «Ampliar horas»: el admin, o el manager del proyecto según el Excel (spec 2026-10-15).

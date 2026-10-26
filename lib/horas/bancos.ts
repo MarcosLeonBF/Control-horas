@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedBancoHoras, getCachedProyectosEstado, getCachedHorasProvisionales, getCachedHorasProvisionalesSetup, type ProyectoEstado, type HorasProvisionales } from '@/lib/graph/client'
+import { getCachedBancoHoras, getCachedProyectosEstado, getProyectoEstado, getCachedHorasProvisionales, getCachedHorasProvisionalesSetup, type ProyectoEstado, type HorasProvisionales } from '@/lib/graph/client'
 import { computeHorasStatus, HORAS_SEVERITY, type BancoHorasRow, type BancoHorasDetalle, type AmpliacionHoras, type MovimientoBanco, type BancoMensual, type BancoDetalleMensual } from '@/lib/horas/bancos-status'
 import type { BancoHorasProyecto } from '@/lib/types'
 import { currentMonth, finDeMes } from '@/lib/horas/format'
@@ -335,7 +335,7 @@ export async function getBancoHorasDetalle(
   }
 
   let meta: ProyectoEstado | undefined
-  try { meta = (await getCachedProyectosEstado()).find((e) => e.project.trim() === name) } catch { /* sin meta */ }
+  try { meta = await getProyectoEstado(name) } catch { /* sin meta */ }
   let horasProv: HorasProvisionales = new Map()
   try { horasProv = await getCachedHorasProvisionales() } catch { horasProv = new Map() }
   let horasProvSetup: HorasProvisionales = new Map()

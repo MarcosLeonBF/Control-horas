@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedProyectosEstado } from '@/lib/graph/client'
+import { getProyectoEstado } from '@/lib/graph/client'
 import { getViewerScope } from '@/lib/horas/scope'
 import { posicionesDelAlcance, type BancosScope } from '@/lib/horas/bancos'
 import { esManagerDelProyecto, errorAlAmpliar } from '@/lib/horas/ampliar-permisos'
@@ -34,7 +34,7 @@ export async function ampliarHoras(
   let esManager: boolean | null = false
   if (viewer.role === 'manager') {
     try {
-      const meta = (await getCachedProyectosEstado()).find((e) => e.project.trim() === name)
+      const meta = await getProyectoEstado(name)
       esManager = esManagerDelProyecto(meta?.manager, viewer.userId, await candidatosManager())
     } catch (e) {
       console.warn(`[bancos] ampliarHoras: no se pudo comprobar el manager de "${name}":`, e instanceof Error ? e.message : e)

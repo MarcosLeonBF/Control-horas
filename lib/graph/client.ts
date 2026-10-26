@@ -257,6 +257,11 @@ export const getCachedProyectosEstado = unstable_cache(
   { revalidate: 300, tags: [BANCO_HORAS_TAG] }
 )
 
+// Un proyecto de Clientes_Proyectos por su nombre (en el Excel puede venir con espacios).
+export async function getProyectoEstado(nombre: string): Promise<ProyectoEstado | undefined> {
+  return (await getCachedProyectosEstado()).find((e) => e.project.trim() === nombre)
+}
+
 // ── Horas provisionales (hoja "Horas_Provisionales" del mismo Excel) ──────────
 // Primera columna = tipo de contrato; columnas siguientes = posiciones (mismas que
 // BancoHoras). Cada celda = horas/mes provisionales de esa posición para ese contrato.
