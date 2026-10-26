@@ -4,11 +4,10 @@ import {
   type PerfilIdentificable, type AusenciaActual, type EventoRef, type Operacion,
 } from '../lib/avisos/vacaciones'
 
-// Las ausencias (vacaciones, festivos…) llegan del flujo de Julián como un interruptor por
-// persona: `activar` lo enciende el día que empieza y `desactivar` lo apaga el día que
-// termina (ese día todavía es de vacaciones). Las fechas del pulso no deciden cuándo se
-// enciende ni se apaga: son la red por si el desactivar no llega a tiempo, que AVISA (panel)
-// y corrige cuando llega un pulso, pero nunca apaga sola (Roberto, 29/09).
+// Las ausencias (vacaciones, festivos…) llegan del flujo de Julián. Desde el 26/10 solo llega
+// el activar, sin accion, con sus fechas: la ausencia va desde el día que llega hasta su Fecha
+// fin y termina sola. Un activar sin fechas sigue siendo un interruptor: lo apaga el
+// desactivar, y si su Fecha fin pasa sin él, solo se avisa en el panel (Roberto, 29/09).
 
 const estefania = { slack_id: 'U096AGWQJN4', accion: 'activar', eventos: [{ inicio: '2026-09-29', fin: '2026-10-02', tipo: 'ausencia' }] }
 const santiago = { slack_id: 'U0A85K6107L', accion: 'activar' }
@@ -49,9 +48,17 @@ test('validarEnvio: un slack_id que no es texto lo dice', () => {
   expect(errorDe([{ slack_id: 12345, accion: 'activar' }])).toMatch(/slack_id tiene que ser texto/)
 })
 
-test('validarEnvio: accion solo "activar" o "desactivar", tal cual', () => {
+test('validarEnvio: accion, si viene, solo "activar" o "desactivar", tal cual', () => {
   expect(errorDe([{ ...santiago, accion: 'Activar' }])).toMatch(/Persona 1 \(U0A85K6107L\): .*accion/)
-  expect(errorDe([{ ...santiago, accion: undefined }])).toMatch(/accion/)
+})
+
+test('validarEnvio: sin accion es un activar, y hacen falta las dos fechas', () => {
+  const r = validarEnvio({ slack_id: 'U0A85K6107L', fecha_inicio: '2026-10-26', fecha_fin: '2026-10-27' })
+  expect(r.ok && r.valor).toEqual([{ slack_id: 'U0A85K6107L', accion: 'activar', eventos: [{ inicio: '2026-10-26', fin: '2026-10-27' }] }])
+  // Sin una Fecha fin que se entienda no terminaría nunca: no llegará ningún desactivar.
+  expect(errorDe({ slack_id: 'U0A85K6107L', fecha_inicio: '2026-10-26' })).toMatch(/fecha_fin/)
+  expect(errorDe({ slack_id: 'U0A85K6107L', fecha_inicio: '2026-10-26', fecha_fin: '27/10/2026' })).toMatch(/fecha_fin/)
+  expect(errorDe({ slack_id: 'U0A85K6107L', fecha_inicio: '2026-10-27', fecha_fin: '2026-10-26' })).toMatch(/fecha_fin/)
 })
 
 test('validarEnvio: eventos es opcional; si viene, es una lista', () => {
@@ -107,7 +114,6 @@ test('validarEnvio: de cada evento de la lista solo se guarda inicio, fin y tipo
 // --- planificar: el interruptor ------------------------------------------------
 
 const HOY = '2026-09-29'
-const MANANA = '2026-09-30'
 const S = 'U096AGWQJN4'
 const perfiles: PerfilIdentificable[] = [{ id: 'p-estefania', nombre: 'Estefanía García', slack_id: S }]
 const pulso = (accion: 'activar' | 'desactivar', eventos: EventoRef[] = [], slack_id = S) => ({ slack_id, accion, eventos })
@@ -149,13 +155,19 @@ test('interruptor: activar lo enciende desde hoy; desactivar lo apaga ese día (
   expect(r.resultado).toBe('terminada')
 })
 
-test('interruptor: las fechas no deciden cuándo se enciende ni se apaga', () => {
-  // Aunque digan otra cosa, se enciende hoy y se apaga cuando llega el desactivar.
-  let r = envio([], pulso('activar', fechas('2026-10-05', '2026-10-09')))
-  expect(periodos(r.filas)).toEqual([[HOY, null]])
+test('activar con fechas: empieza el día que llega y termina sola en su Fecha fin', () => {
+  const r = envio([], pulso('activar', fechas('2026-10-05', '2026-10-09')))
+  expect(periodos(r.filas)).toEqual([[HOY, '2026-10-09']])
   expect(r.filas[0].eventos).toEqual(fechas('2026-10-05', '2026-10-09'))
-  r = envio(r.filas, pulso('desactivar', fechas('2026-10-05', '2026-10-09')), MANANA)
-  expect(periodos(r.filas)).toEqual([[HOY, MANANA]])
+  expect(r.resultado).toBe('iniciada')
+})
+
+test('activar con fechas: repetido no cambia nada; si empalma con otra, llega hasta el final de la otra', () => {
+  let r = envio([], pulso('activar', fechas(HOY, '2026-10-02')))
+  expect(envio(r.filas, pulso('activar', fechas(HOY, '2026-10-02'))).plan.operaciones).toEqual([])
+  r = envio(r.filas, pulso('activar', fechas('2026-10-02', '2026-10-06')), '2026-10-02')
+  expect(periodos(r.filas)).toEqual([[HOY, '2026-10-06']])
+  expect(r.resultado).toBe('ya_iniciada')
 })
 
 test('interruptor: encendido, otro activar no hace nada (guarda sus fechas si trae nuevas)', () => {
@@ -175,12 +187,11 @@ test('interruptor: apagado, un desactivar no hace nada', () => {
   expect(sinActivar.resultado).toBe('sin_ausencia')
 })
 
-test('interruptor: un activar el mismo día en que se apagó no lo vuelve a encender', () => {
-  // Solo puede ser un reintento del activar de esa mañana: volver a encender dejaría a la
-  // persona de vacaciones sin fin.
+test('interruptor: un activar el día en que termina no la vuelve a encender', () => {
+  // Volver a encender dejaría a la persona de vacaciones sin fin.
   const r = envio([fila(1, '2026-09-25', HOY)], pulso('activar'))
   expect(r.plan.operaciones).toEqual([])
-  expect(r.resultado).toBe('ya_terminada')
+  expect(r.resultado).toBe('ya_iniciada') // hoy todavía está fuera
 })
 
 test('interruptor: un festivo de un día, activar y desactivar el mismo día', () => {
@@ -203,14 +214,17 @@ test('varias personas y pulsos en un envío, en orden; sin usuario se guarda igu
   expect(plan.resumen).toBe('Estefanía García: iniciada · Estefanía García: terminada · U0A85K6107L (sin usuario): iniciada')
 })
 
-test('el pulso real de Julián: activar el día de inicio', () => {
-  const v = validarEnvio({ Accion: 'activar', 'Slack ID': S, 'Fecha inicio': HOY, 'Fecha fin': '2026-10-02' })
+test('el pulso real de Julián (26/10): solo el activar, con sus fechas', () => {
+  const v = validarEnvio({ tipos: ['vacaciones'], slack_id: S, fecha_fin: '2026-10-27', fecha_inicio: '2026-10-26' })
   if (!v.ok) throw new Error(v.error)
-  const r = envio([], v.valor[0])
-  expect(periodos(r.filas)).toEqual([[HOY, null]])
-  expect(ausenciasHoy(r.filas, HOY).get(S)).toEqual({ desde: HOY, fin: '2026-10-02' }) // se ve cuándo vuelve
-  // Si pasa su Fecha fin sin que llegue el desactivar, sigue de vacaciones (la red solo avisa).
-  expect(ausenciasHoy(r.filas, '2026-10-05').get(S)).toEqual({ desde: HOY, fin: null })
+  const r = envio([], v.valor[0], '2026-10-26')
+  expect(periodos(r.filas)).toEqual([['2026-10-26', '2026-10-27']])
+  expect(ausenciasHoy(r.filas, '2026-10-27').get(S)).toEqual({ desde: '2026-10-26', fin: '2026-10-27' })
+  // Al día siguiente de su Fecha fin ya no está fuera, y sus dos días no cuentan como pendientes.
+  expect(ausenciasHoy(r.filas, '2026-10-28').has(S)).toBe(false)
+  const a = ausenciasPorPersona(r.filas, '2026-10-30', '2026-10-01').get(S)!
+  expect(a.ausenteHoy).toBe(false)
+  expect([...a.dias]).toEqual(['2026-10-26', '2026-10-27'])
 })
 
 // --- lectura: días sin registrar, avisos y panel ------------------------------
@@ -297,7 +311,7 @@ test('red: si Airtable alarga la Fecha fin, el desactivar con la nueva manda', (
 
 test('red: un activar nuevo tras un desactivar perdido cierra la vieja en su Fecha fin', () => {
   const r = envio([encendidoHasta('2026-10-02')], pulso('activar', fechas('2026-10-20', '2026-10-23')), '2026-10-20')
-  expect(periodos(r.filas)).toEqual([[HOY, '2026-10-02'], ['2026-10-20', null]])
+  expect(periodos(r.filas)).toEqual([[HOY, '2026-10-02'], ['2026-10-20', '2026-10-23']])
   expect(r.resultado).toBe('iniciada')
 })
 
@@ -317,16 +331,16 @@ test('interruptor: un activar el día de inicio con una Fecha fin mal tecleada e
   expect(r.resultado).toBe('iniciada')
 })
 
-test('interruptor: un festivo dentro de unas vacaciones no las apaga', () => {
+test('un festivo dentro de unas vacaciones no las acorta', () => {
   const vacaciones = fechas('2026-10-05', '2026-10-16')
   let r = envio([], pulso('activar', vacaciones), '2026-10-05')
-  r = envio(r.filas, pulso('activar', fechas('2026-10-12', '2026-10-12')), '2026-10-12') // ya encendido
-  r = envio(r.filas, pulso('desactivar', fechas('2026-10-12', '2026-10-12')), '2026-10-12')
-  expect(periodos(r.filas)).toEqual([['2026-10-05', null]])
-  expect(r.resultado).toBe('ya_iniciada') // sigue de vacaciones
-  r = envio(r.filas, pulso('desactivar', vacaciones), '2026-10-16')
+  r = envio(r.filas, pulso('activar', fechas('2026-10-12', '2026-10-12')), '2026-10-12')
   expect(periodos(r.filas)).toEqual([['2026-10-05', '2026-10-16']])
-  expect(r.resultado).toBe('terminada')
+  expect(r.resultado).toBe('ya_iniciada')
+  // Encendidas sin final (antes del 26/10): el desactivar del festivo tampoco las apaga.
+  r = envio([fila(1, '2026-10-05', null, vacaciones)], pulso('desactivar', fechas('2026-10-12', '2026-10-12')), '2026-10-12')
+  expect(periodos(r.filas)).toEqual([['2026-10-05', null]])
+  expect(r.resultado).toBe('ya_iniciada')
 })
 
 test('interruptor: un desactivar tardío de una ausencia anterior no apaga la siguiente', () => {

@@ -1,8 +1,8 @@
-// POST /api/avisos/v1/vacaciones — ausencias por pulsos desde el flujo de Julián: una lista
-// de personas, cada una con su slack_id y `activar` (empieza la ausencia) o `desactivar`
-// (termina). Misma clave que las consultas. Qué se acepta y qué se hace lo deciden
-// validarEnvio y planificar (lib/avisos/vacaciones.ts); aquí solo se autentica, se lee lo
-// necesario y se ejecuta.
+// POST /api/avisos/v1/vacaciones — ausencias desde el flujo de Julián: una lista de personas
+// (o una), cada una con su slack_id y sus fechas; termina sola en su Fecha fin (`activar` y
+// `desactivar` explícitos se siguen aceptando). Misma clave que las consultas. Qué se acepta
+// y qué se hace lo deciden validarEnvio y planificar (lib/avisos/vacaciones.ts); aquí solo se
+// autentica, se lee lo necesario y se ejecuta.
 //
 // Todo envío con la clave correcta, aceptado o no, se anota en `avisos_entrantes` (0053)
 // para verlo en Administración → Avisos → Recibidos.

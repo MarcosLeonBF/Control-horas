@@ -1,20 +1,22 @@
 // Ausencias (vacaciones, festivos, ausencias) que manda el flujo de Julián a
 // POST /api/avisos/v1/vacaciones: una lista de personas (o una sola), cada una con su
-// slack_id y una acción, y opcionalmente las fechas de la ausencia.
+// slack_id, sus fechas y, opcionalmente, una acción.
 //
-// Es un INTERRUPTOR por persona (Roberto, 29/09): `activar` lo enciende el día que llega
-// (el día que empieza la ausencia) y `desactivar` lo apaga el día que llega (el último
-// día, que todavía es de vacaciones). Encendido, otro activar no hace nada; apagado, otro
-// desactivar tampoco. Las fechas no deciden cuándo se enciende ni se apaga: son la RED por
-// si el desactivar no llega a tiempo, y la red AVISA, no apaga (Roberto, 29/09). Si pasa la
-// Fecha fin y sigue encendido, sigue de vacaciones y sale en el panel («No llegó el
-// desactivar a tiempo», con botón para desactivarlo a mano en su Fecha fin); si el
-// desactivar llega tarde, o llega el activar de otra ausencia, se corrige a esa fecha.
+// Desde el 26/10 el flujo solo manda el activar (sin accion) con su Fecha fin, y la ausencia
+// termina sola ese día: va desde el día que llega hasta su Fecha fin, los dos incluidos.
 //
-// Cada encendido es una fila de `vacaciones` (0054): desde el día del activar hasta el del
-// desactivar (`hasta` null = encendido). La persona se busca al leer, por slack_id, para
-// que cuente sola el día que se le dé de alta. Puro, sin IO: la ruta autentica, lee perfiles
-// y ausencias, y ejecuta lo que esto decide.
+// Antes era un INTERRUPTOR por persona (Roberto, 29/09), y sigue valiendo para un activar sin
+// fechas: `activar` lo enciende el día que llega y `desactivar` lo apaga el día que llega (el
+// último día, que todavía es de vacaciones). Encendido, otro activar no hace nada; apagado,
+// otro desactivar tampoco. Si un encendido trae Fecha fin y pasa sin desactivar, sigue de
+// vacaciones y sale en el panel («No llegó el desactivar a tiempo», con botón para
+// desactivarlo a mano en su Fecha fin); si el desactivar llega tarde, o llega el activar de
+// otra ausencia, se corrige a esa fecha.
+//
+// Cada ausencia es una fila de `vacaciones` (0054): desde el día del activar hasta su Fecha
+// fin o el día del desactivar (`hasta` null = encendido sin final). La persona se busca al
+// leer, por slack_id, para que cuente sola el día que se le dé de alta. Puro, sin IO: la ruta
+// autentica, lee perfiles y ausencias, y ejecuta lo que esto decide.
 import { normalizarSlackId } from '@/lib/slack-id'
 import { addDiasISO, diaMadrid } from '@/lib/horas/auditoria-types'
 import { describirCampos, tipoDe } from '@/lib/avisos/entrantes'
@@ -114,9 +116,12 @@ function validarPersona(bruto: unknown): { ok: true; valor: PulsoPersona } | { o
   const n = typeof p.slack_id === 'string' ? normalizarSlackId(p.slack_id) : null
   if (!n || (n.ok && !n.valor)) return { ok: false, error: 'falta el slack_id.' }
   if (!n.ok || !n.valor) return { ok: false, error: 'el slack_id no es un ID de miembro de Slack (empieza por U, p. ej. U01ABCD2EFG).' }
+  // Desde el 26/10 el flujo solo manda la activación, sin accion: es un activar.
+  const sinAccion = p.accion === undefined || p.accion === null
+  const accion = sinAccion ? 'activar' : p.accion
   // Estricto a propósito: un "Activar" mal escrito tiene que fallar, no tomarse por otra cosa.
-  if (p.accion !== 'activar' && p.accion !== 'desactivar') {
-    return { ok: false, error: 'accion tiene que ser "activar" o "desactivar", en minúsculas.' }
+  if (accion !== 'activar' && accion !== 'desactivar') {
+    return { ok: false, error: 'accion, si viene, tiene que ser "activar" o "desactivar", en minúsculas.' }
   }
   const suelto = limpiarEvento({ inicio: p.inicio, fin: p.fin, tipo: p.tipo })
   let eventos: EventoRef[] = suelto && (suelto.inicio || suelto.fin) ? [suelto] : []
@@ -124,7 +129,11 @@ function validarPersona(bruto: unknown): { ok: true; valor: PulsoPersona } | { o
     if (!Array.isArray(p.eventos)) return { ok: false, error: 'eventos, si viene, tiene que ser una lista.' }
     eventos = [...eventos, ...p.eventos.map(limpiarEvento).filter((e): e is EventoRef => e !== null)].slice(0, MAX_EVENTOS)
   }
-  return { ok: true, valor: { slack_id: n.valor, accion: p.accion, eventos } }
+  // Sin accion no llegará ningún desactivar: sin fechas la ausencia no terminaría nunca.
+  if (sinAccion && !periodoDelPulso(eventos)) {
+    return { ok: false, error: 'sin accion hacen falta fecha_inicio y fecha_fin (YYYY-MM-DD, la de fin no antes que la de inicio).' }
+  }
+  return { ok: true, valor: { slack_id: n.valor, accion, eventos } }
 }
 
 // Todo o nada: si una persona no es válida se rechaza el envío entero, diciendo cuál
@@ -219,17 +228,20 @@ export function planificar(
           encendida = undefined
         }
       }
+      // Con fechas ya se guarda su final, así que también está en curso la que termina hoy o
+      // después.
+      const enCurso = encendida ?? mias.find((f) => f.hasta !== null && f.desde <= hoy && f.hasta >= hoy)
       if (periodo && periodo.fin < hoy) {
         resultado = 'ya_terminada' // un activar muy tardío: esa ausencia ya terminó
-      } else if (encendida) {
-        conEventos(encendida, eventos)
+      } else if (enCurso) {
+        conEventos(enCurso, eventos)
+        // Otra ausencia que empalma con esta, o Airtable alargó la Fecha fin. Nunca la acorta: un
+        // festivo en medio de unas vacaciones no las corta.
+        if (enCurso.hasta !== null && periodo && periodo.fin > enCurso.hasta) enCurso.hasta = periodo.fin
         resultado = 'ya_iniciada'
-      } else if (mias.some((f) => f.hasta === hoy)) {
-        // Se apagó hoy: un activar después solo puede ser un reintento del de esta mañana.
-        // Volver a encender dejaría a la persona de vacaciones sin fin.
-        resultado = 'ya_terminada'
       } else {
-        filas.push({ id: null, slack_id, desde: hoy, hasta: null, eventos: [...eventos], orig: null })
+        // Termina sola en su Fecha fin: desde el 26/10 no llega ningún desactivar.
+        filas.push({ id: null, slack_id, desde: hoy, hasta: periodo?.fin ?? null, eventos: [...eventos], orig: null })
         resultado = 'iniciada'
       }
     } else if (encendida && periodo && periodo.fin < encendida.desde) {

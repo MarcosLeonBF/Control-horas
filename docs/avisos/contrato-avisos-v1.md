@@ -643,62 +643,53 @@ POST https://<dominio>/api/avisos/v1/vacaciones
 Content-Type: application/json
 ```
 
-Funciona como un **interruptor por persona**: **`activar`** el día que empieza su ausencia
-(vacaciones, festivo, ausencia…) la deja de vacaciones, y **`desactivar`** el día que
-termina la quita. Se pueden mandar varias personas en un mismo envío, en una lista, o una
-sola como objeto.
+Manda cada persona el día que empieza su ausencia (vacaciones, festivo, ausencia…), con su
+`slack_id` y sus fechas. Queda de vacaciones desde ese día hasta su `fecha_fin`, incluida, y
+al día siguiente vuelve sola: al terminar no hay que mandar nada. Se pueden mandar varias
+personas en un mismo envío, en una lista, o una sola como objeto.
 
 | Campo | Qué es |
 |---|---|
-| `Slack ID` (o `slack_id`) | ID de miembro de Slack de la persona (`U…`). Obligatorio |
-| `Accion` (o `accion`) | `"activar"` o `"desactivar"`, en minúsculas. Obligatorio |
-| `Fecha inicio` (o `inicio`) | Primer día de la ausencia, `YYYY-MM-DD`. Recomendado |
-| `Fecha fin` (o `fin`) | Último día de la ausencia, `YYYY-MM-DD`. Recomendado |
+| `slack_id` | ID de miembro de Slack de la persona (`U…`). Obligatorio |
+| `fecha_inicio` | Primer día de la ausencia, `YYYY-MM-DD`. Obligatorio |
+| `fecha_fin` | Último día de la ausencia, `YYYY-MM-DD`. Obligatorio |
+| `accion` | Opcional: sin ella es un `activar`. Ver «Con `accion`», más abajo |
 | `eventos` | Opcional. Lista de fechas (`inicio`, `fin`, `tipo`), por si una persona trae varias |
 
-Los nombres de campo valen como vienen de Airtable o en minúsculas: no se distinguen
-mayúsculas, tildes, espacios, guiones ni guiones bajos.
+Lo demás que traiga (por ejemplo, `tipos`) se ignora. Los nombres de campo valen como vienen
+de Airtable o en minúsculas: no se distinguen mayúsculas, tildes, espacios, guiones ni guiones
+bajos (`Fecha fin` vale como `fecha_fin`).
 
 ```json
-{ "Accion": "activar", "Slack ID": "U01LAURA001", "Fecha inicio": "2026-09-29", "Fecha fin": "2026-10-02" }
+{ "slack_id": "U01LAURA001", "fecha_inicio": "2026-10-26", "fecha_fin": "2026-10-27", "tipos": ["vacaciones"] }
 ```
 
-Cómo funciona el interruptor:
-
-- `activar` la deja de vacaciones desde el día en que llega. Si ya lo estaba, no cambia nada.
-- `desactivar` la quita el día en que llega, y ese día todavía cuenta como de vacaciones
-  (llega el último día). Si no lo estaba, no cambia nada.
-- Un `activar` que llega el mismo día en que se hizo el `desactivar` no la vuelve a poner de
-  vacaciones: solo puede ser un reintento. Reintentar un envío es seguro.
-- El día es el de Madrid en el momento de recibir el pulso. Manda los pulsos durante el día,
-  y el `activar` antes de tu consulta diaria de `dias-sin-registrar` (si no, el primer día
+- Cuenta desde el día en que llega (el de Madrid en ese momento), no desde `fecha_inicio`.
+  Mándalo el primer día y antes de tu consulta diaria de `dias-sin-registrar` (si no, ese día
   la persona todavía sale en ella).
-- Para un festivo de un día, manda el `activar` antes que el `desactivar`: el interruptor
-  hace caso al orden en que llegan.
-- Si dentro de unas vacaciones cae otra ausencia (un festivo), su `desactivar` no quita las
-  vacaciones, siempre que los pulsos traigan fechas: se contesta `ya_iniciada` y sigue de
-  vacaciones hasta el `desactivar` de las vacaciones.
-- El `desactivar` tardío de una ausencia anterior no quita la que está en curso ahora.
-
-**Las fechas son la red de seguridad.** No deciden cuándo se activa ni se desactiva: nunca
-quitan a nadie de vacaciones por su cuenta. Sirven por si el `desactivar` no llega a tiempo:
-
-- Si pasa la `Fecha fin` y el `desactivar` no ha llegado, la persona **sigue de
-  vacaciones** y sale en el panel de usuarios en «No llegó el desactivar a tiempo». Si la
-  ausencia se alargó, no hay que hacer nada: llegará el `desactivar` con la fecha nueva. Si
-  ya volvió, un admin la desactiva ahí a mano (queda desactivada en su `Fecha fin`).
-- Si llega el `activar` de otra ausencia estando todavía activada una cuya `Fecha fin` ya
-  pasó, aquella se da por terminada en su `Fecha fin`.
-- Si el `desactivar` llega tarde, se corrige a la `Fecha fin` que trae (lo último que dice
-  Airtable, también si la alargó o la acortó) o, si no trae, a la del `activar`.
-- Un `activar` cuya `Fecha fin` ya pasó no hace nada: esa ausencia ya terminó.
-- Con fechas, el panel de usuarios muestra cuándo vuelve la persona («Ausente hasta el
-  02/10»). Sin fechas, solo desde cuándo está fuera, y sigue fuera hasta su `desactivar`.
+- Repetir un envío no cambia nada. Reintentar es seguro.
+- Si mientras está fuera llega otra ausencia que termina más tarde, se alarga hasta la nueva
+  `fecha_fin`. Una que termina antes (un festivo en medio de unas vacaciones) no la acorta.
+- Si la `fecha_fin` ya pasó, no hace nada: esa ausencia ya terminó.
+- Si vuelve antes de su `fecha_fin`, la plataforma no se entera: cuenta como fuera hasta esa
+  fecha.
 
 Las fechas van en `YYYY-MM-DD` (con hora también vale: si trae zona, cuenta su día en
-Madrid). Una fecha que no se entiende, o una `Fecha fin` anterior a la de inicio, se
-ignora: no hace fallar el pulso ni impide activar. De cada evento
-solo se guardan `inicio`, `fin` y `tipo`, como mucho 50 por persona.
+Madrid). Sin `accion`, si falta una de las dos fechas, no se entiende o la `fecha_fin` es
+anterior a la `fecha_inicio`, el envío da `400`. De cada evento solo se guardan `inicio`,
+`fin` y `tipo`, como mucho 50 por persona.
+
+#### Con `accion`
+
+Se sigue aceptando `accion`, del formato anterior: `"activar"` o `"desactivar"`, en
+minúsculas (otra cosa da `400`).
+
+- `activar` con fechas funciona igual que sin `accion`.
+- `activar` sin fechas la deja de vacaciones hasta que llegue un `desactivar`. Si ya lo
+  estaba, no cambia nada.
+- `desactivar` quita a quien se activó sin fechas, el día en que llega, y ese día todavía
+  cuenta como de vacaciones. A quien tiene `fecha_fin` no le hace falta: no cambia nada.
+- Con `accion` una fecha que no se entiende se ignora, no da `400`.
 
 Todo el envío se valida antes de guardar nada: si una persona está mal, se rechaza entero y
 el error dice cuál. Como mucho 500 personas por envío; una lista vacía da `400`.
@@ -716,11 +707,11 @@ Respuesta (`200`), una línea por persona, en el mismo orden:
 
 - `persona`: a quién corresponde ese `slack_id` en la plataforma. `null` si no tiene
   usuario: se guarda igual y contará cuando lo tenga.
-- `resultado`: `iniciada` (queda de vacaciones), `ya_iniciada` (ya lo estaba, o sigue: el
-  `desactivar` era de otra ausencia dentro de esta), `terminada`
-  (deja de estarlo), `ya_terminada` (ya se había desactivado hoy, o el `activar` es de una
-  ausencia que ya terminó) o `sin_ausencia` (un `desactivar` de alguien que no estaba de
-  vacaciones).
+- `accion`: `activar` también cuando el envío no la traía.
+- `resultado`: `iniciada` (queda de vacaciones), `ya_iniciada` (ya lo estaba: un envío
+  repetido u otra ausencia dentro de esta), `terminada` (un `desactivar` la quita),
+  `ya_terminada` (su `fecha_fin` ya pasó, o ya se había desactivado) o `sin_ausencia` (un
+  `desactivar` de alguien que no estaba de vacaciones).
 
 Si algo falla, la respuesta es `{ "ok": false, "error": "…" }` con el motivo:
 
@@ -845,3 +836,9 @@ amplía elige la posición). Campo nuevo y un cambio de comportamiento; sigue `v
   `inutilizables` y siguen disponibles hasta que se consumen.
 - Ahora también puede ampliar el manager del proyecto, así que `actor` puede ser un
   manager, no solo un administrador.
+
+**26/10/2026** · **La entrada de vacaciones acepta tu formato nuevo**: sin `accion`, con
+`slack_id`, `fecha_inicio` y `fecha_fin`. La persona queda fuera desde el día en que llega
+hasta su `fecha_fin` y vuelve sola, sin `desactivar`. Sin `accion` las dos fechas son
+obligatorias. Un `activar` con fechas del formato anterior también termina solo en su
+`fecha_fin`. Ver «Entradas → Vacaciones y ausencias».
