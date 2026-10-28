@@ -1,4 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect width="64" height="64" rx="13" fill="#BD0842"/>
-  <text x="32" y="34" fill="#ffffff" font-family="Georgia, 'Times New Roman', serif" font-size="32" font-weight="700" letter-spacing="-2" text-anchor="middle" dominant-baseline="central">BF</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M6 0 H42 A22 22 0 0 1 64 22 V58 A6 6 0 0 1 58 64 H6 A6 6 0 0 1 0 58 V6 A6 6 0 0 1 6 0 Z" fill="#1d1d1b"/><g transform="translate(17.32 9.00) scale(0.1631)"><g fill="#bd0842"><rect x="2" y="2" width="82" height="55"/><rect x="2" y="113" width="82" height="57"/><rect x="2" y="226" width="82" height="54"/></g><path d="M2 57 V2 H88 A90 90 0 0 1 178 92 V113 M2 57 H84 A27 27 0 0 1 84 111 M2 113 H178 M2 113 V170 H84 M84 113 V280 M84 113 A100 100 0 0 1 178 170 M178 113 A100 100 0 0 1 84 170 M84 170 A28 28 0 0 1 84 226 M2 226 H84 M2 226 V280 H178 M178 113 V280 M178 226 A100 100 0 0 1 104 280" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="square"/></g></svg>

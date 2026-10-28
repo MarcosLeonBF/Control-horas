@@ -7,8 +7,8 @@ import { ConfirmarProvider } from '@/components/ui/confirmar'
 export const metadata: Metadata = {
   title: 'Control de Rentabilidad',
   description: 'Registro de horas, bancos y HUCHA.',
-  // Favicon: ícono cuadrado generado en app/icon.tsx (el logo es un wordmark ancho que
-  // se veía ilegible aplastado en la pestaña).
+  // Favicon: app/icon.svg, icon.png y apple-icon.png, la B de Bastida&Farina con sus barras en carmesí. Es el mismo en
+  // todas las apps; se genera con scripts/generar-iconos.ts del repo de Acceso (acceso-bf) y se copia aquí.
 }
 
 export default function RootLayout({
