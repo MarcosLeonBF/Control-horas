@@ -46,6 +46,16 @@ export function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
 }
 
+// Hoy como 'YYYY-MM-DD' para los campos de fecha: el día local de quien está delante, que
+// desde América ya es mañana en UTC a partir de las 21:00 (Cecilia, 15/09/2026). Nunca pasa
+// del día UTC: en España, pasada la medianoche, la base (current_date, UTC) lo vería futuro.
+export function hoyISO(): string {
+  const d = new Date()
+  const utc = d.toISOString().slice(0, 10)
+  const local = d.toLocaleDateString('sv-SE') // AAAA-MM-DD en la hora local
+  return local < utc ? local : utc
+}
+
 // 'YYYY-MM' → "Jul 2026" (mes abreviado + año, inicial mayúscula, sin punto).
 const MES_CORTO = new Intl.DateTimeFormat('es-ES', { month: 'short', year: 'numeric', timeZone: 'UTC' })
 

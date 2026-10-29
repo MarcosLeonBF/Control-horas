@@ -6,13 +6,13 @@ import { toast } from 'sonner'
 import { Receipt } from 'lucide-react'
 import { registrarConsumo } from './actions'
 import { formatEUR } from '@/lib/hucha/format'
+import { hoyISO } from '@/lib/horas/format'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog'
 
-function todayISO() { return new Date().toISOString().slice(0, 10) }
 // Admite la coma decimal ("12,50"): Number() solo entiende el punto.
 const aNumero = (s: string) => Number(s.trim().replace(',', '.'))
 
@@ -21,7 +21,7 @@ export default function ConsumoDialog({ projectId, projectName, remaining }: { p
   const [open, setOpen] = useState(false)
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
-  const [entryDate, setEntryDate] = useState(todayISO())
+  const [entryDate, setEntryDate] = useState(hoyISO())
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
@@ -31,7 +31,7 @@ export default function ConsumoDialog({ projectId, projectName, remaining }: { p
 
   function onOpenChange(o: boolean) {
     setOpen(o)
-    if (!o) { setAmount(''); setDescription(''); setEntryDate(todayISO()); setError(null) }
+    if (!o) { setAmount(''); setDescription(''); setEntryDate(hoyISO()); setError(null) }
   }
 
   function submit(e: React.FormEvent) {
@@ -74,7 +74,7 @@ export default function ConsumoDialog({ projectId, projectName, remaining }: { p
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="consumo-fecha">Fecha</Label>
-              <Input id="consumo-fecha" type="date" max={todayISO()} value={entryDate}
+              <Input id="consumo-fecha" type="date" max={hoyISO()} value={entryDate}
                 onChange={(e) => setEntryDate(e.target.value)} />
             </div>
             <div className="grid gap-1.5 sm:col-span-2">

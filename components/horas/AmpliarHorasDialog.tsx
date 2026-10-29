@@ -9,8 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import NativeSelect from '@/components/ui/native-select'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog'
-
-const today = () => new Date().toISOString().slice(0, 10)
+import { hoyISO } from '@/lib/horas/format'
 
 // Ampliar horas (admin o manager del proyecto): un botón en la cabecera del detalle que
 // abre el formulario. Es una acción ocasional, así que las cifras van primero.
@@ -27,7 +26,7 @@ export default function AmpliarHorasDialog({ project, posicionesProyecto, posici
   const [posicion, setPosicion] = useState('')
   const [horas, setHoras] = useState('')
   const [motivo, setMotivo] = useState('')
-  const [fecha, setFecha] = useState(today())
+  const [fecha, setFecha] = useState(hoyISO())
   const [saving, setSaving] = useState(false)
 
   const delProyecto = posicionesAlcance.filter((p) => posicionesProyecto.includes(p))
@@ -40,7 +39,7 @@ export default function AmpliarHorasDialog({ project, posicionesProyecto, posici
     setSaving(false)
     if (!res.ok) { toast.error(res.error); return }
     toast.success(`Horas ampliadas en ${posicion}`)
-    setPosicion(''); setHoras(''); setMotivo(''); setFecha(today())
+    setPosicion(''); setHoras(''); setMotivo(''); setFecha(hoyISO())
     setOpen(false)
     router.refresh()
   }
@@ -80,7 +79,7 @@ export default function AmpliarHorasDialog({ project, posicionesProyecto, posici
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="ampliar-fecha">Fecha</Label>
-              <Input id="ampliar-fecha" type="date" max={today()} required value={fecha}
+              <Input id="ampliar-fecha" type="date" max={hoyISO()} required value={fecha}
                 onChange={(e) => setFecha(e.target.value)} />
             </div>
             <div className="grid gap-1.5 sm:col-span-2">
