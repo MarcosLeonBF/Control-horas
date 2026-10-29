@@ -1,8 +1,10 @@
-// Detector de bancos de horas: compara el nivel de cada banco (por posición y total del
-// proyecto) con el último anotado en avisos_estado y avisa cuando empeora. Usa el mismo
-// cálculo que /bancos (getBancosHoras: carry forward, provisionales e histórico).
+// Detector de bancos de horas: compara el nivel de cada banco en el mes en curso (por
+// posición y total del proyecto) con el último anotado en avisos_estado y avisa cuando
+// empeora. Son las cifras de la vista Mensual de /bancos (getBancosHoras). Al cambiar de
+// mes el banco vuelve a empezar: mejora y se rearma sin avisar.
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBancosHoras } from '@/lib/horas/bancos'
+import { currentMonth } from '@/lib/horas/format'
 import { emitirAviso } from '@/lib/avisos/bandeja'
 import { esProduccion, esPersonaDePrueba, enlaceBanco, enlaceRegistro } from '@/lib/avisos/entorno'
 import { nivelesDeBancos, datosAmpliacionHoras, type NivelBanco } from '@/lib/avisos/capacidad'
@@ -11,12 +13,13 @@ import { leerEstados, guardarEstados } from '@/lib/avisos/estado'
 import { perfilesPorId, managerPorNombre, actorDe, type Perfil } from '@/lib/avisos/personas'
 import type { DatosBanco, PersonaAviso } from '@/lib/avisos/contrato'
 
-// Niveles actuales de los bancos de proyectos activos. También los usa el resumen de capacidad.
+// Niveles actuales de los bancos de proyectos activos: los avisos piden los del mes en curso
+// (`mes`); el resumen de capacidad, sin `mes`, los del banco total.
 // Modo estricto: con el Excel o los perfiles a medias lanza en vez de calcular bancos
 // falsos; evaluarBancos lo captura y no avisa ni anota nada, y el resumen responde 500.
 // Las ampliaciones vienen dentro de las filas (por posición, spec 2026-10-15).
-export async function nivelesActuales(): Promise<NivelBanco[]> {
-  return nivelesDeBancos(await getBancosHoras({ role: 'admin' }, { estricto: true }))
+export async function nivelesActuales(mes?: string): Promise<NivelBanco[]> {
+  return nivelesDeBancos(await getBancosHoras({ role: 'admin' }, { estricto: true }), mes)
 }
 
 // Tras ampliar horas: avisa de la ampliación (banco.ampliacion) y re-evalúa el banco, que
@@ -44,7 +47,7 @@ export async function alAmpliarHoras(ampliacionId: string, project: string): Pro
       let total: NivelBanco | undefined
       try {
         const nombre = String(amp.project).trim()
-        total = (await nivelesActuales()).find((n) => n.alcance === 'proyecto' && n.proyecto === nombre)
+        total = (await nivelesActuales(currentMonth())).find((n) => n.alcance === 'proyecto' && n.proyecto === nombre)
       } catch (e) {
         console.warn(`[avisos] alAmpliarHoras ${ampliacionId}: sin estado del banco (Excel):`, e instanceof Error ? e.message : e)
       }
@@ -77,7 +80,7 @@ export async function evaluarBancos(proyectos?: string[], origen?: OrigenRegistr
   try {
     const db = createAdminClient()
     const filtro = proyectos ? new Set(proyectos.map((p) => p.trim())) : null
-    const niveles = (await nivelesActuales()).filter((n) => !filtro || filtro.has(n.proyecto))
+    const niveles = (await nivelesActuales(currentMonth())).filter((n) => !filtro || filtro.has(n.proyecto))
     if (!niveles.length) return
     const previos = await leerEstados(db, 'banco:')
     const aGuardar: { clave: string; nivel: Nivel }[] = []

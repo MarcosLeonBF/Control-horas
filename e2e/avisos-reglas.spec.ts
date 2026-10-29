@@ -228,6 +228,27 @@ test('nivelesDeBancos: ampliaciones por posición, el total las suma, sin inacti
   expect(totalA.managerExcel).toBe('Carlos Ruiz')
 })
 
+// Los avisos miden el mes en curso (Noguerol, 21/10/2026): el total arrastra los excesos de
+// meses cerrados y puede ir excedido aunque el mes tenga horas de sobra.
+test('nivelesDeBancos con mes: solo ese mes; sin mes, el banco total', () => {
+  const rows = [
+    fila({
+      project: 'N', position: 'CRM', assigned: 30, consumed: 30.11, remaining: -0.11, status: 'excedido',
+      monthly: [{ month: '2026-09', assigned: 18, consumed: 26.11 }, { month: '2026-10', assigned: 12, ampliado: 2, consumed: 4 }],
+    }),
+    // Sin nada en octubre: no avisa por su posición y no suma al total del mes.
+    fila({ project: 'N', position: 'SEO Strategist', assigned: 8, consumed: 8, remaining: 0, status: 'consumido', monthly: [{ month: '2026-09', assigned: 8, consumed: 8 }] }),
+  ]
+
+  const octubre = nivelesDeBancos(rows, '2026-10')
+  expect(octubre.map((x) => [x.clave, x.nivel])).toEqual([['banco:N:CRM', 'disponible'], ['banco:N:*', 'disponible']])
+  const total = octubre.find((x) => x.clave === 'banco:N:*')!
+  expect(total.horas).toEqual({ asignadas: 12, ampliadas: 2, consumidas: 4, inutilizables: 0, disponibles: 8 })
+  expect(total.porcentajeConsumido).toBe(33.3)
+
+  expect(nivelesDeBancos(rows).find((x) => x.clave === 'banco:N:*')!.nivel).toBe('excedido') // 38 asignadas, 38,11 consumidas
+})
+
 // Sin tope (pedido de Roberto, 2026-09-18): cada lista trae TODOS los proyectos, solo
 // cambia el orden. "Sin tope" no es "sin reglas": las listas por porcentaje siguen
 // dejando fuera los que no tienen base (porcentaje null).

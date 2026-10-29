@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Search, AlertTriangle, TrendingDown, Download, ChevronRight, X, Clock } from 'lucide-react'
 import type { BancoHorasRow, HorasStatus, BancoHorasProyecto } from '@/lib/horas/bancos-status'
-import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProject, estadoProyectoBadgeClass, computeHorasStatus } from '@/lib/horas/bancos-status'
+import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProject, estadoProyectoBadgeClass, filaDeMeses } from '@/lib/horas/bancos-status'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
 import { formatHoras, formatHorasTotal, formatFechaISO, currentMonth } from '@/lib/horas/format'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
@@ -120,24 +120,12 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
   }, [rows])
   const hayMensual = meses.length > 0
 
-  // En Mensual, cada fila muestra las cifras del mes elegido (0/0 si no tiene datos:
-  // decisión de producto — el proyecto se ve en cero, no desaparece).
-  // En Mensual, cada fila suma los meses elegidos (assigned/consumed de esos meses);
-  // provisional = true si alguno de los meses elegidos es provisional.
+  // En Mensual, cada fila suma los meses elegidos (filaDeMeses, la misma cuenta que los
+  // avisos de banco); 0/0 si no tienen datos: decisión de producto, el proyecto se ve en
+  // cero, no desaparece. provisional = true si alguno de los meses elegidos es provisional.
   const viewRows = useMemo(() => {
     if (vista === 'total') return rows.map((r) => ({ ...r, provisional: r.monthly.some((m) => m.provisional) }))
-    return rows.map((r) => {
-      let assigned = 0, consumed = 0, provisional = false, inutilizables = 0, libres = 0
-      for (const m of r.monthly) {
-        if (!selSet.has(m.month)) continue
-        assigned += m.assigned; consumed += m.consumed
-        inutilizables += m.inutilizables ?? 0; libres += m.libres ?? 0
-        if (m.provisional) provisional = true
-      }
-      // En Mensual el restante/status del mes se mantienen crudos (el corte se ve en el
-      // detalle); inutilizables/carryNeto llevan lo de los meses elegidos para el export.
-      return { ...r, assigned, consumed, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), provisional, inutilizables, carryNeto: libres }
-    })
+    return rows.map((r) => filaDeMeses(r, selSet))
   }, [rows, vista, selSet])
 
   const filtered = useMemo(() => {

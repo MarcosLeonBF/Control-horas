@@ -269,10 +269,12 @@ cambio y solo si el día sigue pasándose del límite en ese momento.
 
 ### `banco.nivel`
 
-Cuando el banco de horas de un proyecto, o de una posición dentro del proyecto, **empeora** de
-nivel (pasa a `bajo`, `consumido` o `excedido`). Solo proyectos activos. Si el banco mejora
-(por ejemplo, tras una ampliación) no se avisa, pero si vuelve a empeorar se avisa de nuevo.
-Cuando es el total del proyecto el que llega al 100%, llega `banco.al_tope` en su lugar.
+Cuando el banco de horas **del mes en curso** de un proyecto, o de una posición dentro del
+proyecto, **empeora** de nivel (pasa a `bajo`, `consumido` o `excedido`). Son las cifras de
+la vista Mensual de la ficha del banco: lo asignado al mes contra lo registrado en el mes.
+Solo proyectos activos. Si el banco mejora (por ejemplo, tras una ampliación) no se avisa,
+pero si vuelve a empeorar se avisa de nuevo. Cuando es el total del proyecto el que llega
+al 100%, llega `banco.al_tope` en su lugar.
 
 | Campo | Qué es |
 |---|---|
@@ -280,11 +282,11 @@ Cuando es el total del proyecto el que llega al 100%, llega `banco.al_tope` en s
 | `alcance` | `posicion` o `proyecto` (total del proyecto) |
 | `posicion` | La posición (`SEO Strategist`, `CRM`…) o `null` si el alcance es `proyecto` |
 | `nivel` / `nivel_anterior` | Nivel nuevo y el que tenía |
-| `horas.asignadas` | Horas del banco (en el total del proyecto incluye las ampliaciones) |
-| `horas.ampliadas` | Horas ampliadas: en una posición, las ampliadas en esa posición; en el total, todas las del proyecto |
-| `horas.consumidas` | Horas registradas |
-| `horas.inutilizables` | Horas perdidas en el cierre de meses anteriores (reparto 75/25) |
-| `horas.disponibles` | Lo que queda de verdad |
+| `horas.asignadas` | Horas del banco en el mes (incluye las ampliaciones del mes) |
+| `horas.ampliadas` | Horas ampliadas en el mes: en una posición, las de esa posición; en el total, todas las del proyecto |
+| `horas.consumidas` | Horas registradas en el mes |
+| `horas.inutilizables` | Siempre `0`: el mes en curso no tiene corte (el campo se mantiene) |
+| `horas.disponibles` | Lo que queda en el mes |
 | `porcentaje_consumido` | Sobre la base efectiva, con un decimal |
 | `estado_proyecto` | Estado en el Excel (`Activo`) |
 | `manager_proyecto` | Manager del proyecto según el Excel |
@@ -320,12 +322,12 @@ enlaza el del día más reciente.
 }
 ```
 
-El día 1 de cada mes, a las 00:00 UTC, se cierra el mes anterior y el reparto 75/25 puede
-empeorar varios bancos a la vez: ese día es normal que llegue una tanda de avisos.
+El día 1 de cada mes (00:00 UTC) los bancos empiezan de cero con lo asignado al mes nuevo:
+mejoran y se rearman sin avisar.
 
 ### `banco.al_tope`
 
-Cuando el **total** de un proyecto llega al 100% (`consumido`) o lo supera (`excedido`)
+Cuando el **total del mes** de un proyecto llega al 100% (`consumido`) o lo supera (`excedido`)
 viniendo de un nivel más bajo. Pensado para avisar al manager y ofrecer más horas. Mismos
 campos que `banco.nivel` con `alcance: "proyecto"`.
 
@@ -376,7 +378,7 @@ posición del banco (desde el 15/10/2026). Es el equivalente en horas de
 | `motivo` | El motivo que se escribió al ampliar |
 | `dia` | Día de la ampliación (`YYYY-MM-DD`) |
 | `actor` | Quien amplió: `{ nombre, email, equipo }` |
-| `horas` | El banco del **proyecto** (el total, no la posición) **después** de ampliar (mismo objeto que en `banco.nivel`) |
+| `horas` | El banco del **proyecto** en el mes en curso (el total, no la posición) **después** de ampliar (mismo objeto que en `banco.nivel`) |
 | `nivel` | Nivel del banco después de ampliar |
 | `porcentaje_consumido` | Sobre la base efectiva, igual que en `banco.nivel` |
 | `manager_proyecto` | Manager del proyecto según el Excel |
@@ -489,7 +491,9 @@ clave o con una clave incorrecta, la respuesta es `401`.
 GET https://<dominio>/api/avisos/v1/resumen-capacidad
 ```
 
-Pensado para el resumen quincenal. **Solo proyectos activos** (Estado «Activo» en el Excel)
+Pensado para el resumen quincenal. A diferencia de los avisos de banco, que miden el mes en
+curso, aquí `horas` es el **banco total** del proyecto (todos sus meses, con el corte de los
+cerrados). **Solo proyectos activos** (Estado «Activo» en el Excel)
 y **sin tope**: cada lista trae **todos** los proyectos activos, lo único que cambia entre
 listas es el orden. No hay parámetro `top` (si tu llamada lo pasa, se ignora). Quedan fuera
 los activos sin ninguna hora asignada ni consumida. Cuatro listas:
@@ -857,3 +861,11 @@ amplía elige la posición). Campo nuevo y un cambio de comportamiento; sigue `v
 hasta su `fecha_fin` y vuelve sola, sin `desactivar`. Sin `accion` las dos fechas son
 obligatorias. Un `activar` con fechas del formato anterior también termina solo en su
 `fecha_fin`. Ver «Entradas → Vacaciones y ausencias».
+
+**29/10/2026** · **Los avisos de banco miden el mes en curso, no el banco total.** Afecta
+a `banco.nivel`, `banco.al_tope` y al objeto `horas` de `banco.ampliacion`: las cifras son
+las de la vista Mensual de la ficha (lo asignado al mes contra lo registrado en el mes) y
+`horas.inutilizables` llega siempre a `0`. Ningún campo cambia de nombre ni de forma; sigue
+`version: 1`. El día 1 de cada mes los bancos empiezan de cero y se rearman sin avisar. Antes,
+el total arrastraba el corte y los excesos de los meses cerrados y podía avisar de un tope
+que el mes no tenía (Noguerol, 21/10). `resumen-capacidad` no cambia: sigue con el banco total.

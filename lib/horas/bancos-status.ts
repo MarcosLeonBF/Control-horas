@@ -115,6 +115,20 @@ export function computeHorasStatus(assigned: number, consumed: number): HorasSta
   return 'disponible'
 }
 
+// La fila con solo los meses elegidos: la vista Mensual de /bancos y los avisos de banco (el
+// mes en curso). Restante y estado van crudos, asignado contra consumido (el corte se ve en
+// el detalle); inutilizables y carryNeto llevan los de esos meses, para el export.
+export function filaDeMeses(r: BancoHorasRow, meses: Set<string>): BancoHorasRow & { provisional: boolean } {
+  let assigned = 0, consumed = 0, ampliado = 0, inutilizables = 0, libres = 0, provisional = false
+  for (const m of r.monthly) {
+    if (!meses.has(m.month)) continue
+    assigned += m.assigned; consumed += m.consumed; ampliado += m.ampliado ?? 0
+    inutilizables += m.inutilizables ?? 0; libres += m.libres ?? 0
+    if (m.provisional) provisional = true
+  }
+  return { ...r, assigned, consumed, ampliado, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), inutilizables, carryNeto: libres, provisional }
+}
+
 // Un proyecto con su banco TOTAL (suma de sus posiciones) y el desglose por posición.
 export interface BancoHorasProyecto {
   project: string

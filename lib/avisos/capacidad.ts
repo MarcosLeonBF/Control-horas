@@ -1,6 +1,6 @@
 // Niveles del banco de horas por posición y por proyecto, y ranking de capacidad.
 // Puro, sin IO: parte de las filas de getBancosHoras, que ya traen las ampliaciones.
-import { computeHorasStatus, type BancoHorasRow } from '@/lib/horas/bancos-status'
+import { computeHorasStatus, filaDeMeses, type BancoHorasRow } from '@/lib/horas/bancos-status'
 import { centesimas, comoNivel, type Nivel } from '@/lib/avisos/reglas'
 import type { ActorAviso, DatosBancoAmpliacion, ManagerAviso } from '@/lib/avisos/contrato'
 
@@ -37,11 +37,17 @@ export function esProyectoActivo(estado: string | undefined): boolean {
 // rows = getBancosHoras({ role: 'admin' }). Las ampliaciones son de una posición (spec
 // 2026-10-15) y ya vienen dentro de cada fila (`assigned` las incluye, `ampliado` dice
 // cuántas): la posición ampliada mejora, y el total del proyecto, que las suma, también.
-export function nivelesDeBancos(rows: BancoHorasRow[]): NivelBanco[] {
+//
+// Sin `mes`, el banco total (el resumen de capacidad). Con `mes`, solo ese mes, con las cifras
+// de la vista Mensual (filaDeMeses): es lo que miden los avisos de banco. Con el total, el
+// corte de los meses cerrados y sus excesos dejaron a Noguerol en −0,11 h y avisó de un tope
+// que su mes no tenía (21/10/2026). El mes en curso no tiene corte: inutilizables 0.
+export function nivelesDeBancos(rows: BancoHorasRow[], mes?: string): NivelBanco[] {
+  const soloMes = mes ? new Set([mes]) : null
   const porProyecto = new Map<string, BancoHorasRow[]>()
   for (const r of rows) {
     if (!esProyectoActivo(r.projectEstado)) continue
-    porProyecto.set(r.project, [...(porProyecto.get(r.project) ?? []), r])
+    porProyecto.set(r.project, [...(porProyecto.get(r.project) ?? []), soloMes ? filaDeMeses(r, soloMes) : r])
   }
 
   const out: NivelBanco[] = []

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { computeHorasStatus, groupBancosByProject, type BancoHorasRow } from '../lib/horas/bancos-status'
+import { computeHorasStatus, filaDeMeses, groupBancosByProject, type BancoHorasRow } from '../lib/horas/bancos-status'
 
 const fila = (position: string, assigned: number, consumed: number, inutilizables = 0): BancoHorasRow => ({
   project: 'P', position, assigned, consumed, inutilizables, ampliado: 0, carryNeto: 0, monthly: [],
@@ -31,4 +31,22 @@ test('un proyecto disponible no nombra ninguna', () => {
   const [g] = groupBancosByProject([fila('A', 10, 2), fila('B', 10, 9.5)])
   expect(g.status).toBe('disponible')
   expect(g.causantes).toEqual([])
+})
+
+// Vista Mensual (y avisos de banco): solo los meses elegidos, con el estado crudo. Septiembre
+// perdió 4 h en el corte: descontándolas sería «bajo» (6 de 36); en crudo queda 10 de 40.
+test('filaDeMeses suma solo los meses elegidos y no descuenta el corte', () => {
+  const r: BancoHorasRow = {
+    ...fila('CRM', 60, 50, 4),
+    monthly: [
+      { month: '2026-08', assigned: 20, consumed: 20 },
+      { month: '2026-09', assigned: 20, consumed: 15, libres: 1, inutilizables: 4 },
+      { month: '2026-10', assigned: 20, consumed: 15, ampliado: 2, provisional: true },
+    ],
+  }
+  expect(filaDeMeses(r, new Set(['2026-09', '2026-10']))).toMatchObject({
+    assigned: 40, consumed: 30, ampliado: 2, remaining: 10, status: 'disponible',
+    inutilizables: 4, carryNeto: 1, provisional: true,
+  })
+  expect(filaDeMeses(r, new Set(['2026-11']))).toMatchObject({ assigned: 0, consumed: 0, status: 'sin_asignacion', provisional: false })
 })
