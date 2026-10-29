@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { computeHorasStatus, filaDeMeses, groupBancosByProject, type BancoHorasRow } from '../lib/horas/bancos-status'
+import { computeHorasStatus, filaDeMeses, groupBancosByProject, mesesPorDefecto, type BancoHorasRow } from '../lib/horas/bancos-status'
 
 const fila = (position: string, assigned: number, consumed: number, inutilizables = 0): BancoHorasRow => ({
   project: 'P', position, assigned, consumed, inutilizables, ampliado: 0, carryNeto: 0, monthly: [],
@@ -49,4 +49,11 @@ test('filaDeMeses suma solo los meses elegidos y no descuenta el corte', () => {
     inutilizables: 4, carryNeto: 1, provisional: true,
   })
   expect(filaDeMeses(r, new Set(['2026-11']))).toMatchObject({ assigned: 0, consumed: 0, status: 'sin_asignacion', provisional: false })
+})
+
+// Al entrar en Mensual: el mes de quien mira si tiene datos; si no, el último que los tiene.
+test('mesesPorDefecto: el mes en curso, o el último con datos', () => {
+  expect(mesesPorDefecto(['2026-09', '2026-10', '2026-11'], '2026-10')).toEqual(['2026-10'])
+  expect(mesesPorDefecto(['2026-08', '2026-09'], '2026-10')).toEqual(['2026-09'])
+  expect(mesesPorDefecto([], '2026-10')).toEqual(['2026-10'])
 })

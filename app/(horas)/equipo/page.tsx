@@ -6,9 +6,8 @@ import { areaIcon } from '@/lib/horas/area-icon'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { cn } from '@/lib/utils'
 import EquipoRegistros, { type EquipoLog } from '@/components/horas/EquipoRegistros'
-
-const pad = (n: number) => String(n).padStart(2, '0')
-const localISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+import RangoDelMes from '@/components/horas/RangoDelMes'
+import { hoyUTC } from '@/lib/horas/format'
 
 function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '·'
@@ -63,9 +62,9 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
   // los 200 registros más recientes y el filtro de fecha se aplicaba sobre ESE recorte,
   // así que nada anterior al corte podía aparecer por mucho que se ampliara el rango
   // (y el día del corte salía a medias). Mismo criterio de rango que Reportes.
-  const now = new Date()
-  const from = sp.from || `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`
-  const to = sp.to || localISO(now)
+  const hoy = hoyUTC()
+  const from = sp.from || `${hoy.slice(0, 8)}01`
+  const to = sp.to || hoy
 
   const supabase = await createClient()
   // Paginado: un rango amplio supera las 1.000 filas de PostgREST y el corte sería
@@ -176,6 +175,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
           Se muestra el mes en curso; amplía las fechas para ver registros anteriores. Abre un registro para ver sus líneas.
         </p>
         <EquipoRegistros logs={registros} isAdmin={viewer.role === 'admin'} from={from} to={to} />
+        {!sp.from && !sp.to && <RangoDelMes hasta={to} />}
       </section>
     </div>
   )

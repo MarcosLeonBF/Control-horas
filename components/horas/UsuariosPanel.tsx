@@ -5,7 +5,8 @@ import { toast } from 'sonner'
 import { CalendarClock, Pencil, Search, Trash2, UserCheck, UserX } from 'lucide-react'
 import { actualizarUsuario, actualizarDiasRegistro, cambiarEstadoUsuario, eliminarUsuario, type EdicionUsuario } from '@/app/(horas)/admin/usuarios/actions'
 import type { AreaRow } from '@/lib/horas/types'
-import { formatFechaISO } from '@/lib/horas/format'
+import { formatFechaISO, hoyUTC } from '@/lib/horas/format'
+import { addDiasISO } from '@/lib/horas/auditoria-types'
 import { AYUDA_SLACK_ID } from '@/lib/slack-id'
 import { cn } from '@/lib/utils'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
@@ -52,13 +53,9 @@ function normalizar(s: string) {
   return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 }
 
-// Fecha ISO de hace n días. Mismo criterio que RegistroForm (UTC vía toISOString):
-// es una previsualización, el piso que manda es el que calcula la base de datos.
-function fechaHaceDias(n: number) {
-  const d = new Date()
-  d.setDate(d.getDate() - n)
-  return d.toISOString().slice(0, 10)
-}
+// Fecha ISO de hace n días. El mismo piso que RegistroForm y guardar_registro
+// (current_date − n, en UTC): es una previsualización, el que manda es el de la base.
+const fechaHaceDias = (n: number) => addDiasISO(hoyUTC(), -n)
 
 // Meses → días por calendario real, no por 30 fijos: "3 meses" tiene los días que
 // de verdad tienen esos tres meses, y el diálogo enseña la fecha que sale.

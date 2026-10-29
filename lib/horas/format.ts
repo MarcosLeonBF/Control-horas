@@ -41,18 +41,22 @@ export function formatMes(month: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-// Mes actual como 'YYYY-MM'.
+// Mes actual como 'YYYY-MM', en UTC como hoyUTC: el del servidor (corte de mes, avisos).
 export function currentMonth(): string {
-  return new Date().toISOString().slice(0, 7)
+  return hoyUTC().slice(0, 7)
 }
 
-// Hoy como 'YYYY-MM-DD' para los campos de fecha: el día local de quien está delante, que
-// desde América ya es mañana en UTC a partir de las 21:00 (Cecilia, 15/09/2026). Nunca pasa
-// del día UTC: en España, pasada la medianoche, la base (current_date, UTC) lo vería futuro.
-export function hoyISO(): string {
-  const d = new Date()
-  const utc = d.toISOString().slice(0, 10)
-  const local = d.toLocaleDateString('sv-SE') // AAAA-MM-DD en la hora local
+// Hoy como 'YYYY-MM-DD' en UTC: el día del servidor y de la base (current_date).
+export function hoyUTC(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+// Hoy como 'YYYY-MM-DD' para quien está delante: su día local, que desde América ya es
+// mañana en UTC a partir de las 21:00 (Cecilia, 15/09/2026). Nunca pasa del día UTC: en
+// España, pasada la medianoche, la base (current_date, UTC) lo vería futuro.
+export function hoyLocal(): string {
+  const utc = hoyUTC()
+  const local = new Date().toLocaleDateString('sv-SE') // AAAA-MM-DD en la hora local
   return local < utc ? local : utc
 }
 

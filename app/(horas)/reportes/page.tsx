@@ -3,9 +3,8 @@ import { getReporteLines, getReporteOptions } from '@/lib/horas/reportes'
 import { getViewerScope } from '@/lib/horas/scope'
 import ReportesView from '@/components/horas/ReportesView'
 import { buttonVariants } from '@/components/ui/button'
-
-const pad = (n: number) => String(n).padStart(2, '0')
-const localISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+import RangoDelMes from '@/components/horas/RangoDelMes'
+import { hoyUTC } from '@/lib/horas/format'
 
 export default async function ReportesPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
   const sp = await searchParams
@@ -13,9 +12,10 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
   if (!viewer) redirect('/login')
   if (viewer.role !== 'manager' && viewer.role !== 'admin') redirect('/registrar')
 
-  const now = new Date()
-  const from = sp.from || `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`
-  const to = sp.to || localISO(now)
+  // Del día 1 a hoy, con el día UTC (el de la base); RangoDelMes lo corrige si el de quien mira es otro mes.
+  const hoy = hoyUTC()
+  const from = sp.from || `${hoy.slice(0, 8)}01`
+  const to = sp.to || hoy
 
   const [lines, options] = await Promise.all([getReporteLines(from, to), getReporteOptions(viewer)])
 
@@ -35,7 +35,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
           </label>
           <label className="flex flex-1 flex-col gap-1 sm:flex-none">
             <span className="text-xs text-muted-foreground">Hasta</span>
-            <input type="date" name="to" defaultValue={to} max={localISO(now)} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm sm:w-auto" />
+            <input type="date" name="to" defaultValue={to} max={hoy} className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm sm:w-auto" />
           </label>
           <button type="submit" className={buttonVariants({ size: 'lg', className: 'shrink-0 px-4' })}>
             Aplicar
@@ -44,6 +44,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
       </header>
 
       <ReportesView lines={lines} options={options} from={from} to={to} />
+      {!sp.from && !sp.to && <RangoDelMes hasta={to} />}
     </div>
   )
 }

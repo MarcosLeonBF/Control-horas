@@ -36,8 +36,10 @@ function AccionBadge({ action }: { action: AuditAction }) {
   )
 }
 
+// En hora de Madrid, como el filtro por día de la página (diaMadrid). Sin zona, el servidor
+// la pintaba en UTC y el navegador en la suya, y no casaban al hidratar.
 const cuando = (iso: string) =>
-  new Date(iso).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
+  new Date(iso).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Madrid' })
 
 export default function AuditoriaView({
   entries,

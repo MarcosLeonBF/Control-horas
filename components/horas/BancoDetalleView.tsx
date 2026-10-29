@@ -4,8 +4,9 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, ChevronRight, ChevronDown, Info } from 'lucide-react'
 import type { BancoHorasDetalle } from '@/lib/horas/bancos-status'
-import { computeHorasStatus, estadoProyectoBadgeClass, HORAS_BAR_COLOR } from '@/lib/horas/bancos-status'
-import { formatHoras, formatFechaISO, currentMonth, mesCorto } from '@/lib/horas/format'
+import { computeHorasStatus, estadoProyectoBadgeClass, HORAS_BAR_COLOR, mesesPorDefecto } from '@/lib/horas/bancos-status'
+import { formatHoras, formatFechaISO, mesCorto } from '@/lib/horas/format'
+import { useHoy } from '@/lib/horas/use-hoy'
 import { puedeAnular, type RolApp } from '@/lib/horas/ampliar-permisos'
 import { cn } from '@/lib/utils'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
@@ -57,11 +58,10 @@ export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDet
   const [vista, setVista] = useState<Vista>(() => (d.monthly.length > 0 ? 'mensual' : 'total'))
 
   const meses = useMemo(() => d.monthly.map((m) => m.month), [d.monthly])
-  const [mesesSel, setMesesSel] = useState<string[]>(() => {
-    const cm = currentMonth()
-    const disp = d.monthly.map((m) => m.month)
-    return disp.includes(cm) ? [cm] : disp.length ? [disp[disp.length - 1]] : [cm]
-  })
+  // Mientras no se eligen meses, los de la lista: mesesPorDefecto con el mes de quien mira.
+  const hoy = useHoy()
+  const [mesesElegidos, setMesesElegidos] = useState<string[] | null>(null)
+  const mesesSel = useMemo(() => mesesElegidos ?? mesesPorDefecto(meses, hoy.slice(0, 7)), [mesesElegidos, meses, hoy])
   const selSet = useMemo(() => new Set(mesesSel), [mesesSel])
   const mesesOrden = useMemo(() => [...mesesSel].sort(), [mesesSel])
   const hayMensual = meses.length > 0
@@ -188,7 +188,7 @@ export default function BancoDetalleView({ d, viewer, meta }: { d: BancoHorasDet
           meses) y, a continuación, Ampliar horas (ocasional: un botón, no un formulario fijo). */}
       {(hayMensual || viewer.puedeAmpliar) && (
         <div className="mb-8 flex flex-wrap items-center gap-3">
-          {hayMensual && <VistaPeriodo vista={vista} onVista={setVista} meses={meses} mesesSel={mesesSel} onMesesSel={setMesesSel} />}
+          {hayMensual && <VistaPeriodo vista={vista} onVista={setVista} meses={meses} mesesSel={mesesSel} onMesesSel={setMesesElegidos} />}
           {viewer.puedeAmpliar && (
             <AmpliarHorasDialog
               project={d.project}

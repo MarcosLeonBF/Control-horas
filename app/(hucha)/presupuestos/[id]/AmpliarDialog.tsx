@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog'
-import { hoyISO } from '@/lib/horas/format'
+import { hoyLocal } from '@/lib/horas/format'
 
 // Ampliar presupuesto (solo admin). Es ocasional: un botón junto a «Registrar consumo»
 // que abre el formulario, como «Ampliar horas» en Bancos de horas.
@@ -19,13 +19,13 @@ export default function AmpliarDialog({ projectId, projectName }: { projectId: s
   const [monto, setMonto] = useState('')
   const [motivo, setMotivo] = useState('')
   const [referencia, setReferencia] = useState('')
-  const [fecha, setFecha] = useState(hoyISO())
+  const [fecha, setFecha] = useState(hoyLocal())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   function onOpenChange(o: boolean) {
     setOpen(o)
-    if (!o) { setMonto(''); setMotivo(''); setReferencia(''); setFecha(hoyISO()); setError(null) }
+    if (!o) { setMonto(''); setMotivo(''); setReferencia(''); setFecha(hoyLocal()); setError(null) }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -60,7 +60,7 @@ export default function AmpliarDialog({ projectId, projectName }: { projectId: s
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="ampliar-fecha">Fecha</Label>
-              <Input id="ampliar-fecha" type="date" max={hoyISO()} value={fecha}
+              <Input id="ampliar-fecha" type="date" max={hoyLocal()} value={fecha}
                 onChange={(e) => setFecha(e.target.value)} />
             </div>
             <div className="grid gap-1.5 sm:col-span-2">

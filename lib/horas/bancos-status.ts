@@ -129,6 +129,13 @@ export function filaDeMeses(r: BancoHorasRow, meses: Set<string>): BancoHorasRow
   return { ...r, assigned, consumed, ampliado, remaining: assigned - consumed, status: computeHorasStatus(assigned, consumed), inutilizables, carryNeto: libres, provisional }
 }
 
+// Los meses que se ven al entrar en Mensual: el mes en curso si tiene datos; si no, el último
+// que los tiene (`disponibles` va en orden ascendente).
+export function mesesPorDefecto(disponibles: string[], mesActual: string): string[] {
+  if (disponibles.includes(mesActual) || !disponibles.length) return [mesActual]
+  return [disponibles[disponibles.length - 1]]
+}
+
 // Un proyecto con su banco TOTAL (suma de sus posiciones) y el desglose por posición.
 export interface BancoHorasProyecto {
   project: string

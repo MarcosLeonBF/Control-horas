@@ -4,9 +4,10 @@ import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Search, AlertTriangle, TrendingDown, Download, ChevronRight, X, Clock } from 'lucide-react'
 import type { BancoHorasRow, HorasStatus, BancoHorasProyecto } from '@/lib/horas/bancos-status'
-import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProject, estadoProyectoBadgeClass, filaDeMeses } from '@/lib/horas/bancos-status'
+import { HORAS_STATUS_LABELS, HORAS_SEVERITY, HORAS_BAR_COLOR, groupBancosByProject, estadoProyectoBadgeClass, filaDeMeses, mesesPorDefecto } from '@/lib/horas/bancos-status'
 import { downloadXlsx, downloadCsv, type ExportRow } from '@/lib/export'
-import { formatHoras, formatHorasTotal, formatFechaISO, currentMonth } from '@/lib/horas/format'
+import { formatHoras, formatHorasTotal, formatFechaISO } from '@/lib/horas/format'
+import { useHoy } from '@/lib/horas/use-hoy'
 import HorasStatusBadge from '@/components/horas/HorasStatusBadge'
 import VistaPeriodo, { periodoEnPalabras, type Vista } from '@/components/horas/VistaPeriodo'
 import { Card } from '@/components/ui/card'
@@ -94,23 +95,6 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
   // Se entra en Mensual, en el mes en curso; Total solo si el Excel aún no trae meses
   // (entonces no hay switch).
   const [vista, setVista] = useState<Vista>(() => (rows.some((r) => r.monthly.length > 0) ? 'mensual' : 'total'))
-  // Selección de meses (multi): por defecto el mes en curso, o el último con datos.
-  const [mesesSel, setMesesSel] = useState<string[]>(() => {
-    const s = new Set<string>()
-    for (const r of rows) for (const m of r.monthly) s.add(m.month)
-    const disp = [...s].sort()
-    const cm = currentMonth()
-    return disp.includes(cm) ? [cm] : disp.length ? [disp[disp.length - 1]] : [cm]
-  })
-  const selSet = useMemo(() => new Set(mesesSel), [mesesSel])
-
-  const positions = useMemo(() => [...new Set(rows.map((r) => r.position))].sort((a, b) => a.localeCompare(b)), [rows])
-  const managers = useMemo(
-    () => [...new Set(rows.map((r) => (r.manager ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
-    [rows],
-  )
-  const hasSinManager = useMemo(() => rows.some((r) => !(r.manager ?? '').trim()), [rows])
-
   // Meses con datos (Excel o consumo) en cualquier fila. Si el Excel aún no tiene
   // la columna Fecha, no hay meses y el switch Mensual no se muestra.
   const meses = useMemo(() => {
@@ -119,6 +103,19 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
     return [...s].sort()
   }, [rows])
   const hayMensual = meses.length > 0
+  // Selección de meses (multi). Mientras no se elige, mesesPorDefecto con el mes en curso de
+  // quien mira (useHoy: desde América, el último día por la noche el UTC ya es el siguiente).
+  const hoy = useHoy()
+  const [mesesElegidos, setMesesElegidos] = useState<string[] | null>(null)
+  const mesesSel = useMemo(() => mesesElegidos ?? mesesPorDefecto(meses, hoy.slice(0, 7)), [mesesElegidos, meses, hoy])
+  const selSet = useMemo(() => new Set(mesesSel), [mesesSel])
+
+  const positions = useMemo(() => [...new Set(rows.map((r) => r.position))].sort((a, b) => a.localeCompare(b)), [rows])
+  const managers = useMemo(
+    () => [...new Set(rows.map((r) => (r.manager ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [rows],
+  )
+  const hasSinManager = useMemo(() => rows.some((r) => !(r.manager ?? '').trim()), [rows])
 
   // En Mensual, cada fila suma los meses elegidos (filaDeMeses, la misma cuenta que los
   // avisos de banco); 0/0 si no tienen datos: decisión de producto, el proyecto se ve en
@@ -232,7 +229,7 @@ export default function BancosHorasClient({ rows, managerInicial }: { rows: Banc
       <div className="space-y-3.5">
         {/* Vista Mensual | Total (spec §5.1). Solo si el Excel ya trae meses. */}
         {hayMensual && (
-          <VistaPeriodo vista={vista} onVista={setVista} meses={meses} mesesSel={mesesSel} onMesesSel={setMesesSel} />
+          <VistaPeriodo vista={vista} onVista={setVista} meses={meses} mesesSel={mesesSel} onMesesSel={setMesesElegidos} />
         )}
 
         {/* Buscar + resumen */}

@@ -3,7 +3,9 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { guardarRegistro, type LineInput } from '@/app/(horas)/registrar/actions'
-import { formatFechaISO, formatHM, hmAHoras, horasAHM, hoyISO } from '@/lib/horas/format'
+import { formatFechaISO, formatHM, hmAHoras, horasAHM, hoyUTC } from '@/lib/horas/format'
+import { useHoy } from '@/lib/horas/use-hoy'
+import { addDiasISO } from '@/lib/horas/auditoria-types'
 import type { AreaRow, EtapaRow, DepartamentoRow } from '@/lib/horas/types'
 import { DIAS_REGISTRO_POR_DEFECTO } from '@/lib/horas/ventana-registro'
 import { Input } from '@/components/ui/input'
@@ -16,8 +18,6 @@ import DepartamentoSelect from '@/components/horas/DepartamentoSelect'
 import NativeSelect from '@/components/ui/native-select'
 import { agruparDescripciones, descripcionValidaEnDepartamento } from '@/lib/horas/descripciones'
 
-const today = () => new Date().toISOString().slice(0, 10) // UTC: la que ve el servidor al renderizar
-const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 // El departamento solo aplica al proyecto "Departamento". El resto de líneas lo
 // llevan fijo en 'Clientes' (valor canónico histórico; la RPC también lo normaliza).
 // No usar departamentos[0]: el catálogo es editable y su primer nombre cambia.
@@ -113,7 +113,7 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
   returnTo?: string // a dónde volver al guardar (default: mis registros; /equipo al editar ajeno)
 }) {
   const router = useRouter()
-  const minDate = daysAgo(diasAtras)
+  const minDate = addDiasISO(hoyUTC(), -diasAtras) // el piso de guardar_registro: current_date − días
   // Generales y específicas de la posición, ya separadas y ordenadas para el desplegable.
   // `permitidas` es la unión: lo que el motor aceptará en "Departamento".
   const grupos = agruparDescripciones(descripciones, descripcionesPosicion)
@@ -124,22 +124,18 @@ export default function RegistroForm({ projects, finishedProjects, pausedProject
   // Confirmación al elegir un proyecto finalizado, pausado y/o con el banco excedido.
   const [projectWarning, setProjectWarning] = useState<{ index: number; project: string; finished: boolean; paused: boolean; exceeded: boolean } | null>(null)
   // Fecha por defecto: la heredan las líneas nuevas y las que aún la seguían.
-  const [defaultDate, setDefaultDate] = useState(initial?.lines[0]?.entry_date ?? today())
+  const [defaultDate, setDefaultDate] = useState(initial?.lines[0]?.entry_date ?? hoyUTC())
   // Departamento inicial al entrar al proyecto "Departamento" (única pantalla donde se elige).
   const defaultDep = departamentos[0]?.name ?? CLIENTES_DEP
-  const [lines, setLines] = useState<LineInput[]>(initial?.lines ?? [emptyLine(areas[0]?.id ?? '', today())])
-  // Hoy es la fecha local de quien registra (hoyISO). El servidor, al renderizar, solo sabe
-  // la UTC, así que se corrige al montar: el valor del input que pintó el servidor no lo
-  // cambia el estado inicial del navegador.
-  const [hoy, setHoy] = useState(today)
+  const [lines, setLines] = useState<LineInput[]>(initial?.lines ?? [emptyLine(areas[0]?.id ?? '', hoyUTC())])
+  // Hoy es el día local de quien registra (useHoy). Al hidratar es el UTC del servidor; si el
+  // local es anterior (desde América, de noche), la fecha por defecto baja con él. Solo esa
+  // vez: después la elige quien registra.
+  const hoy = useHoy()
   useEffect(() => {
-    const local = hoyISO()
-    if (local === hoy) return
-    setHoy(local)
-    if (!initial) changeDefaultDate(local)
-    // Solo al montar: después la fecha la elige quien registra.
+    if (!initial && hoy !== hoyUTC()) changeDefaultDate(hoy)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [hoy])
   // Lo tecleado en las casillas H y M de cada línea. Es estado de UI: NO viaja al
   // servidor. `hours` (decimal) sigue siendo la única fuente de verdad y lo único que
   // se guarda; estas casillas solo son la forma de escribirlo. El array va en paralelo
